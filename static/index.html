@@ -3,88 +3,175 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sjekka</title>
+    <title>Sjekka – Utforsk</title>
     <style>
-        body {
-            font-family: sans-serif;
-            max-width: 480px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-        h1 { font-size: 2rem; margin-bottom: 4px; }
-        p { color: #666; margin-top: 0; }
-        input[type="file"] { display: none; }
-        label {
-            display: block;
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            margin: 24px 0;
-        }
-        label:hover { border-color: #999; }
-        button {
-            width: 100%;
-            padding: 14px;
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f5f5f5; }
+
+        nav {
             background: #222;
             color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            cursor: pointer;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        button:disabled { background: #999; }
-        #status { margin-top: 16px; color: #444; }
+        nav a { color: white; text-decoration: none; font-size: 1.2rem; font-weight: bold; }
+        nav .links { display: flex; gap: 16px; }
+        nav .links a { font-size: 0.85rem; opacity: 0.7; }
+        nav .links a:hover { opacity: 1; }
+
+        .toolbar {
+            padding: 16px 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            background: white;
+            border-bottom: 1px solid #eee;
+        }
+        .toolbar button {
+            padding: 6px 14px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .toolbar button.active {
+            background: #222;
+            color: white;
+            border-color: #222;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        }
+        .card .emoji { font-size: 2rem; margin-bottom: 8px; }
+        .card .name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #222;
+            margin-bottom: 4px;
+            text-transform: capitalize;
+        }
+        .card .meta { font-size: 0.72rem; color: #999; margin-bottom: 8px; }
+        .card .price { font-size: 1.2rem; font-weight: bold; color: #222; }
+        .card .price span { font-size: 0.72rem; color: #999; font-weight: normal; }
+        .card .store { font-size: 0.72rem; color: #666; margin-top: 4px; }
+
+        #empty { text-align: center; padding: 60px 20px; color: #999; }
     </style>
 </head>
 <body>
-    <h1>Sjekka 🧾</h1>
-    <p>Har du sjekka i dag?</p>
 
-    <label for="receipt" id="dropzone">
-        📷 Trykk for å laste opp kvittering
-    </label>
-    <input type="file" id="receipt" accept="image/*" capture="environment">
-    <button id="btn" onclick="upload()" disabled>Last opp</button>
-    <p id="status"></p>
+<nav>
+    <a href="/sjekka">🧾 Sjekka</a>
+    <div class="links">
+        <a href="/sjekka/explore.html">Utforsk</a>
+        <a href="/sjekka/upload.html<a href="/sjekka/upload.html" style="background:#fff;color:#222;padding:6px 14px;border-radius:20px;font-size:0.85rem;opacity:1;">+ Last opp kvittering</a></a>
+    </div>
+</nav>
+<div style="padding: 16px 20px; background: white; border-bottom: 1px solid #eee;">
+    <input 
+        type="text" 
+        id="search" 
+        placeholder="Søk etter produkt..." 
+        oninput="renderGrid()"
+        style="width:100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 20px; font-size: 0.9rem; outline: none;"
+    >
+</div>
+<div class="toolbar" id="categories"></div>
 
-    <script>
-        const input = document.getElementById('receipt');
-        const btn = document.getElementById('btn');
-        const dropzone = document.getElementById('dropzone');
+<div class="grid" id="grid"></div>
+<div id="empty" style="display:none">Ingen produkter funnet.</div>
 
-        input.addEventListener('change', () => {
-            if (input.files[0]) {
-                dropzone.textContent = `📎 ${input.files[0].name}`;
-                btn.disabled = false;
-            }
-        });
+<script>
+const CATEGORY_EMOJI = {
+    "Meieri": "🥛",
+    "Kjøtt": "🍗",
+    "Fisk": "🐟",
+    "Frukt og grønt": "🥦",
+    "Bakeri": "🍞",
+    "Godteri": "🍬",
+    "Snacks": "🍿",
+    "Drikke": "🥤",
+    "Frys": "🧊",
+    "Hermetikk": "🥫",
+    "Hygiene": "🧴",
+    "Rengjøring": "🧹",
+    "Annet": "📦",
+};
 
-        async function upload() {
-            const file = input.files[0];
-            if (!file) return;
+let allProducts = [];
+let activeCategory = null;
 
-            btn.disabled = true;
-            document.getElementById('status').textContent = 'Laster opp...';
+async function load() {
+    const res = await fetch('/sjekka/products');
+    allProducts = await res.json();
+    renderCategories();
+    renderGrid();
+}
 
-            const form = new FormData();
-            form.append('file', file);
+function renderCategories() {
+    const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))];
+    const toolbar = document.getElementById('categories');
+    toolbar.innerHTML = '';
 
-            try {
-                const res = await fetch('/sjekka/upload', { method: 'POST', body: form });
-                const data = await res.json();
-                if (res.ok) {
-                    window.location.href = `/sjekka/review.html?id=${data.id}`;
-                } else {
-                    document.getElementById('status').textContent = `Feil: ${data.detail}`;
-                    btn.disabled = false;
-                }
-            } catch (e) {
-                document.getElementById('status').textContent = 'Noe gikk galt, prøv igjen.';
-                btn.disabled = false;
-            }
-        }
-    </script>
+    const all = document.createElement('button');
+    all.textContent = 'Alle';
+    all.className = activeCategory === null ? 'active' : '';
+    all.onclick = () => { activeCategory = null; renderCategories(); renderGrid(); };
+    toolbar.appendChild(all);
+
+    categories.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.textContent = `${CATEGORY_EMOJI[cat] || '📦'} ${cat}`;
+        btn.className = activeCategory === cat ? 'active' : '';
+        btn.onclick = () => { activeCategory = cat; renderCategories(); renderGrid(); };
+        toolbar.appendChild(btn);
+    });
+}
+function renderGrid() {
+    const grid = document.getElementById('grid');
+    const query = document.getElementById('search').value.toLowerCase().trim();
+
+    const filtered = allProducts.filter(p => {
+        const matchCategory = activeCategory === null || p.category === activeCategory;
+        const matchSearch = !query || p.canonical_name.toLowerCase().includes(query);
+        return matchCategory && matchSearch;
+    });
+
+    document.getElementById('empty').style.display = filtered.length === 0 ? 'block' : 'none';
+
+    grid.innerHTML = filtered.map(p => {
+        const emoji = CATEGORY_EMOJI[p.category] || '📦';
+        const perUnit = p.price_per_unit
+            ? `<div class="meta">${p.price_per_unit.toFixed(2)}kr / 100${p.unit === 'ml' ? 'ml' : 'g'}</div>`
+            : `<div class="meta">${p.quantity} ${p.unit}</div>`;
+
+        return `
+            <div class="card">
+                <div class="emoji">${emoji}</div>
+                <div class="name">${p.canonical_name}</div>
+                ${perUnit}
+                <div class="price">${p.price?.toFixed(2)}kr <span>sist sett</span></div>
+                <div class="store">${p.store_chain} · ${p.purchase_date}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+load();
+</script>
 </body>
 </html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sjekka – Takk!</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .receipt-img {
+            width: 100%;
+            max-width: 320px;
+            border-radius: 8px;
+            margin: 24px auto;
+            display: block;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        h1 { font-size: 2rem; margin-bottom: 8px; }
+        p { color: #666; margin-bottom: 24px; }
+        a {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #222;
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        a:hover { background: #444; }
+    </style>
+</head>
+<body>
+    <h1>Takk! 🧾</h1>
+    <p>Kvitteringen din er lastet opp og blir behandlet.</p>
+    <img class="receipt-img" id="img" src="" alt="Kvittering">
+    <br><br>
+	<a href="/sjekka/upload.html">Last opp en til</a>
+    <script>
+        const id = new URLSearchParams(window.location.search).get('id');
+        document.getElementById('img').src = `/sjekka/uploads/${id}`;
+    </script>
+</body>
+</html>

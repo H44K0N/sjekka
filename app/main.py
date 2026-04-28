@@ -3,42 +3,22 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import List, Optional
-from datetime import date
-import io, uuid
+import io, uuid, asyncio
+from datetime import date as date_type
 
 from app.config import UPLOAD_DIR, MAX_SIZE_MB, MAX_DIMENSION, JPEG_QUALITY
 from app.database import engine, get_db
 from app import models
+from app.extractor import extract_receipt
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# --- Pydantic schemas ---
-
-class ItemIn(BaseModel):
-    raw_name: str
-    canonical_name: str
-    quantity: float
-    unit: str
-    price: float
-    price_per_unit: Optional[float] = None
-    is_member_price: bool = False
-
-class ReceiptIn(BaseModel):
-    image_filename: str
-    store_chain: str
-    store_location: Optional[str] = None
-    region: Optional[str] = None
-    purchase_date: date
-    items: List[ItemIn]
-
 # --- Routes ---
 
 @app.post("/upload")
-async def upload_receipt(file: UploadFile = File(...)):
+async def upload_receipt(file: UploadFile = File(...), db: Session = Depends(get_db)):
     if file.content_type not in ["image/jpeg", "image/png", "image/webp", "image/heic"]:
         raise HTTPException(400, "Only images allowed")
 
@@ -54,39 +34,98 @@ async def upload_receipt(file: UploadFile = File(...)):
     filepath = UPLOAD_DIR / filename
     img.save(filepath, format="JPEG", quality=JPEG_QUALITY, optimize=True)
 
-    return JSONResponse({"id": filename, "size_kb": filepath.stat().st_size // 1024})
+    asyncio.create_task(extract_and_save(filepath, filename, db))
 
-@app.post("/receipts")
-def save_receipt(data: ReceiptIn, db: Session = Depends(get_db)):
-    receipt = models.Receipt(
-        image_filename=data.image_filename,
-        store_chain=data.store_chain,
-        store_location=data.store_location,
-        region=data.region,
-        purchase_date=data.purchase_date,
-    )
-    db.add(receipt)
-    db.flush()
+    return JSONResponse({"id": filename})
 
-    for item in data.items:
-        db.add(models.ReceiptItem(
-            receipt_id=receipt.id,
-            raw_name=item.raw_name,
-            canonical_name=item.canonical_name,
-            quantity=item.quantity,
-            unit=item.unit,
-            price=item.price,
-            price_per_unit=item.price_per_unit,
-            is_member_price=int(item.is_member_price),
-        ))
 
-    db.commit()
-    return {"receipt_id": receipt.id}
+async def extract_and_save(filepath, filename, db):
+    try:
+        data = await asyncio.to_thread(extract_receipt, filepath)
+
+        purchase_date = None
+        if data.get("purchase_date"):
+            try:
+                purchase_date = date_type.fromisoformat(data["purchase_date"])
+            except ValueError:
+                pass
+
+        receipt = models.Receipt(
+            image_filename=filename,
+            store_chain=data.get("store_chain"),
+            store_location=data.get("store_location"),
+            region=data.get("region"),
+            purchase_date=purchase_date,
+        )
+        db.add(receipt)
+        db.flush()
+
+        for item in data.get("items", []):
+            db.add(models.ReceiptItem(
+                receipt_id=receipt.id,
+                raw_name=item.get("raw_name"),
+                canonical_name=item.get("canonical_name"),
+                category=item.get("category"),
+		quantity=item.get("quantity"),
+                unit=item.get("unit"),
+                price=item.get("price"),
+                price_per_unit=item.get("price_per_unit"),
+                is_member_price=int(item.get("is_member_price", False)),
+		deal=item.get("deal"),
+            ))
+
+        db.commit()
+        print(f"✓ Saved receipt {filename} — {receipt.store_chain}, {len(data.get('items', []))} items")
+
+    except Exception as e:
+        print(f"✗ Extraction failed for {filename}: {e}")
+        db.rollback()
+
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
+@app.get("/products")
+def get_products(db: Session = Depends(get_db)):
+    from sqlalchemy import func
+
+    subquery = (
+        db.query(
+            models.ReceiptItem.canonical_name,
+            func.max(models.Receipt.purchase_date).label("latest_date")
+        )
+        .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
+        .group_by(models.ReceiptItem.canonical_name)
+        .subquery()
+    )
+
+    items = (
+        db.query(models.ReceiptItem, models.Receipt)
+        .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
+        .join(subquery, (models.ReceiptItem.canonical_name == subquery.c.canonical_name) &
+                        (models.Receipt.purchase_date == subquery.c.latest_date))
+        .all()
+    )
+
+    seen = set()
+    products = []
+    for item, receipt in items:
+        if item.canonical_name in seen:
+            continue
+        seen.add(item.canonical_name)
+        products.append({
+            "canonical_name": item.canonical_name,
+            "category": item.category,
+            "unit": item.unit,
+            "quantity": item.quantity,
+            "price": item.price,
+            "price_per_unit": item.price_per_unit,
+            "store_chain": receipt.store_chain,
+            "purchase_date": str(receipt.purchase_date),
+        })
+
+    return products
 # --- Static files (must be last) ---
 
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")

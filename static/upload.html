@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sjekka</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 480px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        h1 { font-size: 2rem; margin-bottom: 4px; }
+        p { color: #666; margin-top: 0; }
+        input[type="file"] { display: none; }
+        label {
+            display: block;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            margin: 24px 0;
+        }
+        label:hover { border-color: #999; }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #222;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        button:disabled { background: #999; }
+        #status { margin-top: 16px; color: #444; }
+    </style>
+</head>
+<body>
+    <h1>Sjekka 🧾</h1>
+    <p>Har du sjekka i dag?</p>
+
+    <label for="receipt" id="dropzone">
+        📷 Trykk for å laste opp kvittering
+    </label>
+    <input type="file" id="receipt" accept="image/*" capture="environment">
+    <button id="btn" onclick="upload()" disabled>Last opp</button>
+    <p id="status"></p>
+
+    <script>
+        const input = document.getElementById('receipt');
+        const btn = document.getElementById('btn');
+        const dropzone = document.getElementById('dropzone');
+
+        input.addEventListener('change', () => {
+            if (input.files[0]) {
+                dropzone.textContent = `📎 ${input.files[0].name}`;
+                btn.disabled = false;
+            }
+        });
+
+        async function upload() {
+            const file = input.files[0];
+            if (!file) return;
+
+            btn.disabled = true;
+            document.getElementById('status').textContent = 'Laster opp...';
+
+            const form = new FormData();
+            form.append('file', file);
+
+            try {
+                const res = await fetch('/sjekka/upload', { method: 'POST', body: form });
+                const data = await res.json();
+                if (res.ok) {
+                    window.location.href = `/sjekka/takk.html?id=${data.id}`;
+                } else {
+                    document.getElementById('status').textContent = `Feil: ${data.detail}`;
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                document.getElementById('status').textContent = 'Noe gikk galt, prøv igjen.';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

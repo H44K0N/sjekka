@@ -39,6 +39,7 @@ class ReceiptItem(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
     raw_name = Column(String)       # "GILDE KJØTTDEIG 400G" — what receipt actually said
     canonical_name = Column(String) # "chicken mince" — normalized
+    category = Column(String, nullable=True)  # "Godteri", "Kjøtt", "Meieri" etc
     quantity = Column(Float)
     unit = Column(String)           # "g", "ml", "stk"
     price = Column(Float)
