@@ -42,8 +42,24 @@ class ReceiptItem(Base):
     category = Column(String, nullable=True)  # "Godteri", "Kjøtt", "Meieri" etc
     quantity = Column(Float)
     unit = Column(String)           # "g", "ml", "stk"
-    price = Column(Float)
-    price_per_unit = Column(Float)  # always stored per 100g or per 100ml
+    pack_size = Column(Integer, default=1)
+    total_price = Column(Float, nullable=True)
+    price_per_unit = Column(Float, nullable=True)
     is_member_price = Column(Integer, default=0)  # boolean
     receipt = relationship("Receipt", back_populates="items")
     product = relationship("Product", back_populates="items")
+    deal = Column(String, nullable=True)
+    brand = Column(String, nullable=True)
+    variant = Column(String, nullable=True)
+    confidence = Column(String, default="high")
+
+class Job(Base):
+    __tablename__ = "jobs"
+
+    id = Column(Integer, primary_key=True)
+    filename = Column(String, nullable=False)
+    status = Column(String, default="pending")  # pending, processing, done, failed
+    attempts = Column(Integer, default=0)
+    error = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sjekka – Utforsk</title>
+    <link rel="icon" type="image/png" href="/sjekka/logo.png">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: sans-serif; background: #f5f5f5; }
@@ -17,9 +18,6 @@
             justify-content: space-between;
         }
         nav a { color: white; text-decoration: none; font-size: 1.2rem; font-weight: bold; }
-        nav .links { display: flex; gap: 16px; }
-        nav .links a { font-size: 0.85rem; opacity: 0.7; }
-        nav .links a:hover { opacity: 1; }
 
         .toolbar {
             padding: 16px 20px;
@@ -66,7 +64,6 @@
         }
         .card .meta { font-size: 0.72rem; color: #999; margin-bottom: 8px; }
         .card .price { font-size: 1.2rem; font-weight: bold; color: #222; }
-        .card .price span { font-size: 0.72rem; color: #999; font-weight: normal; }
         .card .store { font-size: 0.72rem; color: #666; margin-top: 4px; }
 
         #empty { text-align: center; padding: 60px 20px; color: #999; }
@@ -76,22 +73,41 @@
 
 <nav>
     <a href="/sjekka">🧾 Sjekka</a>
-    <div class="links">
-        <a href="/sjekka/explore.html">Utforsk</a>
-        <a href="/sjekka/upload.html<a href="/sjekka/upload.html" style="background:#fff;color:#222;padding:6px 14px;border-radius:20px;font-size:0.85rem;opacity:1;">+ Last opp kvittering</a></a>
-    </div>
 </nav>
+
+<div id="hero" style="background:#222; color:white; padding: 28px 20px; text-align:center;">
+    <h1 style="font-size:1.4rem; font-weight:600; margin-bottom:8px;">
+        Sammen gjør vi matprisene transparente 🧾
+    </h1>
+    <p style="color:#aaa; font-size:0.85rem; max-width:480px; margin:0 auto 16px;">
+        Hver kvittering du deler hjelper folk i hele landet å handle smartere og spare penger.
+    </p>
+    <div style="display:flex; justify-content:center; gap:32px; margin-top:16px;">
+        <div>
+            <div id="stat-receipts" style="font-size:2rem; font-weight:700; color:white;">—</div>
+            <div style="font-size:0.75rem; color:#aaa; margin-top:2px;">kvitteringer delt</div>
+        </div>
+        <div>
+            <div id="stat-items" style="font-size:2rem; font-weight:700; color:white;">—</div>
+            <div style="font-size:0.75rem; color:#aaa; margin-top:2px;">priser registrert</div>
+        </div>
+    </div>
+    <a href="/sjekka/upload.html" style="display:inline-block; margin-top:20px; background:white; color:#222; padding:10px 24px; border-radius:20px; font-size:0.85rem; font-weight:600; text-decoration:none;">
+        + Last opp din kvittering
+    </a>
+</div>
+
 <div style="padding: 16px 20px; background: white; border-bottom: 1px solid #eee;">
-    <input 
-        type="text" 
-        id="search" 
-        placeholder="Søk etter produkt..." 
+    <input
+        type="text"
+        id="search"
+        placeholder="Søk etter produkt..."
         oninput="renderGrid()"
         style="width:100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 20px; font-size: 0.9rem; outline: none;"
     >
 </div>
-<div class="toolbar" id="categories"></div>
 
+<div class="toolbar" id="categories"></div>
 <div class="grid" id="grid"></div>
 <div id="empty" style="display:none">Ingen produkter funnet.</div>
 
@@ -116,8 +132,16 @@ let allProducts = [];
 let activeCategory = null;
 
 async function load() {
-    const res = await fetch('/sjekka/products');
-    allProducts = await res.json();
+    const [productsRes, statsRes] = await Promise.all([
+        fetch('/sjekka/products'),
+        fetch('/sjekka/stats')
+    ]);
+    allProducts = await productsRes.json();
+    const stats = await statsRes.json();
+
+    document.getElementById('stat-receipts').textContent = stats.total_receipts;
+    document.getElementById('stat-items').textContent = stats.total_items;
+
     renderCategories();
     renderGrid();
 }
@@ -141,6 +165,18 @@ function renderCategories() {
         toolbar.appendChild(btn);
     });
 }
+
+function daysAgo(dateStr) {
+    const date = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    date.setHours(0, 0, 0, 0);
+    const diff = Math.round((today - date) / (1000 * 60 * 60 * 24));
+    if (diff === 0) return 'i dag';
+    if (diff === 1) return 'i går';
+    return `${diff} dager siden`;
+}
+
 function renderGrid() {
     const grid = document.getElementById('grid');
     const query = document.getElementById('search').value.toLowerCase().trim();
@@ -155,19 +191,35 @@ function renderGrid() {
 
     grid.innerHTML = filtered.map(p => {
         const emoji = CATEGORY_EMOJI[p.category] || '📦';
-        const perUnit = p.price_per_unit
-            ? `<div class="meta">${p.price_per_unit.toFixed(2)}kr / 100${p.unit === 'ml' ? 'ml' : 'g'}</div>`
-            : `<div class="meta">${p.quantity} ${p.unit}</div>`;
 
-        return `
-            <div class="card">
-                <div class="emoji">${emoji}</div>
-                <div class="name">${p.canonical_name}</div>
-                ${perUnit}
-                <div class="price">${p.price?.toFixed(2)}kr <span>sist sett</span></div>
-                <div class="store">${p.store_chain} · ${p.purchase_date}</div>
-            </div>
-        `;
+        const perUnit = (() => {
+            if (p.price_per_unit && (p.unit === 'g' || p.unit === 'ml')) {
+                return `<div class="meta">${p.price_per_unit.toFixed(2)}kr / 100${p.unit === 'ml' ? 'ml' : 'g'}</div>`;
+            }
+            if (p.unit === 'stk' && p.pack_size > 1) {
+                const perStk = (p.total_price / p.pack_size).toFixed(2);
+                return `<div class="meta">${perStk}kr / stk</div>`;
+            }
+            return `<div class="meta">${p.quantity} ${p.unit}</div>`;
+        })();
+
+        const displayPrice = (() => {
+            if (p.pack_size > 1) {
+                return (p.total_price / p.pack_size).toFixed(2);
+            }
+            return p.total_price?.toFixed(2);
+        })();
+
+       return `
+    <div class="card">
+        <div class="emoji">${emoji}</div>
+        <div class="name">${p.canonical_name}</div>
+        ${p.brand ? `<div style="font-size:0.72rem; color:#999; margin-bottom:2px;">${p.brand}</div>` : ''}
+        ${perUnit}
+        <div class="price">${displayPrice}kr</div>
+        <div class="store">${p.store_chain} · Oppdatert ${daysAgo(p.purchase_date)}</div>
+    </div>
+`;
     }).join('');
 }
 

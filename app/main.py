@@ -3,19 +3,25 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from sqlalchemy.orm import Session
-import io, uuid, asyncio
+import io, uuid, asyncio, sys, logging
 from datetime import date as date_type
 
 from app.config import UPLOAD_DIR, MAX_SIZE_MB, MAX_DIMENSION, JPEG_QUALITY
 from app.database import engine, get_db
 from app import models
 from app.extractor import extract_receipt
+from app import worker
+
+logging.basicConfig(stream=sys.stdout, level=logging.INFO, force=True)
+logger = logging.getLogger("sjekka")
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# --- Routes ---
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(worker.run_worker())
 
 @app.post("/upload")
 async def upload_receipt(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -34,57 +40,18 @@ async def upload_receipt(file: UploadFile = File(...), db: Session = Depends(get
     filepath = UPLOAD_DIR / filename
     img.save(filepath, format="JPEG", quality=JPEG_QUALITY, optimize=True)
 
-    asyncio.create_task(extract_and_save(filepath, filename, db))
+    job = models.Job(filename=filename)
+    db.add(job)
+    db.commit()
+
+    logger.info(f"📥 Job created for {filename}")
 
     return JSONResponse({"id": filename})
-
-
-async def extract_and_save(filepath, filename, db):
-    try:
-        data = await asyncio.to_thread(extract_receipt, filepath)
-
-        purchase_date = None
-        if data.get("purchase_date"):
-            try:
-                purchase_date = date_type.fromisoformat(data["purchase_date"])
-            except ValueError:
-                pass
-
-        receipt = models.Receipt(
-            image_filename=filename,
-            store_chain=data.get("store_chain"),
-            store_location=data.get("store_location"),
-            region=data.get("region"),
-            purchase_date=purchase_date,
-        )
-        db.add(receipt)
-        db.flush()
-
-        for item in data.get("items", []):
-            db.add(models.ReceiptItem(
-                receipt_id=receipt.id,
-                raw_name=item.get("raw_name"),
-                canonical_name=item.get("canonical_name"),
-                category=item.get("category"),
-		quantity=item.get("quantity"),
-                unit=item.get("unit"),
-                price=item.get("price"),
-                price_per_unit=item.get("price_per_unit"),
-                is_member_price=int(item.get("is_member_price", False)),
-		deal=item.get("deal"),
-            ))
-
-        db.commit()
-        print(f"✓ Saved receipt {filename} — {receipt.store_chain}, {len(data.get('items', []))} items")
-
-    except Exception as e:
-        print(f"✗ Extraction failed for {filename}: {e}")
-        db.rollback()
-
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
 
 @app.get("/products")
 def get_products(db: Session = Depends(get_db)):
@@ -116,17 +83,29 @@ def get_products(db: Session = Depends(get_db)):
         seen.add(item.canonical_name)
         products.append({
             "canonical_name": item.canonical_name,
+            "brand": item.brand,
             "category": item.category,
             "unit": item.unit,
             "quantity": item.quantity,
-            "price": item.price,
+            "pack_size": item.pack_size,
+            "total_price": item.total_price,
             "price_per_unit": item.price_per_unit,
             "store_chain": receipt.store_chain,
             "purchase_date": str(receipt.purchase_date),
         })
 
     return products
-# --- Static files (must be last) ---
+
+@app.get("/stats")
+def get_stats(db: Session = Depends(get_db)):
+    total_receipts = db.query(models.Receipt).count()
+    total_items = db.query(models.ReceiptItem).count()
+    pending_jobs = db.query(models.Job).filter(models.Job.status == "pending").count()
+    return {
+        "total_receipts": total_receipts,
+        "total_items": total_items,
+        "pending_jobs": pending_jobs,
+    }
 
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

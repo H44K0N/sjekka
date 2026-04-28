@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
+    <link rel="icon" type="image/png" href="/sjekka/logo.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sjekka – Takk!</title>
@@ -37,9 +38,10 @@
 <body>
     <h1>Takk! 🧾</h1>
     <p>Kvitteringen din er lastet opp og blir behandlet.</p>
-    <img class="receipt-img" id="img" src="" alt="Kvittering">
+    <a href="/sjekka/index.html">Tilbake til startsiden</a>
     <br><br>
-	<a href="/sjekka/upload.html">Last opp en til</a>
+    <a href="/sjekka/upload.html">Last opp en til</a>
+    <img class="receipt-img" id="img" src="" alt="Kvittering">
     <script>
         const id = new URLSearchParams(window.location.search).get('id');
         document.getElementById('img').src = `/sjekka/uploads/${id}`;
