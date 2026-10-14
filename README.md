@@ -51,6 +51,17 @@ Visible on the explore page
 - Member/loyalty prices not always flagged correctly
 - Product taxonomy is flat — no hierarchy yet
 
+### Security
+
+- Uploaded receipt photos are served publicly at `/uploads/<id>.jpg`. Filenames are random UUIDs, but a receipt can show card digits, store and time of purchase
+- No authentication or rate limiting on `/upload` — every upload costs a Gemini call, so anyone with the URL can use up the API quota
+
+### Code
+
+- The worker only retries on 503. A 429 (rate limited) marks the job as failed for good
+- Paths are hard-coded to `/home/haakon/sjekka` in `app/worker.py` (extraction log) and `util/requeue_photos_as_jobs.py`
+- The `products` and `categories` tables are defined but never used — category is stored as a string on each receipt item
+
 ---
 
 ## Planned
@@ -62,6 +73,18 @@ Visible on the explore page
 - Deal alerts
 - Confidence scoring — surface low-confidence extractions for review
 - API access to the dataset
+
+---
+
+## Running it
+
+```bash
+cp .env.example .env        # then add your Gemini API key
+pip install -r requirements.txt
+uvicorn app.main:app
+```
+
+`test_data/sjekka.db` is a small sample database: one Kiwi receipt with six items, plus twelve queued jobs whose photos aren't in the repo. Copy it to `./sjekka.db` to start with data. Without it, an empty database is created on first run.
 
 ---
 
