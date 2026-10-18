@@ -38,7 +38,7 @@ Visible on the explore page
 - Multi-pack and deal detection
 - Explore page with category filters and search
 - Live counters showing total receipts and prices registered
-- Auto-start via systemd on reboot
+- Docker image with CI/CD to a VPS (see [Deployment](#deployment))
 
 ---
 
@@ -59,7 +59,6 @@ Visible on the explore page
 ### Code
 
 - The worker only retries on 503. A 429 (rate limited) marks the job as failed for good
-- Paths are hard-coded to `/home/haakon/sjekka` in `app/worker.py` (extraction log) and `util/requeue_photos_as_jobs.py`
 - The `products` and `categories` tables are defined but never used — category is stored as a string on each receipt item
 
 ---
@@ -80,11 +79,41 @@ Visible on the explore page
 
 ```bash
 cp .env.example .env        # then add your Gemini API key
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 uvicorn app.main:app
 ```
 
-`test_data/sjekka.db` is a small sample database: one Kiwi receipt with six items, plus twelve queued jobs whose photos aren't in the repo. Copy it to `./sjekka.db` to start with data. Without it, an empty database is created on first run.
+The database, uploaded photos and extraction log are written to `./data/` (set `DATA_DIR` to change it).
+
+`test_data/sjekka.db` is a small sample database: one Kiwi receipt with six items, plus twelve queued jobs whose photos aren't in the repo. Copy it to `./data/sjekka.db` to start with data. Without it, an empty database is created on first run.
+
+Before pushing, run the same checks as CI:
+
+```bash
+ruff check .
+pytest
+```
+
+---
+
+## Deployment
+
+Production runs at https://sjekka.tischbein.dev as a Docker container on a VPS, with cloudflared on the host routing the subdomain to `http://localhost:8000`.
+
+`.github/workflows/pipeline.yml` runs on every pull request and every push to `main`:
+
+1. **Lint and test**: `ruff check` and `pytest`.
+2. **Build and smoke test image**: builds the Docker image, starts it and checks the main endpoints respond. On `main` the image is pushed to `ghcr.io/h44k0n/sjekka`, tagged with the commit SHA and `latest`.
+3. **Deploy** (`main` only): logs in to the VPS as `sjekka-deploy` with a key that can only run `/opt/sjekka/deploy.sh`. That script starts the image for the pushed commit and restores the previous one if the container doesn't become healthy. Finally the job checks the public URL.
+
+The server is set up with `deploy/setup-vps.sh` (Docker, the `sjekka-deploy` user, `/opt/sjekka`, the restricted CI key). `compose.yaml` and `deploy.sh` are installed by that script, not by CI, so re-run it after changing either file:
+
+```bash
+scp -r compose.yaml deploy vps:/tmp/sjekka-setup/
+ssh -t vps 'sudo bash /tmp/sjekka-setup/deploy/setup-vps.sh /tmp/sjekka-setup/ci-deploy-key.pub'
+```
+
+Production data lives in `/opt/sjekka/data` and secrets in `/opt/sjekka/.env`. The pipeline never touches either.
 
 ---
 
@@ -92,9 +121,9 @@ uvicorn app.main:app
 
 - **Backend:** Python / FastAPI
 - **Extraction:** Google Gemini 2.5 Flash
-- **Database:** SQLite (local, on Pi)
+- **Database:** SQLite
 - **Frontend:** Plain HTML / CSS / JS
-- **Infrastructure:** Nginx on Raspberry Pi 4, Cloudflare Tunnel
+- **Infrastructure:** Docker on a VPS, Cloudflare Tunnel, GitHub Actions
 
 ---
 

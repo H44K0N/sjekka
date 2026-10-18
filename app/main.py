@@ -3,13 +3,15 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from sqlalchemy.orm import Session
-import io, uuid, asyncio, sys, logging
-from datetime import date as date_type
+import io
+import uuid
+import asyncio
+import sys
+import logging
 
 from app.config import UPLOAD_DIR, MAX_SIZE_MB, MAX_DIMENSION, JPEG_QUALITY
 from app.database import engine, get_db
 from app import models
-from app.extractor import extract_receipt
 from app import worker
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, force=True)

@@ -1,0 +1,127 @@
+# CI/CD for Sjekka.
+#
+#   pull request to main  ->  check, image (build + smoke test)
+#   push to main          ->  check, image (build + smoke test + push), deploy
+#
+# Deploying needs these repository secrets (set up by deploy/setup-vps.sh):
+#   VPS_HOST         hostname or IP of the VPS
+#   VPS_SSH_KEY      private key of the CI deploy key. On the server it is
+#                    restricted to running /opt/sjekka/deploy.sh, nothing else
+#   VPS_KNOWN_HOSTS  output of `ssh-keyscan <host>`
+name: Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/h44k0n/sjekka
+
+jobs:
+  check:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check --output-format=github .
+
+      - name: Test
+        # Exit code 5 means no tests were collected. Allowed until the
+        # test suite exists.
+        run: pytest || [ $? -eq 5 ]
+
+  image:
+    name: Build and smoke test image
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test
+        run: |
+          docker run -d --name sjekka -p 8000:8000 -e GEMINI_API_KEY=dummy "$IMAGE:${{ github.sha }}"
+          for _ in $(seq 30); do
+            curl -sf http://localhost:8000/health && break
+            sleep 1
+          done
+          set -x
+          curl -sf http://localhost:8000/health
+          curl -sf http://localhost:8000/stats
+          curl -sf http://localhost:8000/products
+          curl -sf -o /dev/null http://localhost:8000/
+          curl -sf -o /dev/null http://localhost:8000/upload.html
+
+      - name: Container logs
+        if: always()
+        run: docker logs sjekka || true
+
+      - name: Push
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:latest"
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+
+  deploy:
+    name: Deploy to production
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://sjekka.tischbein.dev
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_deploy
+          echo "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_deploy
+          # The key can only run deploy.sh, which takes the commit SHA as its
+          # command and a GHCR token on stdin.
+          echo "${{ secrets.GITHUB_TOKEN }}" | ssh -i ~/.ssh/id_deploy \
+            "sjekka-deploy@${{ secrets.VPS_HOST }}" "${{ github.sha }}"
+
+      - name: Check public URL
+        run: |
+          for _ in $(seq 20); do
+            curl -sf https://sjekka.tischbein.dev/health && exit 0
+            sleep 3
+          done
+          echo "https://sjekka.tischbein.dev/health is not responding" >&2
+          exit 1
