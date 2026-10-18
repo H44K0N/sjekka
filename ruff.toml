@@ -1,0 +1,7 @@
+target-version = "py313"
+
+[lint]
+select = ["E", "F", "W", "B"]
+# E501: long lines are fine (the extraction prompt).
+# B008: FastAPI's Depends()/File() in default arguments is intended.
+ignore = ["E501", "B008"]

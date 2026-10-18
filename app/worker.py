@@ -7,13 +7,13 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app import models
 from app.extractor import extract_receipt
-from app.config import UPLOAD_DIR
+from app.config import UPLOAD_DIR, LOG_DIR
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, force=True)
 logger = logging.getLogger("sjekka.worker")
 
 extraction_logger = logging.getLogger("sjekka.extraction")
-extraction_handler = logging.FileHandler("/home/haakon/sjekka/logs/extractions.log")
+extraction_handler = logging.FileHandler(LOG_DIR / "extractions.log")
 extraction_handler.setFormatter(logging.Formatter("%(asctime)s\n%(message)s\n"))
 extraction_logger.addHandler(extraction_handler)
 extraction_logger.setLevel(logging.INFO)

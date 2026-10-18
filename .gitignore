@@ -5,3 +5,6 @@ __pycache__/
 
 .env
 /sjekka.db
+secrets.env
+/data/
+.venv/

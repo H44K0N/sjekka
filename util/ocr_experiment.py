@@ -1,3 +1,5 @@
+# One-off experiment comparing Tesseract preprocessing on a receipt photo.
+# Needs `pip install pytesseract` and the tesseract-ocr-nor language pack.
 import pytesseract
 from PIL import Image, ImageFilter, ImageEnhance
 import sys

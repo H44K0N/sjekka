@@ -1,12 +1,10 @@
 import sys
-sys.path.insert(0, '/home/haakon/sjekka')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.database import SessionLocal
 from app import models
-import os
-from pathlib import Path
-
-UPLOAD_DIR = Path('/home/haakon/sjekka/uploads')
+from app.config import UPLOAD_DIR
 
 db = SessionLocal()
 

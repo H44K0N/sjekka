@@ -1,0 +1,32 @@
+# Production stack for sjekka.tischbein.dev, installed to /opt/sjekka on the VPS
+# by deploy/setup-vps.sh.
+#
+# deploy.sh sets SJEKKA_IMAGE to the exact image CI just built. cloudflared on
+# the host routes sjekka.tischbein.dev to http://localhost:8000, so the port is
+# only published on loopback.
+
+services:
+  app:
+    image: ${SJEKKA_IMAGE:-ghcr.io/h44k0n/sjekka:latest}
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data
+    ports:
+      - "127.0.0.1:8000:8000"
+    # The app only writes to /data and temp files (large uploads are spooled
+    # to /tmp), so everything else is read-only and unprivileged.
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
