@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import sys
 from collections import Counter
 from datetime import date, timedelta
 
@@ -15,7 +14,6 @@ from app.extractor import extract_receipt
 from app.schema import ExtractedItem, ExtractedReceipt
 from app.config import UPLOAD_DIR, LOG_DIR
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO, force=True)
 logger = logging.getLogger("sjekka.worker")
 
 extraction_logger = logging.getLogger("sjekka.extraction")
@@ -197,7 +195,3 @@ async def run_worker():
             await asyncio.sleep(POLL_INTERVAL)
         finally:
             db.close()
-
-
-if __name__ == "__main__":
-    asyncio.run(run_worker())

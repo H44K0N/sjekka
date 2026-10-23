@@ -1,23 +1,16 @@
 """Upload -> job queue -> worker -> API, with only the Gemini call faked."""
 import asyncio
-import io
 from datetime import date
 
 import pytest
-from PIL import Image
 
 from app import models, worker
 from app.schema import ExtractedItem, ExtractedReceipt
-
-
-def jpeg():
-    buf = io.BytesIO()
-    Image.new("RGB", (400, 800), "white").save(buf, format="JPEG")
-    return buf.getvalue()
+from tests import helpers
 
 
 def upload(client, ip="203.0.113.1"):
-    res = client.post("/upload", files={"file": ("r.jpg", jpeg(), "image/jpeg")}, headers={"CF-Connecting-IP": ip})
+    res = helpers.upload(client, helpers.image_bytes(size=(400, 800)), ip=ip)
     assert res.status_code == 200
     return res.json()["id"]
 

@@ -2,10 +2,10 @@ import asyncio
 from datetime import timedelta
 
 import pytest
-from google.genai import errors
 
 from app import models, worker
 from app.schema import ExtractedItem, ExtractedReceipt
+from tests.helpers import api_error
 
 
 def receipt(**overrides):
@@ -19,10 +19,6 @@ def receipt(**overrides):
     ]
     fields = dict(store_chain="Kiwi", purchase_date="2026-10-20", items=items, total=157.7)
     return ExtractedReceipt(**(fields | overrides))
-
-
-def api_error(code):
-    return errors.APIError(code, {"error": {"code": code, "message": "nope", "status": "X"}})
 
 
 def run(db, extract, filename="a.jpg"):
