@@ -5,7 +5,8 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from pillow_heif import register_heif_opener
 from sqlalchemy.orm import Session
 from collections import defaultdict, deque
-from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
+from datetime import timedelta
 import io
 import time
 import uuid
@@ -30,12 +31,16 @@ logger = logging.getLogger("sjekka")
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
 
-@app.on_event("startup")
-async def startup_event():
-    if RUN_WORKER:
-        asyncio.create_task(worker.run_worker())
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(worker.run_worker()) if RUN_WORKER else None
+    yield
+    if task:
+        task.cancel()
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Every upload costs a Gemini call, so uploads are limited per client and per
 # day. The per-client window lives in memory: there is only one app process.
@@ -56,7 +61,7 @@ def check_upload_limits(ip: str, db: Session):
     if len(window) >= UPLOADS_PER_IP_PER_HOUR:
         raise HTTPException(429, "Du har lastet opp mange kvitteringer på kort tid. Prøv igjen om en time.")
 
-    since = datetime.utcnow() - timedelta(days=1)
+    since = models.utcnow() - timedelta(days=1)
     if db.query(models.Job).filter(models.Job.created_at >= since).count() >= UPLOADS_PER_DAY:
         raise HTTPException(429, "Sjekka har nådd dagens grense for opplastinger. Prøv igjen i morgen.")
 

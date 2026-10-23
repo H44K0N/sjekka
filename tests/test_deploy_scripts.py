@@ -142,7 +142,9 @@ def test_backup_copies_database_and_can_be_restored(backup_dir, tmp_path):
     [archive] = (backup_dir / "backups").glob("sjekka-*.db.gz")
     restored = tmp_path / "restored.db"
     restored.write_bytes(gzip.decompress(archive.read_bytes()))
-    assert sqlite3.connect(restored).execute("SELECT count(*) FROM t").fetchone() == (3,)
+    con = sqlite3.connect(restored)
+    assert con.execute("SELECT count(*) FROM t").fetchone() == (3,)
+    con.close()
     assert oct((backup_dir / "backups").stat().st_mode)[-3:] == "700"
 
 
@@ -152,6 +154,7 @@ def test_backup_works_while_the_app_holds_a_write_transaction(backup_dir):
     con.execute("INSERT INTO t VALUES (99)")  # uncommitted
     res = backup(backup_dir)
     con.rollback()
+    con.close()
     assert res.returncode == 0, res.stderr
 
 

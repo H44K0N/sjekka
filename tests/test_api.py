@@ -53,3 +53,36 @@ def test_products_empty_database(client):
 def test_unknown_paths_are_404(client):
     assert client.get("/nope.html").status_code == 404
     assert client.get("/uploads/nope.jpg").status_code == 404
+
+
+def test_app_starts_and_stops_the_worker(monkeypatch):
+    import asyncio
+    from fastapi.testclient import TestClient
+    from app import main
+
+    events = []
+
+    async def fake_worker():
+        events.append("started")
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            events.append("stopped")
+            raise
+
+    monkeypatch.setattr(main, "RUN_WORKER", True)
+    monkeypatch.setattr(main.worker, "run_worker", fake_worker)
+    with TestClient(main.app) as client:
+        assert client.get("/health").status_code == 200
+        assert events == ["started"]
+    assert events == ["started", "stopped"]
+
+
+def test_app_can_run_without_the_worker(monkeypatch):
+    from fastapi.testclient import TestClient
+    from app import main
+
+    monkeypatch.setattr(main, "RUN_WORKER", False)
+    monkeypatch.setattr(main.worker, "run_worker", lambda: (_ for _ in ()).throw(AssertionError("started")))
+    with TestClient(main.app) as client:
+        assert client.get("/health").status_code == 200

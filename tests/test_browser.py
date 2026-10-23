@@ -58,6 +58,7 @@ def seed(db_path):
                 unit=unit, pack_size=pack, total_price=price, price_per_unit=ppu,
             ))
         db.commit()
+    engine.dispose()
 
 
 @pytest.fixture(scope="module")

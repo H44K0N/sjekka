@@ -2,7 +2,7 @@ import asyncio
 import logging
 import sys
 from collections import Counter
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 import httpx
 from google.genai import errors
@@ -115,7 +115,7 @@ async def process_job(job: models.Job, db: Session):
 
     job.status = "processing"
     job.attempts += 1
-    job.updated_at = datetime.utcnow()
+    job.updated_at = models.utcnow()
     db.commit()
 
     try:
@@ -133,7 +133,7 @@ async def process_job(job: models.Job, db: Session):
             job.status = "done"
             logger.info(f"Done: {job.filename} — {receipt.store_chain}, {len(data.items)} items")
 
-        job.updated_at = datetime.utcnow()
+        job.updated_at = models.utcnow()
         db.commit()
 
     except Exception as e:
@@ -153,14 +153,14 @@ async def process_job(job: models.Job, db: Session):
                 job.error = str(e)[:500]
             logger.error(f"Failed: {job.filename} — {job.error[:100]}")
 
-        job.updated_at = datetime.utcnow()
+        job.updated_at = models.utcnow()
         db.commit()
 
 
 def next_job(db: Session) -> models.Job | None:
     """The oldest pending job whose retry delay has passed. Jobs waiting to
     retry don't hold up the ones behind them."""
-    now = datetime.utcnow()
+    now = models.utcnow()
     pending = (
         db.query(models.Job)
         .filter(models.Job.status == "pending")

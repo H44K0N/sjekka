@@ -1,7 +1,13 @@
 from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database import Base
+
+
+def utcnow() -> datetime:
+    """Current UTC time without tzinfo, matching the timestamps already stored."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 class Receipt(Base):
     __tablename__ = "receipts"
@@ -12,7 +18,7 @@ class Receipt(Base):
     store_location = Column(String)     # "Grünerløkka"
     region = Column(String)             # "Oslo"
     purchase_date = Column(Date)
-    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    uploaded_at = Column(DateTime, default=utcnow)
     items = relationship("ReceiptItem", back_populates="receipt")
 
 class Category(Base):
@@ -61,5 +67,5 @@ class Job(Base):
     status = Column(String, default="pending")  # pending, processing, done, failed
     attempts = Column(Integer, default=0)
     error = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
