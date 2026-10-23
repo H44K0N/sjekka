@@ -200,9 +200,25 @@ def test_upload_flow(page, site, tmp_path):
 
     saved_before = set((site[1] / "uploads").iterdir())
     button.click()
-    page.wait_for_url("**/takk.html")
-    expect(page.locator("#queue")).to_contain_text("i kø")
+    page.wait_for_url("**/takk.html?id=*.jpg")
+    expect(page.locator("#state")).to_contain_text("I kø")
     assert len(set((site[1] / "uploads").iterdir()) - saved_before) == 1
+
+    # The worker is off in these tests: mark the job read, as it would
+    job_id = page.url.split("id=")[1]
+    engine = create_engine(f"sqlite:///{site[1] / 'sjekka.db'}")
+    with Session(engine) as db:
+        db.add(models.Receipt(image_filename=job_id, store_chain="Rema 1000", purchase_date=date.today()))
+        db.flush()
+        rid = db.query(models.Receipt).filter_by(image_filename=job_id).one().id
+        db.add(models.ReceiptItem(receipt_id=rid, canonical_name="Rømme", total_price=26.9, pack_size=1))
+        db.query(models.Job).filter_by(filename=job_id).update({"status": "done"})
+        db.commit()
+    engine.dispose()
+    expect(page.locator("#state")).to_have_text("Lest. Prisene ligger nå i oversikten.", timeout=8000)
+    expect(page.locator("#found .chain img")).to_have_attribute("alt", "Rema 1000")
+    expect(page.locator("#items a")).to_have_text("Rømme")
+    expect(page.locator("#items a")).to_have_attribute("href", "/produkt.html?navn=R%C3%B8mme")
 
     # The photo comes from this tab, not from the server
     img = page.locator("#img")
@@ -212,6 +228,7 @@ def test_upload_flow(page, site, tmp_path):
 
 def test_thank_you_page_without_a_photo(page):
     page.goto("/takk.html")
+    expect(page.locator("#progress")).to_be_hidden()
     expect(page.locator("h1")).to_have_text("Takk.")
     expect(page.locator("#img")).to_be_hidden()
 

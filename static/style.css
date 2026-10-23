@@ -291,6 +291,23 @@ a.card:hover { border-color: var(--hover); background: rgba(236, 230, 220, 0.04)
 .status { min-height: 1.6em; margin: 16px 0 0; }
 .status.error { color: var(--error); }
 
+/* thanks: the upload's progress */
+.progress { margin: 28px 0 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.progress .state { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--soft); }
+.progress .state.busy::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 10px; border-radius: 50%;
+  background: var(--accent); vertical-align: 1px; animation: pulse 1.6s ease-in-out infinite;
+}
+.progress .state.ok { color: var(--text); }
+.progress .state.error { color: var(--error); }
+@keyframes pulse { 50% { opacity: 0.25; } }
+.found { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; font-family: var(--mono); font-size: 13px; color: var(--soft); }
+.items { margin: 12px 0 0; padding: 0; list-style: none; }
+.items li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 17px; }
+.items li span { font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+.items a { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; }
+.items a:hover { text-decoration-color: var(--accent); }
+
 /* thanks */
 .receipt {
   display: block;

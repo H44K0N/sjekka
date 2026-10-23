@@ -196,6 +196,35 @@ def get_product(name: str, db: Session = Depends(get_db)):
         ],
     }
 
+@app.get("/jobs/{job_id}")
+def get_job(job_id: str, db: Session = Depends(get_db)):
+    """How an upload is doing, for the thank-you page. The id is the random
+    filename /upload returned, so it can't be guessed."""
+    job = db.query(models.Job).filter_by(filename=job_id).first()
+    if not job:
+        raise HTTPException(404, "Fant ikke opplastingen.")
+
+    result = {"status": job.status, "retrying": job.status == "pending" and job.attempts > 0}
+    if job.status == "pending":
+        result["queue_position"] = (
+            db.query(models.Job)
+            .filter(models.Job.status == "pending", models.Job.created_at <= job.created_at)
+            .count()
+        )
+    if job.status == "done":
+        receipt = db.query(models.Receipt).filter_by(image_filename=job.filename).first()
+        if receipt:
+            result["receipt"] = {
+                "store_chain": receipt.store_chain,
+                "purchase_date": str(receipt.purchase_date) if receipt.purchase_date else None,
+                "items": [
+                    {"canonical_name": i.canonical_name, "total_price": i.total_price, "pack_size": i.pack_size}
+                    for i in receipt.items
+                ],
+            }
+    return result
+
+
 @app.get("/stats")
 def get_stats(db: Session = Depends(get_db)):
     total_receipts = db.query(models.Receipt).count()

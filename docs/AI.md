@@ -59,6 +59,7 @@ The AI's work wasn't right the first time every time. Recorded so the process ca
 - Claude first said changing `.env` only needs a container restart. It needs `docker compose up -d`; corrected before it was used.
 - Claude took "let's leave it" to mean leaving a failing CI check as it was, when Haakon wanted it fixed later; resolved when Haakon asked.
 - shellcheck flagged a notice in the setup script when it was first added to CI; fixed.
+- Claude committed the product page directly on `main` and pushed it, skipping the branch and PR. It noticed at once and cancelled the pipeline before the deploy step, so production never got the unreviewed change; the commit was then reviewed as part of PR #15.
 
 ## Change log
 
@@ -78,4 +79,5 @@ The AI's work wasn't right the first time every time. Recorded so the process ca
 | #12 | Showcase video and the scripts that record it | Gemini simulated in the recording; stated on the end card |
 | #13 | AI voice-over for the video (Kokoro text-to-speech) | Script written by Claude; pronunciation checked by transcribing the track with Whisper |
 | #14 | Privacy notice, photos deleted after reading, raw Gemini answers kept | Haakon caught that the video called the photos private while they're sent to Google |
-| #15 | Product page with per-store prices and history; chain logos on cards | Logo idea from Haakon; chart colours validated, then a logo-per-row design instead of colour per store |
+| #15 | Product page with per-store prices and history; chain logos on cards; CI uses the runner's Chrome | Logo idea from Haakon; chart colours validated, then a logo-per-row design instead of colour per store. CI: 7–10 min → ~1.5 min |
+| #16 | Thank-you page follows the upload live; export of raw Gemini answers | |
