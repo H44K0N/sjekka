@@ -107,3 +107,10 @@ def test_waiting_job_does_not_block_the_queue(client, db):
     waiting.updated_at = now - worker.retry_delay(3) - timedelta(seconds=1)
     db.commit()
     assert worker.next_job(db).filename == "old.jpg"
+
+
+@pytest.mark.parametrize("missing", [{"store_chain": None}, {"purchase_date": None}])
+def test_receipts_without_store_or_date_are_never_duplicates(client, db, missing):
+    run(db, lambda path: receipt(**missing), filename="a.jpg")
+    job = run(db, lambda path: receipt(**missing), filename="b.jpg")
+    assert job.status == "done"

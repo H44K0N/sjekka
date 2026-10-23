@@ -15,7 +15,7 @@ import logging
 
 from app.config import (
     UPLOAD_DIR, MAX_SIZE_MB, MAX_DIMENSION, JPEG_QUALITY,
-    UPLOADS_PER_IP_PER_HOUR, UPLOADS_PER_DAY,
+    UPLOADS_PER_IP_PER_HOUR, UPLOADS_PER_DAY, RUN_WORKER,
 )
 from app.database import engine, get_db
 from app import models
@@ -34,7 +34,8 @@ app = FastAPI()
 
 @app.on_event("startup")
 async def startup_event():
-    asyncio.create_task(worker.run_worker())
+    if RUN_WORKER:
+        asyncio.create_task(worker.run_worker())
 
 # Every upload costs a Gemini call, so uploads are limited per client and per
 # day. The per-client window lives in memory: there is only one app process.

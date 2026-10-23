@@ -90,8 +90,24 @@ Before pushing, run the same checks as CI:
 
 ```bash
 ruff check .
-pytest
+shellcheck deploy/*.sh
+playwright install chromium   # once; or set CHROMIUM_PATH=/usr/bin/chromium
+pytest --cov=app
 ```
+
+The tests never call Gemini; it's replaced with fakes.
+
+| File | What it covers |
+|---|---|
+| `test_upload.py`, `test_upload_edge_cases.py` | Upload validation, formats (incl. HEIC), EXIF rotation, resizing, rate limits |
+| `test_api.py` | `/products`, `/stats`, static pages |
+| `test_worker.py`, `test_worker_helpers.py` | Saving receipts, unit prices, name normalisation, duplicates, retries and backoff |
+| `test_extractor.py` | The Gemini request and response validation |
+| `test_pipeline.py` | Upload → queue → worker → API, the worker loop and crash recovery |
+| `test_deploy_scripts.py` | `deploy.sh` (SHA check, health check, rollback) with a fake `docker`, and `backup.sh` |
+| `test_browser.py` | The pages in Chromium: rendering, formatting, search, filters, upload flow, phone layout |
+
+Browser tests are skipped if Playwright isn't installed. CI requires them and fails below 95% coverage.
 
 ---
 
