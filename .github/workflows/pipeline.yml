@@ -40,9 +40,7 @@ jobs:
         run: ruff check --output-format=github .
 
       - name: Test
-        # Exit code 5 means no tests were collected. Allowed until the
-        # test suite exists.
-        run: pytest || [ $? -eq 5 ]
+        run: pytest
 
   image:
     name: Build and smoke test image
