@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<style>
+  body { margin: 0; height: 100vh; overflow: hidden; }
+  .scene { display: none; position: absolute; inset: 0; padding: 64px 88px; }
+  .scene.active { display: block; }
+  .mono { font-family: var(--mono); }
+  .fade { opacity: 0; transform: translateY(10px); transition: opacity 700ms, transform 700ms cubic-bezier(.2,.8,.2,1); }
+  .fade.on { opacity: 1; transform: none; }
+
+  /* title + end */
+  .center { display: flex; flex-direction: column; justify-content: center; height: 100%; }
+  .big { font-size: 112px; line-height: 1; letter-spacing: -0.03em; margin: 0 0 28px; font-weight: 700; }
+  .sub { font-size: 30px; color: var(--soft); margin: 0 0 40px; max-width: 26em; }
+  .tag { font-family: var(--mono); font-size: 17px; color: var(--soft); }
+  .tag b { color: var(--accent); font-weight: 400; }
+  .heading { font-family: var(--mono); font-size: 16px; color: var(--soft); margin: 0 0 6px; }
+  .title { font-size: 44px; margin: 0; letter-spacing: -0.02em; font-weight: 700; }
+
+  /* diagram */
+  .stage { position: absolute; inset: 0; }
+  .box {
+    position: absolute; padding: 14px 18px; background: rgba(236,230,220,0.03);
+    border: 1px solid var(--line); border-radius: 12px; transition: border-color 500ms, background 500ms, opacity 700ms, transform 700ms;
+  }
+  .box h4 { margin: 0 0 2px; font-size: 22px; }
+  .box p { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--soft); line-height: 1.5; }
+  .box.hot { border-color: var(--accent); background: rgba(201,180,143,0.06); }
+  .group { position: absolute; border: 1px dashed rgba(236,230,220,0.18); border-radius: 16px; }
+  .group > span { position: absolute; top: -11px; left: 18px; padding: 0 8px; background: var(--ink); font-family: var(--mono); font-size: 13px; color: var(--soft); }
+  svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .wire { fill: none; stroke: rgba(236,230,220,0.28); stroke-width: 1.5; stroke-dasharray: 2000; stroke-dashoffset: 2000; transition: stroke-dashoffset 1400ms ease, stroke 400ms; }
+  .wire.on { stroke-dashoffset: 0; }
+  .wire.hot { stroke: var(--accent); }
+  .step {
+    position: absolute; left: 88px; right: 88px; bottom: 52px; min-height: 64px;
+    font-size: 26px; line-height: 1.35; transition: opacity 400ms;
+  }
+  .step .n { font-family: var(--mono); font-size: 15px; color: var(--accent); display: block; margin-bottom: 4px; }
+
+  /* pipeline */
+  .lane { display: flex; gap: 14px; margin-top: 64px; align-items: stretch; }
+  .lane .box { position: relative; flex: 1; }
+  .lane .arrow { align-self: center; font-family: var(--mono); color: var(--soft); opacity: 0; transition: opacity 500ms; }
+  .lane .arrow.on { opacity: 1; }
+  .extras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 28px; }
+  .extras .box { position: relative; }
+</style>
+</head>
+<body>
+
+<!-- Title -->
+<section class="scene" id="title">
+  <div class="center">
+    <p class="tag fade" data-at="200">Matpriser fra ekte kvitteringer</p>
+    <h1 class="big fade" data-at="500">Sjekka</h1>
+    <p class="sub fade" data-at="1200">Crowdsourced grocery prices for Norway. Snap a receipt, and AI turns it into a searchable price database.</p>
+    <p class="tag fade" data-at="2000"><b>sjekka.tischbein.dev</b> &nbsp;·&nbsp; FastAPI · SQLite · Gemini · Docker</p>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section class="scene" id="arch">
+  <p class="heading fade" data-at="0">How it works</p>
+  <h2 class="title fade" data-at="150">Architecture</h2>
+  <div class="stage" id="stage">
+    <svg class="wires" id="wires">
+      <path id="w1" class="wire"/><path id="w2" class="wire"/><path id="w3" class="wire"/><path id="w4" class="wire"/>
+      <path id="w5" class="wire"/><path id="w6" class="wire"/><path id="w7" class="wire"/>
+    </svg>
+    <div class="box fade" id="browser" style="left:88px; top:236px; width:170px;"><h4>Browser</h4><p>phone or laptop</p></div>
+    <div class="box fade" id="cf" style="left:300px; top:236px; width:205px;"><h4>Cloudflare</h4><p>HTTPS · bot check<br>tunnel, no open ports</p></div>
+    <div class="group fade" id="vps" style="left:540px; top:205px; width:500px; height:310px;"><span>VPS · Docker container</span></div>
+    <div class="box fade" id="api" style="left:560px; top:236px; width:215px;"><h4>FastAPI</h4><p>photo checks<br>rate limits · API</p></div>
+    <div class="box fade" id="queue" style="left:560px; top:392px; width:215px;"><h4>Job queue</h4><p>SQLite<br>survives restarts</p></div>
+    <div class="box fade" id="worker" style="left:805px; top:392px; width:215px;"><h4>Worker</h4><p>retries · dedupe<br>unit prices</p></div>
+    <div class="box fade" id="db" style="left:805px; top:236px; width:215px;"><h4>Database</h4><p>SQLite<br>nightly backups</p></div>
+    <div class="box fade" id="gemini" style="left:1062px; top:392px; width:150px;"><h4>Gemini</h4><p>reads receipt<br>fixed schema</p></div>
+  </div>
+  <div class="step" id="step"></div>
+</section>
+
+<!-- Pipeline -->
+<section class="scene" id="pipeline">
+  <p class="heading fade" data-at="0">How changes ship</p>
+  <h2 class="title fade" data-at="150">From pull request to production</h2>
+  <div class="lane">
+    <div class="box fade" data-at="900"><h4>Pull request</h4><p>every change<br>reviewed as a PR</p></div>
+    <span class="arrow" data-at="1700">→</span>
+    <div class="box fade" data-at="1900"><h4>Checks</h4><p>ruff · shellcheck<br>110 tests · 95% coverage</p></div>
+    <span class="arrow" data-at="2900">→</span>
+    <div class="box fade" data-at="3100"><h4>Image</h4><p>built, smoke-tested<br>pushed to GHCR</p></div>
+    <span class="arrow" data-at="4100">→</span>
+    <div class="box fade" data-at="4300"><h4>Deploy</h4><p>restricted SSH key<br>can only run deploy.sh</p></div>
+    <span class="arrow" data-at="5300">→</span>
+    <div class="box fade" data-at="5500"><h4>Health check</h4><p>live, or automatic<br>rollback</p></div>
+  </div>
+  <div class="extras">
+    <div class="box fade" data-at="7200"><h4>Tests</h4><p>unit · integration · deploy scripts<br>browser tests in Chromium</p></div>
+    <div class="box fade" data-at="7900"><h4>Safety</h4><p>upload limits · private photos<br>Gemini never called in tests</p></div>
+    <div class="box fade" data-at="8600"><h4>Operations</h4><p>nightly integrity-checked backups<br>14 days kept</p></div>
+  </div>
+</section>
+
+<!-- End -->
+<section class="scene" id="end">
+  <div class="center">
+    <p class="tag fade" data-at="200">Har du sjekka i dag?</p>
+    <h1 class="big fade" data-at="500" style="font-size:88px">sjekka.tischbein.dev</h1>
+    <p class="sub fade" data-at="1200">Built by Haakon Meyer Tischbein, developed with Claude Code. How AI was used is documented in <span class="mono" style="font-size:24px">docs/AI.md</span>.</p>
+    <p class="tag fade" data-at="2200">Demo data. The Gemini call is simulated in this recording.</p>
+  </div>
+</section>
+
+<script>
+const scene = new URLSearchParams(location.search).get("s") || "title";
+const root = document.getElementById(scene);
+root.classList.add("active");
+for (const el of root.querySelectorAll("[data-at]")) {
+  setTimeout(() => el.classList.add("on"), +el.dataset.at);
+}
+
+if (scene === "arch") {
+  const $ = id => document.getElementById(id);
+  // Wires follow the boxes' real positions (offset* are layout px, unaffected by zoom)
+  // No viewBox: the SVG then uses the same CSS px as the boxes, with or without zoom
+  const r = id => { const e = $(id); return { l: e.offsetLeft, t: e.offsetTop, r: e.offsetLeft + e.offsetWidth, b: e.offsetTop + e.offsetHeight,
+    cx: e.offsetLeft + e.offsetWidth / 2, cy: e.offsetTop + e.offsetHeight / 2 }; };
+  // Same-row boxes share a top edge, so a line level with their titles joins them
+  const across = (a, b) => { const A = r(a), B = r(b); return `M ${A.r} ${A.t + 30} H ${B.l}`; };
+  const down = (a, b) => { const A = r(a), B = r(b); return `M ${A.cx} ${A.b} V ${B.t}`; };
+  const up = (a, b) => { const A = r(a), B = r(b); return `M ${A.cx} ${A.t} V ${B.b}`; };
+  // Box heights depend on the web fonts, so draw once they've loaded
+  document.fonts.ready.then(() => {
+  const paths = {
+    w1: across("browser", "cf"), w2: across("cf", "api"), w3: down("api", "queue"), w4: across("queue", "worker"),
+    w5: across("worker", "gemini"), w6: up("worker", "db"),
+    w7: `M ${r("db").cx} ${r("db").t} V 185 H ${r("browser").cx} V ${r("browser").t}`,
+  };
+  for (const [id, d] of Object.entries(paths)) $(id).setAttribute("d", d);
+  });
+  const stepEl = $("step");
+  // [time ms, boxes to show, wires to draw, highlighted, step text]
+  const steps = [
+    [700, ["browser"], [], ["browser"], ["1", "Someone uploads a photo of a receipt."]],
+    [3200, ["cf"], ["w1"], ["cf"], ["2", "It reaches the server through Cloudflare's tunnel. The server has no open ports."]],
+    [6400, ["vps", "api"], ["w2"], ["api"], ["3", "FastAPI checks the photo (format, size, rotation) and rate-limits uploads, since each one costs an AI call."]],
+    [10200, ["queue"], ["w3"], ["queue"], ["4", "The upload becomes a job in the queue, and the uploader gets an answer at once."]],
+    [13400, ["worker"], ["w4"], ["worker"], ["5", "A background worker takes the next job and retries if Gemini is busy."]],
+    [16400, ["gemini"], ["w5"], ["gemini"], ["6", "Gemini reads the receipt and must answer in a fixed schema: store, date, every line."]],
+    [20000, ["db"], ["w6"], ["db"], ["7", "The answer is validated, unit prices are computed in Python, duplicates are skipped, and it's saved."]],
+    [23600, [], ["w7"], ["browser"], ["8", "The explore page reads the prices back from the database."]],
+  ];
+  for (const [at, show, wires, hot, [n, text]] of steps) {
+    setTimeout(() => {
+      show.forEach(id => $(id).classList.add("on"));
+      document.querySelectorAll(".hot").forEach(el => el.classList.remove("hot"));
+      wires.forEach(id => { $(id).classList.add("on", "hot"); });
+      hot.forEach(id => $(id).classList.add("hot"));
+      stepEl.style.opacity = 0;
+      setTimeout(() => {
+        stepEl.innerHTML = "";
+        const num = document.createElement("span");
+        num.className = "n";
+        num.textContent = n + " / 8";
+        stepEl.append(num, text);
+        stepEl.style.opacity = 1;
+      }, 300);
+    }, at);
+  }
+}
+if (scene === "pipeline") {
+  for (const el of document.querySelectorAll(".arrow")) setTimeout(() => el.classList.add("on"), +el.dataset.at);
+}
+</script>
+</body>
+</html>

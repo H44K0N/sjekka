@@ -90,7 +90,7 @@ Before pushing, run the same checks as CI:
 
 ```bash
 ruff check .
-shellcheck deploy/*.sh
+shellcheck deploy/*.sh docs/video/*.sh
 playwright install chromium   # once; or set CHROMIUM_PATH=/usr/bin/chromium
 pytest --cov=app
 ```
@@ -149,6 +149,12 @@ docker compose start app
 - **Database:** SQLite
 - **Frontend:** Plain HTML / CSS / JS
 - **Infrastructure:** Docker on a VPS, Cloudflare Tunnel, GitHub Actions
+
+---
+
+## Showcase video
+
+`docs/video/make.sh` records a 1080p walkthrough of the app and its architecture: the real app and worker on demo data, driven by Playwright, with the Gemini call replaced by a fixed answer. It writes `docs/video/sjekka-showcase.mp4` (not committed). Rerun it after visible changes; the slides' facts (like the test count) are in `docs/video/slides.html`.
 
 ---
 
