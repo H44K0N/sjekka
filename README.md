@@ -108,7 +108,7 @@ The tests never call Gemini; it's replaced with fakes.
 | `test_extractor.py` | The Gemini request and response validation |
 | `test_pipeline.py` | Upload → queue → worker → API, the worker loop and crash recovery |
 | `test_deploy_scripts.py` | `deploy.sh` (SHA check, health check, rollback) with a fake `docker`, and `backup.sh` |
-| `test_browser.py` | The pages in Chromium: rendering, formatting, search, filters, upload flow, phone layout |
+| `test_browser.py` | The pages in Chromium: rendering, formatting, search, filters, upload flow, phone layout, and automated accessibility checks (axe-core, WCAG 2.1 AA) on every page |
 
 Browser tests are skipped if Playwright isn't installed. CI requires them and fails below 95% coverage.
 

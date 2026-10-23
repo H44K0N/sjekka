@@ -109,6 +109,23 @@ def cards(page):
     return page.locator(".card")
 
 
+AXE = Path(__file__).parent / "vendor" / "axe.min.js"  # axe-core, pinned (MPL-2.0)
+
+
+@pytest.mark.parametrize("path", ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/finnes-ikke.html"])
+def test_pages_pass_automated_accessibility_checks(page, path):
+    page.goto(path)
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(900)  # let the entrance animation finish, or contrast is measured mid-fade
+    page.add_script_tag(path=str(AXE))
+    result = page.evaluate("axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice'] })")
+    problems = [
+        f"{v['impact']}: {v['id']} – {v['help']} ({len(v['nodes'])}× e.g. {v['nodes'][0]['target']})"
+        for v in result["violations"]
+    ]
+    assert problems == [], "\n".join(problems)
+
+
 def test_explore_page_shows_products_and_stats(page):
     page.goto("/")
     expect(cards(page)).to_have_count(5)
