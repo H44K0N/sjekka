@@ -122,10 +122,17 @@ jobs:
           # Log each attempt's status so a failure shows whether it was DNS or
           # a timeout (000), the tunnel (502) or Cloudflare blocking (403).
           for _ in $(seq 20); do
-            code=$(curl -s -o /tmp/health -w '%{http_code}' --max-time 10 \
-              https://sjekka.tischbein.dev/health || true)
+            code=$(curl -s -D /tmp/headers -o /tmp/health -w '%{http_code}' \
+              --max-time 10 https://sjekka.tischbein.dev/health || true)
             echo "HTTP $code"
             [ "$code" = 200 ] && exit 0
+            # Cloudflare's bot protection challenges GitHub's runners, so the
+            # site can't be verified from here. deploy.sh has already checked
+            # the container's health on the VPS.
+            if grep -qi '^cf-mitigated: challenge' /tmp/headers; then
+              echo "::warning::Cloudflare challenged the runner; public URL not verified"
+              exit 0
+            fi
             sleep 3
           done
           echo "https://sjekka.tischbein.dev/health is not responding; last body:" >&2
