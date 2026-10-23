@@ -162,8 +162,9 @@ if (scene === "arch") {
     [20000, ["db"], ["w6"], ["db"], ["7", "The answer is validated, unit prices are computed in Python, duplicates are skipped, and it's saved."]],
     [23600, [], ["w7"], ["browser"], ["8", "The explore page reads the prices back from the database."]],
   ];
-  window.step = i => {
-      const [, show, wires, hot, [n, text]] = steps[i - 1];
+  window.step = (i, spokenText) => {
+      const [, show, wires, hot, [n, ownText]] = steps[i - 1];
+      const text = spokenText || ownText;
       show.forEach(id => $(id).classList.add("on"));
       document.querySelectorAll(".hot").forEach(el => el.classList.remove("hot"));
       wires.forEach(id => { $(id).classList.add("on", "hot"); });
