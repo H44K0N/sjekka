@@ -1,50 +1,67 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-    <link rel="icon" type="image/png" href="/logo.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sjekka – Takk!</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            max-width: 480px;
-            margin: 0 auto;
-            padding: 40px 20px;
-            text-align: center;
-        }
-        .receipt-img {
-            width: 100%;
-            max-width: 320px;
-            border-radius: 8px;
-            margin: 24px auto;
-            display: block;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-        }
-        h1 { font-size: 2rem; margin-bottom: 8px; }
-        p { color: #666; margin-bottom: 24px; }
-        a {
-            display: inline-block;
-            padding: 12px 24px;
-            background: #222;
-            color: white;
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 0.9rem;
-        }
-        a:hover { background: #444; }
-    </style>
+    <title>Sjekka – Takk</title>
+    <meta name="theme-color" content="#0d0c0b">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="preload" href="/fonts/Libron-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <h1>Takk! 🧾</h1>
-    <p>Kvitteringen din er lastet opp og blir behandlet.</p>
-    <a href="/index.html">Tilbake til startsiden</a>
-    <br><br>
-    <a href="/upload.html">Last opp en til</a>
-    <img class="receipt-img" id="img" src="" alt="Kvittering">
+    <header class="top">
+        <a href="/" class="mark">sjekka</a>
+        <nav>
+            <a href="/">utforsk</a>
+            <a href="/upload.html">last opp</a>
+        </nav>
+    </header>
+
+    <main class="narrow">
+        <section>
+            <p class="meta">Mottatt</p>
+            <h1>Takk.</h1>
+            <p class="lede">Kvitteringen er lastet opp og står i kø for å bli lest. Prisene dukker opp i oversikten om litt.</p>
+            <p class="stats" id="queue" hidden></p>
+            <div class="actions">
+                <a class="button primary" href="/upload.html">Last opp en til <span class="arrow">→</span></a>
+                <a class="button" href="/">Se prisene</a>
+            </div>
+        </section>
+
+        <section>
+            <img class="receipt" id="img" alt="Kvitteringen du lastet opp" hidden>
+        </section>
+    </main>
+
+    <footer>
+        <span>sjekka</span>
+        <span>Har du sjekka i dag?</span>
+    </footer>
+
     <script>
-        const id = new URLSearchParams(window.location.search).get('id');
-        document.getElementById('img').src = `/uploads/${id}`;
+        const id = new URLSearchParams(window.location.search).get("id");
+        if (id) {
+            const img = document.getElementById("img");
+            img.addEventListener("load", () => { img.hidden = false; });
+            img.src = `/uploads/${encodeURIComponent(id)}`;
+        }
+
+        fetch("/stats")
+            .then(res => res.ok ? res.json() : null)
+            .then(stats => {
+                if (!stats || !stats.pending_jobs) return;
+                const queue = document.getElementById("queue");
+                const b = document.createElement("b");
+                b.textContent = stats.pending_jobs;
+                queue.append(b, stats.pending_jobs === 1 ? "kvittering i kø" : "kvitteringer i kø");
+                queue.hidden = false;
+            })
+            .catch(() => {});
     </script>
 </body>
 </html>

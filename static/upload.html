@@ -1,91 +1,135 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-    <link rel="icon" type="image/png" href="/logo.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sjekka</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            max-width: 480px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-        h1 { font-size: 2rem; margin-bottom: 4px; }
-        p { color: #666; margin-top: 0; }
-        input[type="file"] { display: none; }
-        label {
-            display: block;
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            margin: 24px 0;
-        }
-        label:hover { border-color: #999; }
-        button {
-            width: 100%;
-            padding: 14px;
-            background: #222;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            cursor: pointer;
-        }
-        button:disabled { background: #999; }
-        #status { margin-top: 16px; color: #444; }
-    </style>
+    <title>Sjekka – Last opp kvittering</title>
+    <meta name="theme-color" content="#0d0c0b">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="preload" href="/fonts/Libron-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <h1>Sjekka 🧾</h1>
-    <p>Har du sjekka i dag?</p>
+    <header class="top">
+        <a href="/" class="mark">sjekka</a>
+        <nav>
+            <a href="/">utforsk</a>
+            <a href="/upload.html" aria-current="page">last opp</a>
+        </nav>
+    </header>
 
-    <label for="receipt" id="dropzone">
-        📷 Trykk for å laste opp kvittering
-    </label>
-    <input type="file" id="receipt" accept="image/*"/>
-    <button id="btn" onclick="upload()" disabled>Last opp</button>
-    <p id="status"></p>
+    <main class="narrow">
+        <section>
+            <p class="meta">Har du sjekka i dag?</p>
+            <h1>Last opp kvittering</h1>
+            <p class="lede">Ta et bilde av hele kvitteringen. Vi leser av butikk, varer og priser, og legger dem til i oversikten.</p>
+        </section>
+
+        <section>
+            <label class="drop" id="drop">
+                <input type="file" id="receipt" accept="image/jpeg,image/png,image/webp,image/heic">
+                <span id="prompt">Velg bilde eller slipp det her</span>
+                <span class="label" id="hint">JPEG, PNG, WebP eller HEIC · maks 10 MB</span>
+            </label>
+            <p class="file" id="file" hidden><span id="file-name"></span><span id="file-size"></span></p>
+
+            <div class="actions">
+                <button class="button primary" id="btn" type="button" disabled>Last opp <span class="arrow">→</span></button>
+            </div>
+            <p class="status" id="status" role="status"></p>
+        </section>
+    </main>
+
+    <footer>
+        <span>sjekka</span>
+        <span>Har du sjekka i dag?</span>
+    </footer>
 
     <script>
-        const input = document.getElementById('receipt');
-        const btn = document.getElementById('btn');
-        const dropzone = document.getElementById('dropzone');
+        const TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+        const MAX_MB = 10;
 
-        input.addEventListener('change', () => {
-            if (input.files[0]) {
-                dropzone.textContent = `📎 ${input.files[0].name}`;
-                btn.disabled = false;
+        const input = document.getElementById("receipt");
+        const drop = document.getElementById("drop");
+        const btn = document.getElementById("btn");
+        const statusEl = document.getElementById("status");
+        let file = null;
+        let previewUrl = null;
+
+        function setStatus(text, isError = false) {
+            statusEl.textContent = text;
+            statusEl.classList.toggle("error", isError);
+        }
+
+        function choose(f) {
+            if (!f) return;
+            if (!TYPES.includes(f.type)) {
+                setStatus("Filen må være et bilde (JPEG, PNG, WebP eller HEIC).", true);
+                return;
             }
-        });
+            if (f.size > MAX_MB * 1024 * 1024) {
+                setStatus(`Bildet er for stort. Maks ${MAX_MB} MB.`, true);
+                return;
+            }
+            file = f;
+            setStatus("");
+            btn.disabled = false;
 
-        async function upload() {
-            const file = input.files[0];
-            if (!file) return;
+            document.getElementById("file").hidden = false;
+            document.getElementById("file-name").textContent = f.name;
+            document.getElementById("file-size").textContent =
+                new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 1 }).format(f.size / 1024 / 1024) + " MB";
 
-            btn.disabled = true;
-            document.getElementById('status').textContent = 'Laster opp...';
-
-            const form = new FormData();
-            form.append('file', file);
-
-            try {
-                const res = await fetch('/upload', { method: 'POST', body: form });
-                const data = await res.json();
-                if (res.ok) {
-                    window.location.href = `/takk.html?id=${data.id}`;
-                } else {
-                    document.getElementById('status').textContent = `Feil: ${data.detail}`;
-                    btn.disabled = false;
-                }
-            } catch (e) {
-                document.getElementById('status').textContent = 'Noe gikk galt, prøv igjen.';
-                btn.disabled = false;
+            // Browsers can't show HEIC, so keep the text prompt for those.
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            drop.querySelector("img")?.remove();
+            if (f.type !== "image/heic") {
+                previewUrl = URL.createObjectURL(f);
+                const img = document.createElement("img");
+                img.src = previewUrl;
+                img.alt = "Forhåndsvisning av kvitteringen";
+                drop.append(img);
+                document.getElementById("prompt").hidden = true;
+                document.getElementById("hint").textContent = "Trykk for å velge et annet bilde";
+            } else {
+                document.getElementById("prompt").textContent = "Bilde valgt";
             }
         }
+
+        input.addEventListener("change", () => choose(input.files[0]));
+
+        drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("dragging"); });
+        drop.addEventListener("dragleave", () => drop.classList.remove("dragging"));
+        drop.addEventListener("drop", e => {
+            e.preventDefault();
+            drop.classList.remove("dragging");
+            choose(e.dataTransfer.files[0]);
+        });
+
+        btn.addEventListener("click", async () => {
+            if (!file) return;
+            btn.disabled = true;
+            setStatus("Laster opp …");
+
+            const form = new FormData();
+            form.append("file", file);
+
+            try {
+                const res = await fetch("/upload", { method: "POST", body: form });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    window.location.href = `/takk.html?id=${encodeURIComponent(data.id)}`;
+                    return;
+                }
+                setStatus(`Opplastingen feilet: ${data.detail || res.statusText}`, true);
+            } catch {
+                setStatus("Noe gikk galt. Sjekk nettet og prøv igjen.", true);
+            }
+            btn.disabled = false;
+        });
     </script>
 </body>
 </html>

@@ -3,227 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sjekka – Utforsk</title>
-    <link rel="icon" type="image/png" href="/logo.png">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: sans-serif; background: #f5f5f5; }
-
-        nav {
-            background: #222;
-            color: white;
-            padding: 14px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        nav a { color: white; text-decoration: none; font-size: 1.2rem; font-weight: bold; }
-
-        .toolbar {
-            padding: 16px 20px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            background: white;
-            border-bottom: 1px solid #eee;
-        }
-        .toolbar button {
-            padding: 6px 14px;
-            border: 1px solid #ddd;
-            border-radius: 20px;
-            background: white;
-            cursor: pointer;
-            font-size: 0.8rem;
-        }
-        .toolbar button.active {
-            background: #222;
-            color: white;
-            border-color: #222;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 12px;
-            padding: 20px;
-        }
-
-        .card {
-            background: white;
-            border-radius: 10px;
-            padding: 16px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-        }
-        .card .emoji { font-size: 2rem; margin-bottom: 8px; }
-        .card .name {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #222;
-            margin-bottom: 4px;
-            text-transform: capitalize;
-        }
-        .card .meta { font-size: 0.72rem; color: #999; margin-bottom: 8px; }
-        .card .price { font-size: 1.2rem; font-weight: bold; color: #222; }
-        .card .store { font-size: 0.72rem; color: #666; margin-top: 4px; }
-
-        #empty { text-align: center; padding: 60px 20px; color: #999; }
-    </style>
+    <title>Sjekka – Matpriser fra ekte kvitteringer</title>
+    <meta name="description" content="Sjekka gjør kvitteringer om til en søkbar oversikt over matpriser i Norge.">
+    <meta name="theme-color" content="#0d0c0b">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="preload" href="/fonts/Libron-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+    <header class="top">
+        <a href="/" class="mark">sjekka</a>
+        <nav>
+            <a href="/" aria-current="page">utforsk</a>
+            <a href="/upload.html">last opp</a>
+        </nav>
+    </header>
 
-<nav>
-    <a href="/">🧾 Sjekka</a>
-</nav>
+    <main>
+        <section class="intro">
+            <p class="meta">Matpriser fra ekte kvitteringer</p>
+            <h1>Sammen gjør vi matprisene transparente.</h1>
+            <p class="lede">Hver kvittering du deler hjelper folk i hele landet å handle smartere og spare penger.</p>
+            <p class="stats">
+                <span><b id="stat-receipts">–</b><span id="stat-receipts-label">kvitteringer delt</span></span>
+                <span><b id="stat-items">–</b><span id="stat-items-label">priser registrert</span></span>
+            </p>
+            <div class="actions">
+                <a class="button primary" href="/upload.html">Last opp kvittering <span class="arrow">→</span></a>
+            </div>
+        </section>
 
-<div id="hero" style="background:#222; color:white; padding: 28px 20px; text-align:center;">
-    <h1 style="font-size:1.4rem; font-weight:600; margin-bottom:8px;">
-        Sammen gjør vi matprisene transparente 🧾
-    </h1>
-    <p style="color:#aaa; font-size:0.85rem; max-width:480px; margin:0 auto 16px;">
-        Hver kvittering du deler hjelper folk i hele landet å handle smartere og spare penger.
-    </p>
-    <div style="display:flex; justify-content:center; gap:32px; margin-top:16px;">
-        <div>
-            <div id="stat-receipts" style="font-size:2rem; font-weight:700; color:white;">—</div>
-            <div style="font-size:0.75rem; color:#aaa; margin-top:2px;">kvitteringer delt</div>
-        </div>
-        <div>
-            <div id="stat-items" style="font-size:2rem; font-weight:700; color:white;">—</div>
-            <div style="font-size:0.75rem; color:#aaa; margin-top:2px;">priser registrert</div>
-        </div>
-    </div>
-    <a href="/upload.html" style="display:inline-block; margin-top:20px; background:white; color:#222; padding:10px 24px; border-radius:20px; font-size:0.85rem; font-weight:600; text-decoration:none;">
-        + Last opp din kvittering
-    </a>
-</div>
+        <section class="explore" aria-label="Produkter">
+            <input class="search" type="search" id="search" placeholder="Søk etter produkt eller merke" aria-label="Søk etter produkt" autocomplete="off">
+            <ul class="chips" id="categories"></ul>
+            <p class="count" id="count" aria-live="polite"></p>
+            <div class="grid" id="grid"></div>
+            <p class="notice" id="notice">Henter priser …</p>
+        </section>
+    </main>
 
-<div style="padding: 16px 20px; background: white; border-bottom: 1px solid #eee;">
-    <input
-        type="text"
-        id="search"
-        placeholder="Søk etter produkt..."
-        oninput="renderGrid()"
-        style="width:100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 20px; font-size: 0.9rem; outline: none;"
-    >
-</div>
+    <footer>
+        <span>sjekka</span>
+        <span>Har du sjekka i dag?</span>
+    </footer>
 
-<div class="toolbar" id="categories"></div>
-<div class="grid" id="grid"></div>
-<div id="empty" style="display:none">Ingen produkter funnet.</div>
+    <script>
+        const kr = new Intl.NumberFormat("nb-NO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const whole = new Intl.NumberFormat("nb-NO");
 
-<script>
-const CATEGORY_EMOJI = {
-    "Meieri": "🥛",
-    "Kjøtt": "🍗",
-    "Fisk": "🐟",
-    "Frukt og grønt": "🥦",
-    "Bakeri": "🍞",
-    "Godteri": "🍬",
-    "Snacks": "🍿",
-    "Drikke": "🥤",
-    "Frys": "🧊",
-    "Hermetikk": "🥫",
-    "Hygiene": "🧴",
-    "Rengjøring": "🧹",
-    "Annet": "📦",
-};
+        let allProducts = [];
+        let activeCategory = null;
 
-let allProducts = [];
-let activeCategory = null;
+        function el(tag, className, text) {
+            const node = document.createElement(tag);
+            if (className) node.className = className;
+            if (text != null) node.textContent = text;
+            return node;
+        }
 
-async function load() {
-    const [productsRes, statsRes] = await Promise.all([
-        fetch('/products'),
-        fetch('/stats')
-    ]);
-    allProducts = await productsRes.json();
-    const stats = await statsRes.json();
+        function daysAgo(dateStr) {
+            const date = new Date(dateStr);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            date.setHours(0, 0, 0, 0);
+            const diff = Math.round((today - date) / (1000 * 60 * 60 * 24));
+            if (Number.isNaN(diff)) return "";
+            if (diff <= 0) return "i dag";
+            if (diff === 1) return "i går";
+            if (diff < 14) return `${diff} dager siden`;
+            return date.toLocaleDateString("nb-NO", { day: "numeric", month: "short", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+        }
 
-    document.getElementById('stat-receipts').textContent = stats.total_receipts;
-    document.getElementById('stat-items').textContent = stats.total_items;
-
-    renderCategories();
-    renderGrid();
-}
-
-function renderCategories() {
-    const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))];
-    const toolbar = document.getElementById('categories');
-    toolbar.innerHTML = '';
-
-    const all = document.createElement('button');
-    all.textContent = 'Alle';
-    all.className = activeCategory === null ? 'active' : '';
-    all.onclick = () => { activeCategory = null; renderCategories(); renderGrid(); };
-    toolbar.appendChild(all);
-
-    categories.forEach(cat => {
-        const btn = document.createElement('button');
-        btn.textContent = `${CATEGORY_EMOJI[cat] || '📦'} ${cat}`;
-        btn.className = activeCategory === cat ? 'active' : '';
-        btn.onclick = () => { activeCategory = cat; renderCategories(); renderGrid(); };
-        toolbar.appendChild(btn);
-    });
-}
-
-function daysAgo(dateStr) {
-    const date = new Date(dateStr);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    date.setHours(0, 0, 0, 0);
-    const diff = Math.round((today - date) / (1000 * 60 * 60 * 24));
-    if (diff === 0) return 'i dag';
-    if (diff === 1) return 'i går';
-    return `${diff} dager siden`;
-}
-
-function renderGrid() {
-    const grid = document.getElementById('grid');
-    const query = document.getElementById('search').value.toLowerCase().trim();
-
-    const filtered = allProducts.filter(p => {
-        const matchCategory = activeCategory === null || p.category === activeCategory;
-        const matchSearch = !query || p.canonical_name.toLowerCase().includes(query);
-        return matchCategory && matchSearch;
-    });
-
-    document.getElementById('empty').style.display = filtered.length === 0 ? 'block' : 'none';
-
-    grid.innerHTML = filtered.map(p => {
-        const emoji = CATEGORY_EMOJI[p.category] || '📦';
-
-        const perUnit = (() => {
-            if (p.price_per_unit && (p.unit === 'g' || p.unit === 'ml')) {
-                return `<div class="meta">${p.price_per_unit.toFixed(2)}kr / 100${p.unit === 'ml' ? 'ml' : 'g'}</div>`;
+        // Price of one unit, plus the comparable unit price where there is one.
+        function prices(p) {
+            const each = p.pack_size > 1 ? p.total_price / p.pack_size : p.total_price;
+            let unit = "";
+            if (p.price_per_unit && (p.unit === "g" || p.unit === "ml")) {
+                unit = `${kr.format(p.price_per_unit)} kr / 100 ${p.unit}`;
+            } else if (p.unit === "stk" && p.pack_size > 1) {
+                unit = `${kr.format(each)} kr / stk`;
+            } else if (p.quantity) {
+                unit = `${whole.format(p.quantity)} ${p.unit}`;
             }
-            if (p.unit === 'stk' && p.pack_size > 1) {
-                const perStk = (p.total_price / p.pack_size).toFixed(2);
-                return `<div class="meta">${perStk}kr / stk</div>`;
+            return { each: each != null ? `${kr.format(each)} kr` : "–", unit };
+        }
+
+        function renderCategories() {
+            const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "nb"));
+            const list = document.getElementById("categories");
+            list.replaceChildren();
+
+            for (const cat of [null, ...categories]) {
+                const btn = el("button", "", cat ?? "Alle");
+                btn.type = "button";
+                btn.setAttribute("aria-pressed", String(activeCategory === cat));
+                btn.addEventListener("click", () => { activeCategory = cat; renderCategories(); renderGrid(); });
+                const item = el("li");
+                item.append(btn);
+                list.append(item);
             }
-            return `<div class="meta">${p.quantity} ${p.unit}</div>`;
-        })();
+        }
 
-        const displayPrice = (() => {
-            if (p.pack_size > 1) {
-                return (p.total_price / p.pack_size).toFixed(2);
+        function renderGrid() {
+            const query = document.getElementById("search").value.toLowerCase().trim();
+            const filtered = allProducts.filter(p =>
+                (activeCategory === null || p.category === activeCategory) &&
+                (!query || p.canonical_name.toLowerCase().includes(query) || (p.brand || "").toLowerCase().includes(query))
+            );
+
+            document.getElementById("count").textContent =
+                allProducts.length ? `${filtered.length} ${filtered.length === 1 ? "produkt" : "produkter"}` : "";
+            const notice = document.getElementById("notice");
+            notice.hidden = filtered.length > 0;
+            notice.textContent = allProducts.length ? "Ingen produkter passer søket." : "Ingen priser ennå. Last opp den første kvitteringen.";
+
+            document.getElementById("grid").replaceChildren(...filtered.map(p => {
+                const { each, unit } = prices(p);
+                const body = el("div", "body");
+                body.append(el("h3", "", p.canonical_name));
+                if (p.brand) body.append(el("p", "brand", p.brand));
+                body.append(el("p", "price", each));
+                if (unit) body.append(el("p", "unit", unit));
+                const where = el("p", "where");
+                where.append(el("span", "", p.store_chain || "Ukjent butikk"), el("span", "", daysAgo(p.purchase_date)));
+                const card = el("article", "card");
+                card.append(body, where);
+                return card;
+            }));
+        }
+
+        async function load() {
+            try {
+                const [productsRes, statsRes] = await Promise.all([fetch("/products"), fetch("/stats")]);
+                if (!productsRes.ok || !statsRes.ok) throw new Error();
+                allProducts = (await productsRes.json()).sort((a, b) => a.canonical_name.localeCompare(b.canonical_name, "nb"));
+                const stats = await statsRes.json();
+                document.getElementById("stat-receipts").textContent = whole.format(stats.total_receipts);
+                document.getElementById("stat-items").textContent = whole.format(stats.total_items);
+                if (stats.total_receipts === 1) document.getElementById("stat-receipts-label").textContent = "kvittering delt";
+                if (stats.total_items === 1) document.getElementById("stat-items-label").textContent = "pris registrert";
+                renderCategories();
+                renderGrid();
+            } catch {
+                document.getElementById("notice").textContent = "Kunne ikke hente priser. Prøv å laste siden på nytt.";
             }
-            return p.total_price?.toFixed(2);
-        })();
+        }
 
-       return `
-    <div class="card">
-        <div class="emoji">${emoji}</div>
-        <div class="name">${p.canonical_name}</div>
-        ${p.brand ? `<div style="font-size:0.72rem; color:#999; margin-bottom:2px;">${p.brand}</div>` : ''}
-        ${perUnit}
-        <div class="price">${displayPrice}kr</div>
-        <div class="store">${p.store_chain} · Oppdatert ${daysAgo(p.purchase_date)}</div>
-    </div>
-`;
-    }).join('');
-}
-
-load();
-</script>
+        document.getElementById("search").addEventListener("input", renderGrid);
+        load();
+    </script>
 </body>
 </html>
