@@ -45,6 +45,19 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Fonts, logos and images rarely change, so browsers (and Cloudflare) may keep
+# them for a week. Pages, CSS and JS keep the default and revalidate, since
+# their names don't change between deploys.
+LONG_CACHE = ("/fonts/", "/chains/", "/favicon.svg", "/og.png")
+
+
+@app.middleware("http")
+async def cache_static_assets(request: Request, call_next):
+    response = await call_next(request)
+    if response.status_code == 200 and request.url.path.startswith(LONG_CACHE):
+        response.headers["Cache-Control"] = "public, max-age=604800"
+    return response
+
 # Every upload costs a Gemini call, so uploads are limited per client and per
 # day. The per-client window lives in memory: there is only one app process.
 recent_uploads: dict[str, deque[float]] = defaultdict(deque)

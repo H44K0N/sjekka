@@ -117,3 +117,29 @@ def test_products_count_the_stores_each_product_was_seen_at(client, db):
     add_item(db, "Smør", 39.90, date(2026, 10, 1))
     counts = {p["canonical_name"]: p["store_count"] for p in client.get("/products").json()}
     assert counts == {"Lettmelk": 2, "Smør": 1}
+
+
+def test_fonts_and_logos_are_cached_for_a_week(client):
+    for path in ["/fonts/Libron-Regular.woff2", "/chains/kiwi.png", "/favicon.svg", "/og.png"]:
+        res = client.get(path)
+        assert res.status_code == 200, path
+        assert res.headers["cache-control"] == "public, max-age=604800", path
+
+
+def test_pages_and_scripts_are_not_long_cached(client):
+    for path in ["/", "/style.css", "/common.js", "/health"]:
+        assert "max-age=604800" not in client.get(path).headers.get("cache-control", ""), path
+
+
+def test_missing_pages_get_the_404_page(client):
+    res = client.get("/finnes-ikke.html")
+    assert res.status_code == 404
+    assert "Fant ikke siden" in res.text
+    assert "max-age" not in res.headers.get("cache-control", "")
+
+
+def test_pages_have_link_previews(client):
+    for path in ["/", "/upload.html", "/produkt.html", "/takk.html"]:
+        html = client.get(path).text
+        assert 'property="og:image" content="https://sjekka.tischbein.dev/og.png"' in html, path
+        assert 'name="twitter:card" content="summary_large_image"' in html, path
