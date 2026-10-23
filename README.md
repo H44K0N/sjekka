@@ -1,4 +1,4 @@
-# Sjekka 🧾
+# Sjekka
 
 > *Har du sjekka i dag?*
 
