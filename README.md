@@ -133,6 +133,8 @@ ssh -t vps 'sudo bash /tmp/sjekka-setup/deploy/setup-vps.sh /tmp/sjekka-setup/ci
 
 Production data lives in `/opt/sjekka/data` and secrets in `/opt/sjekka/.env`. The pipeline never touches either.
 
+Dependabot (`.github/dependabot.yml`) opens a PR every Monday when Python packages, the Python base image or GitHub Actions have new versions. Each runs the full pipeline; nothing is deployed until it's merged.
+
 ### Backups
 
 `sjekka-backup.timer` runs `deploy/backup.sh` every night at about 03:30. It copies the database with SQLite's online backup API, checks the copy, and keeps 14 days of gzipped copies in `/opt/sjekka/backups`. Those are on the same disk as the database, so copy them elsewhere as well. To restore:
