@@ -260,9 +260,7 @@ def test_cards_show_chain_logos_or_colours(page):
     page.goto("/")
     expect(cards(page).filter(has_text="Kjøttdeig").locator(".chain img")).to_have_attribute("alt", "Rema 1000")
     expect(cards(page).filter(has_text="Seigmenn").locator(".chain img")).to_have_attribute("alt", "Meny")
-    extra = cards(page).filter(has_text="<img src=x").locator(".chain")
-    expect(extra).to_have_text("Extra")
-    expect(extra).to_have_class("chain colored")
+    expect(cards(page).filter(has_text="<img src=x").locator(".chain img")).to_have_attribute("alt", "Extra")
     # Every logo file the badges use actually loads
     for img in page.locator(".chain img").all():
         assert img.evaluate("i => i.complete && i.naturalWidth > 0"), img.get_attribute("src")

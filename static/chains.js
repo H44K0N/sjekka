@@ -1,5 +1,5 @@
-// Store chains as recognisable badges: the chain's logo where a free one
-// exists (Wikimedia Commons, public domain text logos), otherwise its colours.
+// Store chains as recognisable badges: the chain's logo (from Wikimedia
+// Commons, see "Store logos" in the README for licences), otherwise its name.
 // Chain names come from Gemini, so matching is loose ("REMA 1000", "Rema").
 const CHAINS = [
     { match: /rema/i, logo: "/chains/rema-1000.svg" },
@@ -9,8 +9,7 @@ const CHAINS = [
     { match: /mega/i, logo: "/chains/coop-mega.svg" },
     { match: /joker/i, logo: "/chains/joker.png" },
     { match: /spar/i, logo: "/chains/spar.svg" },
-    // Extra's current logo isn't freely licensed: its colours instead
-    { match: /extra/i, colors: ["#d8001d", "#ffe100"] },
+    { match: /extra/i, logo: "/chains/extra.png" },
     // Others (Bunnpris, Obs, Oda…) show as plain text until we have a logo
 ];
 
@@ -25,11 +24,6 @@ function chainBadge(name) {
         img.alt = name;
         badge.classList.add("logo");
         badge.append(img);
-    } else if (chain?.colors) {
-        badge.classList.add("colored");
-        badge.style.background = chain.colors[0];
-        badge.style.color = chain.colors[1];
-        badge.textContent = name;
     } else {
         badge.textContent = name || "Ukjent butikk";
     }
