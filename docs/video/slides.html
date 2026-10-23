@@ -100,9 +100,9 @@
     <div class="box fade" data-at="5500"><h4>Health check</h4><p>live, or automatic<br>rollback</p></div>
   </div>
   <div class="extras">
-    <div class="box fade" data-at="7200"><h4>Tests</h4><p>unit · integration · deploy scripts<br>browser tests in Chromium</p></div>
-    <div class="box fade" data-at="7900"><h4>Safety</h4><p>upload limits · private photos<br>Gemini never called in tests</p></div>
-    <div class="box fade" data-at="8600"><h4>Operations</h4><p>nightly integrity-checked backups<br>14 days kept</p></div>
+    <div class="box fade" data-step="2" data-at="0"><h4>Tests</h4><p>unit · integration · deploy scripts<br>browser tests in Chromium</p></div>
+    <div class="box fade" data-step="2" data-at="700"><h4>Safety</h4><p>upload limits · private photos<br>Gemini never called in tests</p></div>
+    <div class="box fade" data-step="2" data-at="1400"><h4>Operations</h4><p>nightly integrity-checked backups<br>14 days kept</p></div>
   </div>
 </section>
 
@@ -117,12 +117,19 @@
 </section>
 
 <script>
-const scene = new URLSearchParams(location.search).get("s") || "title";
+const params = new URLSearchParams(location.search);
+const scene = params.get("s") || "title";
+// With &manual, record.py calls window.step(n) in time with the voice-over;
+// without it, steps run on their own timers.
+const manual = params.has("manual");
 const root = document.getElementById(scene);
 root.classList.add("active");
-for (const el of root.querySelectorAll("[data-at]")) {
-  setTimeout(() => el.classList.add("on"), +el.dataset.at);
-}
+const reveal = group => {
+  for (const el of root.querySelectorAll("[data-at]")) {
+    if ((+el.dataset.step || 1) === group) setTimeout(() => el.classList.add("on"), +el.dataset.at);
+  }
+};
+reveal(1);
 
 if (scene === "arch") {
   const $ = id => document.getElementById(id);
@@ -155,8 +162,8 @@ if (scene === "arch") {
     [20000, ["db"], ["w6"], ["db"], ["7", "The answer is validated, unit prices are computed in Python, duplicates are skipped, and it's saved."]],
     [23600, [], ["w7"], ["browser"], ["8", "The explore page reads the prices back from the database."]],
   ];
-  for (const [at, show, wires, hot, [n, text]] of steps) {
-    setTimeout(() => {
+  window.step = i => {
+      const [, show, wires, hot, [n, text]] = steps[i - 1];
       show.forEach(id => $(id).classList.add("on"));
       document.querySelectorAll(".hot").forEach(el => el.classList.remove("hot"));
       wires.forEach(id => { $(id).classList.add("on", "hot"); });
@@ -170,11 +177,12 @@ if (scene === "arch") {
         stepEl.append(num, text);
         stepEl.style.opacity = 1;
       }, 300);
-    }, at);
-  }
+  };
+  if (!manual) steps.forEach(([at], i) => setTimeout(() => window.step(i + 1), at));
 }
 if (scene === "pipeline") {
-  for (const el of document.querySelectorAll(".arrow")) setTimeout(() => el.classList.add("on"), +el.dataset.at);
+  window.step = reveal;
+  if (!manual) setTimeout(() => reveal(2), 7200);
 }
 </script>
 </body>
