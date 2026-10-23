@@ -8,7 +8,7 @@
 # too, e.g. scp from another machine.
 set -euo pipefail
 
-dir=/opt/sjekka
+dir="${SJEKKA_DIR:-/opt/sjekka}"
 dest="$dir/backups"
 keep_days="${KEEP_DAYS:-14}"
 db="$dir/data/sjekka.db"

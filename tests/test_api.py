@@ -37,3 +37,19 @@ def test_products_returns_latest_price(client, db):
 def test_pages_are_served(client):
     for path in ["/", "/upload.html", "/takk.html", "/style.css"]:
         assert client.get(path).status_code == 200
+
+
+def test_products_lists_each_name_once_when_bought_same_day(client, db):
+    add_item(db, "Lettmelk", 24.90, date(2026, 10, 1), store="Kiwi")
+    add_item(db, "Lettmelk", 23.90, date(2026, 10, 1), store="Rema 1000")
+    assert len(client.get("/products").json()) == 1
+
+
+def test_products_empty_database(client):
+    assert client.get("/products").json() == []
+    assert client.get("/stats").json() == {"total_receipts": 0, "total_items": 0, "pending_jobs": 0}
+
+
+def test_unknown_paths_are_404(client):
+    assert client.get("/nope.html").status_code == 404
+    assert client.get("/uploads/nope.jpg").status_code == 404

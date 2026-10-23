@@ -34,13 +34,22 @@ jobs:
           cache-dependency-path: requirements*.txt
 
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
+        run: |
+          pip install -r requirements-dev.txt
+          playwright install --with-deps chromium
 
       - name: Lint
-        run: ruff check --output-format=github .
+        run: |
+          ruff check --output-format=github .
+          shellcheck deploy/*.sh
 
       - name: Test
-        run: pytest
+        # Unit, integration, deploy-script and browser tests. E2E_REQUIRED
+        # makes the browser tests fail instead of skipping if Playwright is
+        # missing.
+        env:
+          E2E_REQUIRED: "1"
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=95
 
   image:
     name: Build and smoke test image

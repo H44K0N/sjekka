@@ -9,7 +9,7 @@
 set -euo pipefail
 
 IMAGE_REPO=ghcr.io/h44k0n/sjekka
-cd /opt/sjekka
+cd "${SJEKKA_DIR:-/opt/sjekka}"
 
 sha="${SSH_ORIGINAL_COMMAND:-${1:-}}"
 if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
