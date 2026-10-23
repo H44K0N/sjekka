@@ -340,6 +340,11 @@ def test_unknown_product_page(page):
 SEEDED = {'<img src=x onerror="window.pwned=1">', "Seigmenn", "Agurk", "Lettmelk", "Kjøttdeig"}
 
 
+def sort_by(page, name):
+    page.locator("#sort-toggle").click()
+    page.get_by_role("menuitemradio", name=name).click()
+
+
 def card_names(page):
     """The seeded products in display order; other tests may add more to the shared server."""
     return [n for n in page.locator(".card h3").all_text_contents() if n in SEEDED]
@@ -348,25 +353,25 @@ def card_names(page):
 def test_sorting_by_price_and_newest(page):
     page.goto("/")
     expect(cards(page).first).to_be_visible()
-    page.get_by_role("button", name="lavest pris").click()
+    sort_by(page, "Lavest pris")
     # One item each: <img…> 10,00 · Seigmenn 38,70/3 = 12,90 · Agurk 30/2 = 15,00 · Lettmelk 24,90 · Kjøttdeig 89,00
     assert card_names(page) == ['<img src=x onerror="window.pwned=1">', "Seigmenn", "Agurk", "Lettmelk", "Kjøttdeig"]
-    expect(page.get_by_role("button", name="lavest pris")).to_have_attribute("aria-pressed", "true")
-    page.get_by_role("button", name="nyest").click()
+    expect(page.locator("#sort-current")).to_have_text("lavest pris")
+    sort_by(page, "Nyest")
     assert card_names(page)[-1] == "Agurk"  # 40 days old
 
 
 def test_view_is_kept_in_the_url(page):
     page.goto("/")
     page.get_by_role("button", name="Meieri").click()
-    page.get_by_role("button", name="lavest pris").click()
+    sort_by(page, "Lavest pris")
     page.fill("#search", "melk")
     expect(page).to_have_url(re.compile(r"\?q=melk&kategori=Meieri&sorter=pris$"))
 
     page.goto("/?kategori=Kj%C3%B8tt&sorter=nyest")
     expect(cards(page)).to_have_count(1)
     expect(page.get_by_role("button", name="Kjøtt")).to_have_attribute("aria-pressed", "true")
-    expect(page.get_by_role("button", name="nyest")).to_have_attribute("aria-pressed", "true")
+    expect(page.locator("#sort-current")).to_have_text("nyest")
 
 
 def test_unknown_category_in_url_falls_back_to_all(page):
@@ -376,3 +381,30 @@ def test_unknown_category_in_url_falls_back_to_all(page):
     page.goto("/?kategori=Finnes%20ikke")
     expect(cards(page)).to_have_count(total)
     expect(page.get_by_role("button", name="Alle")).to_have_attribute("aria-pressed", "true")
+
+
+def test_sort_menu_opens_closes_and_works_with_the_keyboard(page):
+    page.goto("/")
+    toggle, menu = page.locator("#sort-toggle"), page.locator("#sort-menu")
+    expect(menu).to_be_hidden()
+    toggle.click()
+    expect(menu).to_be_visible()
+    expect(toggle).to_have_attribute("aria-expanded", "true")
+    expect(page.get_by_role("menuitemradio", name="Navn")).to_have_attribute("aria-checked", "true")
+
+    page.locator("h1").click()  # tapping elsewhere folds it away
+    expect(menu).to_be_hidden()
+    expect(toggle).to_have_attribute("aria-expanded", "false")
+
+    toggle.focus()
+    page.keyboard.press("ArrowDown")  # opens with the current choice focused
+    expect(page.get_by_role("menuitemradio", name="Navn")).to_be_focused()
+    page.keyboard.press("ArrowDown")
+    page.keyboard.press("Enter")
+    expect(menu).to_be_hidden()
+    expect(page.locator("#sort-current")).to_have_text("lavest pris")
+    expect(toggle).to_be_focused()
+
+    toggle.click()
+    page.keyboard.press("Escape")
+    expect(menu).to_be_hidden()
