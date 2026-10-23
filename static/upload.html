@@ -142,7 +142,7 @@
                 const data = await res.json().catch(() => ({}));
                 if (res.ok) {
                     rememberPreview();
-                    window.location.href = "/takk.html";
+                    window.location.href = `/takk.html?id=${encodeURIComponent(data.id)}`;
                     return;
                 }
                 setStatus(`Opplastingen feilet: ${data.detail || res.statusText}`, true);

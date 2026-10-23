@@ -25,8 +25,12 @@
         <section>
             <p class="meta">Mottatt</p>
             <h1>Takk.</h1>
-            <p class="lede">Kvitteringen er lastet opp og står i kø for å bli lest. Prisene dukker opp i oversikten om litt, og bildet slettes når det er lest.</p>
-            <p class="stats" id="queue" hidden></p>
+            <p class="lede">Kvitteringen er lastet opp og blir lest nå. Bildet slettes når det er lest.</p>
+            <div class="progress" id="progress" aria-live="polite" hidden>
+                <p class="state" id="state"></p>
+                <p class="found" id="found" hidden></p>
+                <ul class="items" id="items" hidden></ul>
+            </div>
             <div class="actions">
                 <a class="button primary" href="/upload.html">Last opp en til <span class="arrow">→</span></a>
                 <a class="button" href="/">Se prisene</a>
@@ -43,6 +47,8 @@
         <span>Har du sjekka i dag?</span>
     </footer>
 
+    <script src="/common.js"></script>
+    <script src="/chains.js"></script>
     <script>
         // Set by upload.html in this tab; the server never serves photos back.
         let preview = null;
@@ -53,17 +59,61 @@
             img.src = preview;
         }
 
-        fetch("/stats")
-            .then(res => res.ok ? res.json() : null)
-            .then(stats => {
-                if (!stats || !stats.pending_jobs) return;
-                const queue = document.getElementById("queue");
-                const b = document.createElement("b");
-                b.textContent = stats.pending_jobs;
-                queue.append(b, stats.pending_jobs === 1 ? "kvittering i kø" : "kvitteringer i kø");
-                queue.hidden = false;
-            })
-            .catch(() => {});
+        // Follow the upload until Gemini has read it
+        const id = new URLSearchParams(location.search).get("id");
+        const $ = i => document.getElementById(i);
+        const POLL_MS = 2000, GIVE_UP_MS = 5 * 60 * 1000;
+        const started = Date.now();
+
+        function setState(text, kind = "") {
+            $("progress").hidden = false;
+            $("state").textContent = text;
+            $("state").className = `state ${kind}`;
+        }
+
+        function showReceipt(receipt) {
+            const date = receipt.purchase_date ? new Date(receipt.purchase_date).toLocaleDateString("nb-NO", { day: "numeric", month: "long" }) : null;
+            const n = receipt.items.length;
+            $("found").replaceChildren(chainBadge(receipt.store_chain),
+                el("span", "", [date, `${n} ${n === 1 ? "vare" : "varer"}`].filter(Boolean).join(" · ")));
+            $("found").hidden = false;
+            $("items").replaceChildren(...receipt.items.map(item => {
+                const li = el("li");
+                const link = el("a", "", item.canonical_name);
+                link.href = `/produkt.html?navn=${encodeURIComponent(item.canonical_name)}`;
+                const each = item.pack_size > 1 ? item.total_price / item.pack_size : item.total_price;
+                li.append(link, el("span", "", each != null ? `${kr.format(each)} kr` : "–"));
+                return li;
+            }));
+            $("items").hidden = !n;
+        }
+
+        async function poll() {
+            let job;
+            try {
+                const res = await fetch(`/jobs/${encodeURIComponent(id)}`);
+                if (!res.ok) throw new Error(res.status);
+                job = await res.json();
+            } catch {
+                setState("Fikk ikke kontakt med Sjekka. Prisene dukker opp i oversikten når kvitteringen er lest.");
+                return;
+            }
+            if (job.status === "done") {
+                setState("Lest. Prisene ligger nå i oversikten.", "ok");
+                if (job.receipt) showReceipt(job.receipt);
+                return;
+            }
+            if (job.status === "duplicate") return setState("Denne kvitteringen er allerede registrert, så prisene telles ikke to ganger.", "ok");
+            if (job.status === "failed") return setState("Kunne ikke lese kvitteringen. Prøv et skarpere bilde der hele kvitteringen er med.", "error");
+
+            if (job.status === "processing") setState("Gemini leser kvitteringen …", "busy");
+            else if (job.retrying) setState("Gemini er opptatt. Prøver igjen om litt …", "busy");
+            else setState(job.queue_position > 1 ? `I kø, nummer ${job.queue_position} …` : "I kø …", "busy");
+
+            if (Date.now() - started < GIVE_UP_MS) setTimeout(poll, POLL_MS);
+            else setState("Det tar litt tid. Prisene dukker opp i oversikten når kvitteringen er lest.");
+        }
+        if (id) poll();
     </script>
 </body>
 </html>

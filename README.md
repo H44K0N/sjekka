@@ -38,6 +38,7 @@ Visible on the explore page
 - Multi-pack and deal detection
 - Explore page with category filters and search; store chains shown as logos or in their colours
 - Product page: latest price per store, cheapest first, with each store's price history on shared axes
+- After uploading, the thank-you page follows the receipt live (queue, reading, retrying) and lists what was found
 - Live counters showing total receipts and prices registered
 - Docker image with CI/CD to a VPS (see [Deployment](#deployment))
 
@@ -55,7 +56,7 @@ Visible on the explore page
 ### Security
 
 - Receipt photos are sent to Google's Gemini API to be read, so Google's API terms apply (on the free tier Google may use them to improve its products; the paid tier says it doesn't). The upload page says so. On the server, photos are never served and are deleted once read; photos of failed jobs stay for retrying. The thank-you page shows a small copy kept in the uploader's own browser tab
-- Gemini's raw answer and the model name are kept on each job (`jobs.raw_response`, `jobs.model`), so extraction and product matching can be reworked later without the photos
+- Gemini's raw answer and the model name are kept on each job (`jobs.raw_response`, `jobs.model`), so extraction and product matching can be reworked later without the photos. `util/export_extractions.py` writes them all as JSON Lines (see the script for running it on the server)
 - `/upload` has no authentication. Every upload costs a Gemini call, so uploads are limited to 10 per client per hour and 200 per day (`UPLOADS_PER_IP_PER_HOUR`, `UPLOADS_PER_DAY`). A Cloudflare rate-limiting rule in front would stop floods before they reach the app
 
 ### Code
