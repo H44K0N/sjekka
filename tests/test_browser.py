@@ -5,6 +5,7 @@ Needs `pip install playwright && playwright install chromium`, or set
 CHROMIUM_PATH to use an installed Chromium. Skipped when Playwright is
 missing, unless E2E_REQUIRED=1 (as in CI)."""
 import io
+import re
 import os
 import socket
 import subprocess
@@ -300,3 +301,36 @@ def test_product_page_tooltip_and_table(page):
 def test_unknown_product_page(page):
     page.goto("/produkt.html?navn=Finnes%20ikke")
     expect(page.locator("#notice")).to_have_text("Fant ingen priser for dette produktet.")
+
+
+def card_names(page):
+    return page.locator(".card h3").all_text_contents()
+
+
+def test_sorting_by_price_and_newest(page):
+    page.goto("/")
+    expect(cards(page)).to_have_count(5)
+    page.get_by_role("button", name="lavest pris").click()
+    # One item each: <img…> 10,00 · Seigmenn 38,70/3 = 12,90 · Agurk 30/2 = 15,00 · Lettmelk 24,90 · Kjøttdeig 89,00
+    assert card_names(page) == ['<img src=x onerror="window.pwned=1">', "Seigmenn", "Agurk", "Lettmelk", "Kjøttdeig"]
+    expect(page.get_by_role("button", name="lavest pris")).to_have_attribute("aria-pressed", "true")
+    page.get_by_role("button", name="nyest").click()
+    assert card_names(page)[-1] == "Agurk"  # 40 days old
+
+
+def test_view_is_kept_in_the_url(page):
+    page.goto("/")
+    page.get_by_role("button", name="Meieri").click()
+    page.get_by_role("button", name="lavest pris").click()
+    page.fill("#search", "melk")
+    expect(page).to_have_url(re.compile(r"\?q=melk&kategori=Meieri&sorter=pris$"))
+
+    page.goto("/?kategori=Kj%C3%B8tt&sorter=nyest")
+    expect(cards(page)).to_have_count(1)
+    expect(page.get_by_role("button", name="Kjøtt")).to_have_attribute("aria-pressed", "true")
+    expect(page.get_by_role("button", name="nyest")).to_have_attribute("aria-pressed", "true")
+
+
+def test_unknown_category_in_url_falls_back_to_all(page):
+    page.goto("/?kategori=Finnes%20ikke")
+    expect(cards(page)).to_have_count(5)

@@ -39,7 +39,15 @@
         <section class="explore" aria-label="Produkter">
             <input class="search" type="search" id="search" placeholder="Søk etter produkt eller merke" aria-label="Søk etter produkt" autocomplete="off">
             <ul class="chips" id="categories"></ul>
-            <p class="count" id="count" aria-live="polite"></p>
+            <div class="listbar">
+                <p class="count" id="count" aria-live="polite"></p>
+                <div class="sort" role="group" aria-label="Sorter">
+                    <span>Sorter:</span>
+                    <button type="button" data-sort="navn">navn</button>
+                    <button type="button" data-sort="pris">lavest pris</button>
+                    <button type="button" data-sort="nyest">nyest</button>
+                </div>
+            </div>
             <div class="grid" id="grid"></div>
             <p class="notice" id="notice">Henter priser …</p>
         </section>
@@ -54,7 +62,30 @@
     <script src="/chains.js"></script>
     <script>
         let allProducts = [];
-        let activeCategory = null;
+        // Search, category and sort live in the URL, so a view can be shared
+        const params = new URLSearchParams(location.search);
+        let activeCategory = params.get("kategori");
+        let sortBy = ["navn", "pris", "nyest"].includes(params.get("sorter")) ? params.get("sorter") : "navn";
+        document.getElementById("search").value = params.get("q") || "";
+
+        const SORTS = {
+            navn: (a, b) => a.canonical_name.localeCompare(b.canonical_name, "nb"),
+            // The price of one item: per-unit prices can't be compared across g, ml and stk
+            pris: (a, b) => (unitPrice(a) ?? Infinity) - (unitPrice(b) ?? Infinity),
+            nyest: (a, b) => (b.purchase_date || "").localeCompare(a.purchase_date || ""),
+        };
+        function unitPrice(p) {
+            return p.total_price == null ? null : p.pack_size > 1 ? p.total_price / p.pack_size : p.total_price;
+        }
+
+        function saveView() {
+            const q = document.getElementById("search").value.trim();
+            const next = new URLSearchParams();
+            if (q) next.set("q", q);
+            if (activeCategory) next.set("kategori", activeCategory);
+            if (sortBy !== "navn") next.set("sorter", sortBy);
+            history.replaceState(null, "", next.size ? `?${next}` : location.pathname);
+        }
 
         function renderCategories() {
             const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "nb"));
@@ -77,7 +108,11 @@
             const filtered = allProducts.filter(p =>
                 (activeCategory === null || p.category === activeCategory) &&
                 (!query || p.canonical_name.toLowerCase().includes(query) || (p.brand || "").toLowerCase().includes(query))
-            );
+            ).sort((a, b) => SORTS[sortBy](a, b) || SORTS.navn(a, b));
+            for (const btn of document.querySelectorAll("[data-sort]")) {
+                btn.setAttribute("aria-pressed", String(btn.dataset.sort === sortBy));
+            }
+            saveView();
 
             document.getElementById("count").textContent =
                 allProducts.length ? `${filtered.length} ${filtered.length === 1 ? "produkt" : "produkter"}` : "";
@@ -106,7 +141,9 @@
             try {
                 const [productsRes, statsRes] = await Promise.all([fetch("/products"), fetch("/stats")]);
                 if (!productsRes.ok || !statsRes.ok) throw new Error();
-                allProducts = (await productsRes.json()).sort((a, b) => a.canonical_name.localeCompare(b.canonical_name, "nb"));
+                allProducts = await productsRes.json();
+                // A category from an old link may no longer exist
+                if (activeCategory && !allProducts.some(p => p.category === activeCategory)) activeCategory = null;
                 const stats = await statsRes.json();
                 document.getElementById("stat-receipts").textContent = whole.format(stats.total_receipts);
                 document.getElementById("stat-items").textContent = whole.format(stats.total_items);
@@ -120,6 +157,9 @@
         }
 
         document.getElementById("search").addEventListener("input", renderGrid);
+        for (const btn of document.querySelectorAll("[data-sort]")) {
+            btn.addEventListener("click", () => { sortBy = btn.dataset.sort; renderGrid(); });
+        }
         load();
     </script>
 </body>
