@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from google.genai import errors
@@ -97,7 +97,7 @@ def test_client_errors_fail_immediately(client, db):
 
 
 def test_waiting_job_does_not_block_the_queue(client, db):
-    now = datetime.utcnow()
+    now = models.utcnow()
     waiting = models.Job(filename="old.jpg", attempts=3, created_at=now - timedelta(minutes=5), updated_at=now)
     fresh = models.Job(filename="new.jpg", created_at=now)
     db.add_all([waiting, fresh])
