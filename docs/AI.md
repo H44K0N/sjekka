@@ -78,3 +78,4 @@ The AI's work wasn't right the first time every time. Recorded so the process ca
 | #12 | Showcase video and the scripts that record it | Gemini simulated in the recording; stated on the end card |
 | #13 | AI voice-over for the video (Kokoro text-to-speech) | Script written by Claude; pronunciation checked by transcribing the track with Whisper |
 | #14 | Privacy notice, photos deleted after reading, raw Gemini answers kept | Haakon caught that the video called the photos private while they're sent to Google |
+| #15 | Product page with per-store prices and history; chain logos on cards | Logo idea from Haakon; chart colours validated, then a logo-per-row design instead of colour per store |

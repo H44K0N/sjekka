@@ -43,10 +43,12 @@ def seed(db_path):
         products = [
             # name, brand, category, quantity, unit, pack, price, per unit, store, days ago
             ("Lettmelk", "Tine", "Meieri", 1000, "ml", 1, 24.9, 2.49, "Kiwi", 0),
+            ("Lettmelk", "Q", "Meieri", 1000, "ml", 1, 22.9, 2.29, "Rema 1000", 3),
+            ("Lettmelk", "Tine", "Meieri", 1000, "ml", 1, 23.9, 2.39, "Kiwi", 20),
             ("Kjøttdeig", "Gilde", "Kjøtt", 400, "g", 1, 89.0, 22.25, "Rema 1000", 1),
             ("Seigmenn", "Laban", "Godteri", 260, "g", 3, 38.7, 4.96, "Meny", 5),
             ("Agurk", None, "Frukt og grønt", None, "stk", 2, 30.0, 15.0, "Kiwi", 40),
-            ('<img src=x onerror="window.pwned=1">', None, "Annet", None, None, 1, 10.0, None, "Kiwi", 0),
+            ('<img src=x onerror="window.pwned=1">', None, "Annet", None, None, 1, 10.0, None, "Extra", 0),
         ]
         for name, brand, cat, qty, unit, pack, price, ppu, store, days in products:
             receipt = models.Receipt(image_filename="r.jpg", store_chain=store,
@@ -109,7 +111,7 @@ def cards(page):
 def test_explore_page_shows_products_and_stats(page):
     page.goto("/")
     expect(cards(page)).to_have_count(5)
-    expect(page.locator("#stat-receipts")).to_have_text("5")
+    expect(page.locator("#stat-receipts")).to_have_text("7")
     expect(page.locator("#count")).to_have_text("5 produkter")
     expect(page.locator(".chips button")).to_have_text(
         ["Alle", "Annet", "Frukt og grønt", "Godteri", "Kjøtt", "Meieri"])
@@ -121,7 +123,7 @@ def test_prices_use_norwegian_formatting(page):
     expect(milk.locator(".price")).to_have_text("24,90 kr")
     expect(milk.locator(".unit")).to_have_text("2,49 kr / 100 ml")
     expect(milk.locator(".brand")).to_have_text("Tine")
-    expect(milk.locator(".where")).to_contain_text("Kiwi")
+    expect(milk.locator(".where .chain img")).to_have_attribute("alt", "Kiwi")
     expect(milk.locator(".where")).to_contain_text("i dag")
 
 
@@ -172,7 +174,7 @@ def test_product_names_are_not_rendered_as_html(page):
 def test_no_horizontal_scroll_on_a_phone(browser, site):
     context = browser.new_context(base_url=site[0], viewport={"width": 360, "height": 740})
     page = context.new_page()
-    for path in ["/", "/upload.html", "/takk.html"]:
+    for path in ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk"]:
         page.goto(path)
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), path
     context.close()
@@ -252,3 +254,51 @@ def test_drag_and_drop(page, tmp_path):
     }""", data)
     expect(page.locator("#file-name")).to_have_text("dropped.png")
     expect(page.locator("#btn")).to_be_enabled()
+
+
+def test_cards_show_chain_logos_or_colours(page):
+    page.goto("/")
+    expect(cards(page).filter(has_text="Kjøttdeig").locator(".chain img")).to_have_attribute("alt", "Rema 1000")
+    expect(cards(page).filter(has_text="Seigmenn").locator(".chain img")).to_have_attribute("alt", "Meny")
+    extra = cards(page).filter(has_text="<img src=x").locator(".chain")
+    expect(extra).to_have_text("Extra")
+    expect(extra).to_have_class("chain colored")
+    # Every logo file the badges use actually loads
+    for img in page.locator(".chain img").all():
+        assert img.evaluate("i => i.complete && i.naturalWidth > 0"), img.get_attribute("src")
+
+
+def test_card_opens_the_product_page(page):
+    page.goto("/")
+    milk = cards(page).filter(has_text="Lettmelk")
+    expect(milk.locator(".stores")).to_have_text("Sammenlign 2 butikker")
+    milk.click()
+    page.wait_for_url("**/produkt.html?navn=Lettmelk")
+    expect(page.locator("h1")).to_have_text("Lettmelk")
+
+
+def test_product_page_ranks_stores_cheapest_first(page):
+    page.goto("/produkt.html?navn=Lettmelk")
+    expect(page.locator("#summary")).to_have_text("3 registrerte priser fra 2 butikker.")
+    stores = page.locator(".store")
+    expect(stores).to_have_count(2)
+    # Rema's latest price (22,90) beats Kiwi's latest (24,90), not Kiwi's older 23,90
+    expect(stores.nth(0).locator(".chain img")).to_have_attribute("alt", "Rema 1000")
+    expect(stores.nth(0).locator(".amount")).to_contain_text("billigst")
+    expect(stores.nth(1).locator(".amount")).to_contain_text("+0,20 kr / 100 ml")
+    expect(page.locator("#best-price")).to_have_text("22,90 kr")
+    # Kiwi's timeline has both of its prices
+    expect(stores.nth(1).locator("circle:not(.hit)")).to_have_count(2)
+
+
+def test_product_page_tooltip_and_table(page):
+    page.goto("/produkt.html?navn=Lettmelk")
+    page.locator(".store").nth(1).locator("circle.hit").first.hover()
+    expect(page.locator("#tip")).to_contain_text("23,90 kr")
+    page.locator(".history summary").click()
+    expect(page.locator("#history tr")).to_have_count(3)
+
+
+def test_unknown_product_page(page):
+    page.goto("/produkt.html?navn=Finnes%20ikke")
+    expect(page.locator("#notice")).to_have_text("Fant ingen priser for dette produktet.")

@@ -130,6 +130,13 @@ def get_products(db: Session = Depends(get_db)):
         .all()
     )
 
+    store_counts = dict(
+        db.query(models.ReceiptItem.canonical_name, func.count(func.distinct(models.Receipt.store_chain)))
+        .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
+        .group_by(models.ReceiptItem.canonical_name)
+        .all()
+    )
+
     seen = set()
     products = []
     for item, receipt in items:
@@ -147,9 +154,47 @@ def get_products(db: Session = Depends(get_db)):
             "price_per_unit": item.price_per_unit,
             "store_chain": receipt.store_chain,
             "purchase_date": str(receipt.purchase_date),
+            "store_count": store_counts.get(item.canonical_name, 1),
         })
 
     return products
+
+
+@app.get("/products/{name}")
+def get_product(name: str, db: Session = Depends(get_db)):
+    """Every registered price of one product, oldest first, for the product page."""
+    rows = (
+        db.query(models.ReceiptItem, models.Receipt)
+        .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
+        .filter(models.ReceiptItem.canonical_name == name)
+        .order_by(models.Receipt.purchase_date, models.ReceiptItem.id)
+        .all()
+    )
+    if not rows:
+        raise HTTPException(404, "Fant ikke produktet.")
+
+    latest = rows[-1][0]
+    return {
+        "canonical_name": name,
+        "category": latest.category,
+        "prices": [
+            {
+                "store_chain": receipt.store_chain,
+                "store_location": receipt.store_location,
+                "purchase_date": str(receipt.purchase_date) if receipt.purchase_date else None,
+                "brand": item.brand,
+                "variant": item.variant,
+                "quantity": item.quantity,
+                "unit": item.unit,
+                "pack_size": item.pack_size,
+                "total_price": item.total_price,
+                "price_per_unit": item.price_per_unit,
+                "is_member_price": bool(item.is_member_price),
+                "deal": item.deal,
+            }
+            for item, receipt in rows
+        ],
+    }
 
 @app.get("/stats")
 def get_stats(db: Session = Depends(get_db)):

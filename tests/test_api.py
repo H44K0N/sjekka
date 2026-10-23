@@ -86,3 +86,34 @@ def test_app_can_run_without_the_worker(monkeypatch):
     monkeypatch.setattr(main.worker, "run_worker", lambda: (_ for _ in ()).throw(AssertionError("started")))
     with TestClient(main.app) as client:
         assert client.get("/health").status_code == 200
+
+
+def test_product_lists_every_price_oldest_first(client, db):
+    add_item(db, "Lettmelk", 24.90, date(2026, 10, 1), store="Kiwi")
+    add_item(db, "Lettmelk", 22.90, date(2026, 9, 1), store="Rema 1000")
+    add_item(db, "Smør", 39.90, date(2026, 10, 1))
+    product = client.get("/products/Lettmelk").json()
+    assert product["canonical_name"] == "Lettmelk"
+    assert product["category"] == "Meieri"
+    assert [(p["store_chain"], p["total_price"]) for p in product["prices"]] == [("Rema 1000", 22.90), ("Kiwi", 24.90)]
+    assert product["prices"][0]["purchase_date"] == "2026-09-01"
+
+
+def test_product_names_with_special_characters(client, db):
+    add_item(db, "Smør & ost", 39.90, date(2026, 10, 1))
+    assert client.get("/products/Sm%C3%B8r%20%26%20ost").json()["canonical_name"] == "Smør & ost"
+
+
+def test_unknown_product_is_404(client):
+    res = client.get("/products/Finnes%20ikke")
+    assert res.status_code == 404
+    assert "Fant ikke" in res.json()["detail"]
+
+
+def test_products_count_the_stores_each_product_was_seen_at(client, db):
+    add_item(db, "Lettmelk", 24.90, date(2026, 10, 1), store="Kiwi")
+    add_item(db, "Lettmelk", 22.90, date(2026, 9, 1), store="Rema 1000")
+    add_item(db, "Lettmelk", 23.90, date(2026, 8, 1), store="Kiwi")
+    add_item(db, "Smør", 39.90, date(2026, 10, 1))
+    counts = {p["canonical_name"]: p["store_count"] for p in client.get("/products").json()}
+    assert counts == {"Lettmelk": 2, "Smør": 1}

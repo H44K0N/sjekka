@@ -36,7 +36,8 @@ Visible on the explore page
 - Product normalization: generic names, brands stored separately
 - Price-per-unit calculation (per 100g, per 100ml, per stk)
 - Multi-pack and deal detection
-- Explore page with category filters and search
+- Explore page with category filters and search; store chains shown as logos or in their colours
+- Product page: latest price per store, cheapest first, with each store's price history on shared axes
 - Live counters showing total receipts and prices registered
 - Docker image with CI/CD to a VPS (see [Deployment](#deployment))
 
@@ -150,6 +151,12 @@ docker compose start app
 - **Database:** SQLite
 - **Frontend:** Plain HTML / CSS / JS
 - **Infrastructure:** Docker on a VPS, Cloudflare Tunnel, GitHub Actions
+
+---
+
+## Store logos
+
+The chain logos in `static/chains/` are text logos marked public domain on Wikimedia Commons (Rema 1000, Kiwi, Meny, Coop Prix, Coop Mega, Joker, Spar). They're trademarks of their chains and are only used to show which store a price is from. Extra's current logo isn't freely licensed, so it's shown in its colours; other chains show as text. Matching is in `static/chains.js`.
 
 ---
 

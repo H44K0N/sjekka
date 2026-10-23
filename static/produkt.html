@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sjekka – Produkt</title>
+    <meta name="theme-color" content="#0d0c0b">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="preload" href="/fonts/Libron-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header class="top">
+        <a href="/" class="mark">sjekka</a>
+        <nav>
+            <a href="/">utforsk</a>
+            <a href="/upload.html">last opp</a>
+        </nav>
+    </header>
+
+    <main class="product">
+        <section>
+            <p class="meta"><a href="/" class="back">← Alle produkter</a><span id="category"></span></p>
+            <h1 id="name">…</h1>
+            <p class="lede" id="summary"></p>
+            <div class="best" id="best" hidden>
+                <span class="label">Billigst nå</span>
+                <span class="best-row"><span id="best-chain"></span><b id="best-price"></b><span id="best-unit"></span></span>
+            </div>
+        </section>
+
+        <section class="stores-section" id="stores-section" hidden>
+            <h2 class="label">Pris per butikk</h2>
+            <p class="label scale-note" id="scale-note"></p>
+            <ol class="stores" id="stores"></ol>
+            <div class="axis" id="axis" aria-hidden="true"><span></span><span></span></div>
+            <details class="history">
+                <summary>Alle registrerte priser</summary>
+                <table>
+                    <thead><tr><th>Dato</th><th>Butikk</th><th>Merke</th><th>Pris</th><th>Enhetspris</th></tr></thead>
+                    <tbody id="history"></tbody>
+                </table>
+            </details>
+        </section>
+
+        <p class="notice" id="notice">Henter priser …</p>
+        <div class="tip" id="tip" role="tooltip" hidden></div>
+    </main>
+
+    <footer>
+        <span>sjekka</span>
+        <span>Har du sjekka i dag?</span>
+    </footer>
+
+    <script src="/common.js"></script>
+    <script src="/chains.js"></script>
+    <script>
+        const name = new URLSearchParams(location.search).get("navn");
+        const $ = id => document.getElementById(id);
+
+        const each = p => p.pack_size > 1 ? p.total_price / p.pack_size : p.total_price;
+        // What prices are compared on: per 100 g/ml or per item, else the price of one
+        const comparable = p => p.price_per_unit ?? each(p);
+        const unitLabel = p => p.price_per_unit != null && (p.unit === "g" || p.unit === "ml")
+            ? `kr / 100 ${p.unit}` : p.unit === "stk" ? "kr / stk" : "kr";
+        const day = p => p.purchase_date ? new Date(p.purchase_date).getTime() : null;
+
+        function render(product) {
+            document.title = `Sjekka – ${product.canonical_name}`;
+            $("name").textContent = product.canonical_name;
+            if (product.category) $("category").textContent = ` · ${product.category}`;
+
+            const prices = product.prices.filter(p => p.total_price != null);
+            const byStore = new Map();
+            for (const p of prices) {
+                const key = p.store_chain || "Ukjent butikk";
+                if (!byStore.has(key)) byStore.set(key, []);
+                byStore.get(key).push(p);
+            }
+            // Latest price per store, cheapest first
+            const stores = [...byStore].map(([chain, list]) => ({ chain, list, latest: list[list.length - 1] }))
+                .sort((a, b) => comparable(a.latest) - comparable(b.latest));
+
+            const n = prices.length, s = stores.length;
+            $("summary").textContent = `${n} ${n === 1 ? "registrert pris" : "registrerte priser"} fra ${s} ${s === 1 ? "butikk" : "butikker"}.`;
+            $("notice").hidden = true;
+            if (!stores.length) return;
+
+            const cheapest = stores[0].latest;
+            $("best").hidden = false;
+            $("best-chain").replaceChildren(chainBadge(stores[0].chain));
+            $("best-price").textContent = `${kr.format(each(cheapest))} kr`;
+            $("best-unit").textContent = cheapest.price_per_unit != null ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : "";
+
+            // Shared axes for every store's timeline, so the rows compare directly
+            const days = prices.map(day).filter(Boolean);
+            let t0 = Math.min(...days), t1 = Math.max(...days);
+            if (t1 - t0 < 7 * 864e5) { t0 -= 3.5 * 864e5; t1 += 3.5 * 864e5; }
+            const values = prices.map(comparable);
+            let v0 = Math.min(...values), v1 = Math.max(...values);
+            const pad = Math.max((v1 - v0) * 0.15, v1 * 0.05);
+            v0 -= pad; v1 += pad;
+            $("scale-note").textContent = `Tidslinjene viser ${unitLabel(cheapest)}, samme skala for alle butikker`;
+            const fmtDate = t => new Date(t).toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
+            $("axis").children[0].textContent = fmtDate(t0);
+            $("axis").children[1].textContent = fmtDate(t1);
+
+            $("stores").replaceChildren(...stores.map((store, i) => {
+                const p = store.latest;
+                const row = el("li", i === 0 ? "store cheapest" : "store");
+                const who = el("div", "who");
+                who.append(chainBadge(store.chain));
+                if (p.brand) who.append(el("span", "brand", p.brand));
+                const price = el("div", "amount");
+                price.append(el("b", "", `${kr.format(each(p))} kr`));
+                const diff = comparable(p) - comparable(cheapest);
+                price.append(el("span", "", i === 0 ? "billigst" : diff < 0.005 ? "samme pris" : `+${kr.format(diff)} ${unitLabel(p)}`));
+                row.append(who, price, timeline(store.list, [t0, t1], [v0, v1]), el("span", "when", daysAgo(p.purchase_date)));
+                return row;
+            }));
+
+            $("history").replaceChildren(...[...prices].reverse().map(p => {
+                const tr = el("tr");
+                const store = el("td");
+                store.append(chainBadge(p.store_chain));
+                tr.append(el("td", "", p.purchase_date ? new Date(p.purchase_date).toLocaleDateString("nb-NO") : "–"), store,
+                    el("td", "", p.brand || "–"), el("td", "", `${kr.format(each(p))} kr`),
+                    el("td", "", `${kr.format(comparable(p))} ${unitLabel(p)}`));
+                return tr;
+            }));
+            $("stores-section").hidden = false;
+        }
+
+        // One store's prices over time as a small line, on the shared axes
+        function timeline(list, [t0, t1], [v0, v1]) {
+            const W = 240, H = 44, NS = "http://www.w3.org/2000/svg";
+            const x = t => 6 + (t - t0) / (t1 - t0) * (W - 12);
+            const y = v => H - 6 - (v - v0) / (v1 - v0) * (H - 12);
+            const svg = document.createElementNS(NS, "svg");
+            svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+            svg.setAttribute("class", "spark");
+            svg.setAttribute("role", "img");
+            svg.setAttribute("aria-label", `Prisutvikling: ${list.map(p => `${kr.format(comparable(p))} ${unitLabel(p)}`).join(", ")}`);
+            const pts = list.filter(p => day(p)).map(p => [x(day(p)), y(comparable(p)), p]);
+            if (pts.length > 1) {
+                const line = document.createElementNS(NS, "polyline");
+                line.setAttribute("points", pts.map(([a, b]) => `${a},${b}`).join(" "));
+                svg.append(line);
+            }
+            for (const [cx, cy, p] of pts) {
+                const dot = document.createElementNS(NS, "circle");
+                dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("r", 4);
+                // Bigger invisible target, so the dot is easy to hover
+                const hit = document.createElementNS(NS, "circle");
+                hit.setAttribute("cx", cx); hit.setAttribute("cy", cy); hit.setAttribute("r", 12);
+                hit.setAttribute("class", "hit");
+                hit.addEventListener("pointerenter", e => showTip(e, p));
+                hit.addEventListener("pointerleave", () => { $("tip").hidden = true; });
+                svg.append(dot, hit);
+            }
+            return svg;
+        }
+
+        function showTip(e, p) {
+            const tip = $("tip");
+            tip.textContent = `${p.purchase_date ? new Date(p.purchase_date).toLocaleDateString("nb-NO") : ""} · ${kr.format(each(p))} kr · ${kr.format(comparable(p))} ${unitLabel(p)}`;
+            tip.hidden = false;
+            const r = e.target.getBoundingClientRect();
+            tip.style.left = `${r.left + r.width / 2 + scrollX}px`;
+            tip.style.top = `${r.top + scrollY - 8}px`;
+        }
+
+        async function load() {
+            if (!name) { $("notice").textContent = "Ingen produkt valgt."; return; }
+            try {
+                const res = await fetch(`/products/${encodeURIComponent(name)}`);
+                if (res.status === 404) { $("name").textContent = name; $("notice").textContent = "Fant ingen priser for dette produktet."; return; }
+                if (!res.ok) throw new Error();
+                render(await res.json());
+            } catch {
+                $("notice").textContent = "Kunne ikke hente prisene. Prøv å laste siden på nytt.";
+            }
+        }
+        load();
+    </script>
+</body>
+</html>

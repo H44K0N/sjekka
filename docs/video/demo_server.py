@@ -44,6 +44,14 @@ SEED = [
     ("Pizza Grandiosa", "Stabburet", "Frys", 575, "g", 1, 59.90, "Coop Extra", 15),
     ("Tomatsuppe", "Toro", "Hermetikk", 1, "stk", 1, 18.90, "Kiwi", 10),
     ("Oppvaskmiddel", "Zalo", "Rengjøring", 500, "ml", 1, 34.90, "Meny", 30),
+    # Some history, so product pages have prices to compare
+    ("Lettmelk", "Q", "Meieri", 1000, "ml", 1, 22.90, "Rema 1000", 10),
+    ("Lettmelk", "Tine", "Meieri", 1000, "ml", 1, 23.90, "Kiwi", 25),
+    ("Lettmelk", "Q", "Meieri", 1000, "ml", 1, 21.90, "Rema 1000", 40),
+    ("Kjøttdeig", "Gilde", "Kjøtt", 400, "g", 1, 62.90, "Kiwi", 5),
+    ("Kjøttdeig", "Gilde", "Kjøtt", 400, "g", 1, 64.90, "Meny", 12),
+    ("Kjøttdeig", "Gilde", "Kjøtt", 400, "g", 1, 57.90, "Rema 1000", 30),
+    ("Kjøttdeig", "Gilde", "Kjøtt", 400, "g", 1, 59.90, "Extra", 18),
 ]
 
 
