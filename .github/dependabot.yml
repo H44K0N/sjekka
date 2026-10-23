@@ -1,0 +1,28 @@
+# Weekly PRs for new versions. Each runs the full pipeline (tests, browser
+# tests, image smoke test) and is only deployed if merged. Updates are
+# grouped per ecosystem to keep the number of PRs down.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
