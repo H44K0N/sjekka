@@ -2,11 +2,11 @@ from datetime import date, timedelta
 
 import httpx
 import pytest
-from google.genai import errors
 from pydantic import ValidationError
 
 from app import worker
 from app.schema import ExtractedItem
+from tests.helpers import api_error
 
 
 def item(**fields):
@@ -49,10 +49,6 @@ def test_unit_price(fields, expected):
 ])
 def test_parse_date(value, expected):
     assert worker.parse_date(value) == expected
-
-
-def api_error(code):
-    return errors.APIError(code, {"error": {"code": code, "message": "x", "status": "X"}})
 
 
 @pytest.mark.parametrize("error, retryable", [

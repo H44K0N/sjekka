@@ -5,24 +5,7 @@ from PIL import Image
 
 from app import main, models
 from app.config import UPLOAD_DIR
-
-
-def image_bytes(fmt="JPEG", size=(300, 100), exif=None):
-    buf = io.BytesIO()
-    img = Image.new("RGB", size, "white")
-    if exif is not None:
-        img.save(buf, format=fmt, exif=exif)
-    else:
-        img.save(buf, format=fmt)
-    return buf.getvalue()
-
-
-def upload(client, data, name="receipt.jpg", ip="203.0.113.1"):
-    return client.post(
-        "/upload",
-        files={"file": (name, data, "application/octet-stream")},
-        headers={"CF-Connecting-IP": ip},
-    )
+from tests.helpers import image_bytes, upload
 
 
 def test_upload_creates_job(client, db):

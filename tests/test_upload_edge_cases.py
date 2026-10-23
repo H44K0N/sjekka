@@ -1,23 +1,9 @@
-import io
 
 from PIL import Image
 
 from app import main
 from app.config import MAX_DIMENSION, MAX_SIZE_MB, UPLOAD_DIR
-
-
-def image_bytes(fmt="JPEG", size=(300, 100), mode="RGB"):
-    buf = io.BytesIO()
-    Image.new(mode, size).save(buf, format=fmt)
-    return buf.getvalue()
-
-
-def upload(client, data, ip="203.0.113.1", headers=None):
-    return client.post(
-        "/upload",
-        files={"file": ("r.jpg", data, "image/jpeg")},
-        headers={"CF-Connecting-IP": ip} | (headers or {}),
-    )
+from tests.helpers import image_bytes, upload
 
 
 def saved_image(res):

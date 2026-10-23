@@ -1,10 +1,7 @@
-uploads/*
-logs/*
 __pycache__/
 *.pyc
 
 .env
-/sjekka.db
 secrets.env
 /data/
 .venv/
