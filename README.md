@@ -58,7 +58,6 @@ Visible on the explore page
 
 ### Code
 
-- The worker only retries on 503. A 429 (rate limited) marks the job as failed for good
 - The `products` and `categories` tables are defined but never used — category is stored as a string on each receipt item
 
 ---
@@ -130,7 +129,7 @@ docker compose start app
 ## Stack
 
 - **Backend:** Python / FastAPI
-- **Extraction:** Google Gemini 2.5 Flash
+- **Extraction:** Google Gemini (`GEMINI_MODEL`, default `gemini-2.5-flash`) with a response schema
 - **Database:** SQLite
 - **Frontend:** Plain HTML / CSS / JS
 - **Infrastructure:** Docker on a VPS, Cloudflare Tunnel, GitHub Actions
