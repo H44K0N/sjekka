@@ -9,6 +9,7 @@
 # - installs compose.yaml and deploy.sh to /opt/sjekka
 # - asks for the Gemini API key if /opt/sjekka/.env doesn't exist yet
 # - authorizes the CI key, restricted to running deploy.sh
+# - installs a nightly database backup (sjekka-backup.timer)
 #
 # Re-run it after changing compose.yaml or deploy.sh.
 set -euo pipefail
@@ -43,6 +44,7 @@ echo "==> Installing $dir"
 install -d -o root -g root -m 755 "$dir"
 install -o root -g root -m 644 "$src/../compose.yaml" "$dir/compose.yaml"
 install -o root -g root -m 755 "$src/deploy.sh" "$dir/deploy.sh"
+install -o root -g root -m 755 "$src/backup.sh" "$dir/backup.sh"
 install -d -o "$user" -g "$user" -m 755 "$dir/state"
 # The container runs as uid 10001 (see Dockerfile).
 install -d -o 10001 -g 10001 -m 750 "$dir/data"
@@ -63,8 +65,14 @@ printf 'command="%s/deploy.sh",restrict %s\n' "$dir" "$(cat "$pubkey_file")" \
     > "/home/$user/.ssh/authorized_keys"
 chmod 644 "/home/$user/.ssh/authorized_keys"
 
-if sshd -T 2>/dev/null | grep -qiE '^(allowusers|allowgroups) '; then
-    echo "!! sshd has AllowUsers/AllowGroups set; add $user there or CI can't log in" >&2
+echo "==> Installing the nightly backup"
+install -o root -g root -m 644 "$src/sjekka-backup.service" "$src/sjekka-backup.timer" /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now sjekka-backup.timer
+
+allowed="$(sshd -T 2>/dev/null | awk '$1 == "allowusers" { print $2 }')"
+if [ -n "$allowed" ] && ! grep -qx "$user" <<< "$allowed"; then
+    echo "!! sshd's AllowUsers doesn't include $user, so CI can't log in. Add it there." >&2
 fi
 
 echo "Done. Containers:"

@@ -1,18 +1,29 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from PIL import Image
+from PIL import Image, ImageOps, UnidentifiedImageError
+from pillow_heif import register_heif_opener
 from sqlalchemy.orm import Session
+from collections import defaultdict, deque
+from datetime import datetime, timedelta
 import io
+import time
 import uuid
 import asyncio
 import sys
 import logging
 
-from app.config import UPLOAD_DIR, MAX_SIZE_MB, MAX_DIMENSION, JPEG_QUALITY
+from app.config import (
+    UPLOAD_DIR, MAX_SIZE_MB, MAX_DIMENSION, JPEG_QUALITY,
+    UPLOADS_PER_IP_PER_HOUR, UPLOADS_PER_DAY,
+)
 from app.database import engine, get_db
 from app import models
 from app import worker
+
+# iPhones save photos as HEIC
+register_heif_opener()
+ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "HEIF"}
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, force=True)
 logger = logging.getLogger("sjekka")
@@ -25,17 +36,49 @@ app = FastAPI()
 async def startup_event():
     asyncio.create_task(worker.run_worker())
 
+# Every upload costs a Gemini call, so uploads are limited per client and per
+# day. The per-client window lives in memory: there is only one app process.
+recent_uploads: dict[str, deque[float]] = defaultdict(deque)
+
+
+def client_ip(request: Request) -> str:
+    # cloudflared sets CF-Connecting-IP; the port is only published on
+    # loopback, so the header can't be sent from outside Cloudflare.
+    return request.headers.get("cf-connecting-ip") or request.client.host
+
+
+def check_upload_limits(ip: str, db: Session):
+    window = recent_uploads[ip]
+    now = time.monotonic()
+    while window and now - window[0] > 3600:
+        window.popleft()
+    if len(window) >= UPLOADS_PER_IP_PER_HOUR:
+        raise HTTPException(429, "Du har lastet opp mange kvitteringer på kort tid. Prøv igjen om en time.")
+
+    since = datetime.utcnow() - timedelta(days=1)
+    if db.query(models.Job).filter(models.Job.created_at >= since).count() >= UPLOADS_PER_DAY:
+        raise HTTPException(429, "Sjekka har nådd dagens grense for opplastinger. Prøv igjen i morgen.")
+
+
 @app.post("/upload")
-async def upload_receipt(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    if file.content_type not in ["image/jpeg", "image/png", "image/webp", "image/heic"]:
-        raise HTTPException(400, "Only images allowed")
+async def upload_receipt(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    ip = client_ip(request)
+    check_upload_limits(ip, db)
 
     data = await file.read()
 
     if len(data) > MAX_SIZE_MB * 1024 * 1024:
-        raise HTTPException(400, f"Max {MAX_SIZE_MB}MB")
+        raise HTTPException(400, f"Bildet er for stort. Maks {MAX_SIZE_MB} MB.")
 
-    img = Image.open(io.BytesIO(data)).convert("RGB")
+    try:
+        img = Image.open(io.BytesIO(data))
+        if img.format not in ALLOWED_FORMATS:
+            raise HTTPException(400, "Bildet må være JPEG, PNG, WebP eller HEIC.")
+        # Phones store rotation as an EXIF tag; apply it so Gemini sees the
+        # receipt upright.
+        img = ImageOps.exif_transpose(img).convert("RGB")
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        raise HTTPException(400, "Kunne ikke lese bildet. Prøv et annet bilde.") from None
     img.thumbnail((MAX_DIMENSION, MAX_DIMENSION))
 
     filename = f"{uuid.uuid4()}.jpg"
@@ -45,6 +88,7 @@ async def upload_receipt(file: UploadFile = File(...), db: Session = Depends(get
     job = models.Job(filename=filename)
     db.add(job)
     db.commit()
+    recent_uploads[ip].append(time.monotonic())
 
     logger.info(f"📥 Job created for {filename}")
 

@@ -30,7 +30,7 @@
 
         <section>
             <label class="drop" id="drop">
-                <input type="file" id="receipt" accept="image/jpeg,image/png,image/webp,image/heic">
+                <input type="file" id="receipt" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif">
                 <span id="prompt">Velg bilde eller slipp det her</span>
                 <span class="label" id="hint">JPEG, PNG, WebP eller HEIC · maks 10 MB</span>
             </label>
@@ -49,7 +49,7 @@
     </footer>
 
     <script>
-        const TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+        const TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
         const MAX_MB = 10;
 
         const input = document.getElementById("receipt");
@@ -66,7 +66,8 @@
 
         function choose(f) {
             if (!f) return;
-            if (!TYPES.includes(f.type)) {
+            // Some phones send HEIC with no type; the server checks the file itself.
+            if (f.type && !TYPES.includes(f.type)) {
                 setStatus("Filen må være et bilde (JPEG, PNG, WebP eller HEIC).", true);
                 return;
             }
@@ -86,7 +87,7 @@
             // Browsers can't show HEIC, so keep the text prompt for those.
             if (previewUrl) URL.revokeObjectURL(previewUrl);
             drop.querySelector("img")?.remove();
-            if (f.type !== "image/heic") {
+            if (["image/jpeg", "image/png", "image/webp"].includes(f.type)) {
                 previewUrl = URL.createObjectURL(f);
                 const img = document.createElement("img");
                 img.src = previewUrl;

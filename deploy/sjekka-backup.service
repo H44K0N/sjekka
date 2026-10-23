@@ -1,0 +1,6 @@
+[Unit]
+Description=Back up the Sjekka database
+
+[Service]
+Type=oneshot
+ExecStart=/opt/sjekka/backup.sh

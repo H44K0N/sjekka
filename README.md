@@ -54,7 +54,7 @@ Visible on the explore page
 ### Security
 
 - Uploaded receipt photos are served publicly at `/uploads/<id>.jpg`. Filenames are random UUIDs, but a receipt can show card digits, store and time of purchase
-- No authentication or rate limiting on `/upload` — every upload costs a Gemini call, so anyone with the URL can use up the API quota
+- `/upload` has no authentication. Every upload costs a Gemini call, so uploads are limited to 10 per client per hour and 200 per day (`UPLOADS_PER_IP_PER_HOUR`, `UPLOADS_PER_DAY`). A Cloudflare rate-limiting rule in front would stop floods before they reach the app
 
 ### Code
 
@@ -104,9 +104,9 @@ Production runs at https://sjekka.tischbein.dev as a Docker container on a VPS, 
 
 1. **Lint and test**: `ruff check` and `pytest`.
 2. **Build and smoke test image**: builds the Docker image, starts it and checks the main endpoints respond. On `main` the image is pushed to `ghcr.io/h44k0n/sjekka`, tagged with the commit SHA and `latest`.
-3. **Deploy** (`main` only): logs in to the VPS as `sjekka-deploy` with a key that can only run `/opt/sjekka/deploy.sh`. That script starts the image for the pushed commit and restores the previous one if the container doesn't become healthy. Finally the job checks the public URL.
+3. **Deploy** (`main` only): logs in to the VPS as `sjekka-deploy` with a key that can only run `/opt/sjekka/deploy.sh`. That script starts the image for the pushed commit and restores the previous one if the container doesn't become healthy. Finally the job checks the public URL. Cloudflare's bot protection challenges GitHub's runners, so that check usually only logs a warning; `deploy.sh` has already verified the container's health.
 
-The server is set up with `deploy/setup-vps.sh` (Docker, the `sjekka-deploy` user, `/opt/sjekka`, the restricted CI key). `compose.yaml` and `deploy.sh` are installed by that script, not by CI, so re-run it after changing either file:
+The server is set up with `deploy/setup-vps.sh` (Docker, the `sjekka-deploy` user, `/opt/sjekka`, the restricted CI key, the nightly backup). `compose.yaml` and the files in `deploy/` are installed by that script, not by CI, so re-run it after changing any of them:
 
 ```bash
 scp -r compose.yaml deploy vps:/tmp/sjekka-setup/
@@ -114,6 +114,16 @@ ssh -t vps 'sudo bash /tmp/sjekka-setup/deploy/setup-vps.sh /tmp/sjekka-setup/ci
 ```
 
 Production data lives in `/opt/sjekka/data` and secrets in `/opt/sjekka/.env`. The pipeline never touches either.
+
+### Backups
+
+`sjekka-backup.timer` runs `deploy/backup.sh` every night at about 03:30. It copies the database with SQLite's online backup API, checks the copy, and keeps 14 days of gzipped copies in `/opt/sjekka/backups`. Those are on the same disk as the database, so copy them elsewhere as well. To restore:
+
+```bash
+cd /opt/sjekka && docker compose stop app
+gunzip -c backups/sjekka-<date>.db.gz > data/sjekka.db && chown 10001:10001 data/sjekka.db
+docker compose start app
+```
 
 ---
 
