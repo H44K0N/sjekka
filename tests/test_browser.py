@@ -112,7 +112,7 @@ def cards(page):
 AXE = Path(__file__).parent / "vendor" / "axe.min.js"  # axe-core, pinned (MPL-2.0)
 
 
-@pytest.mark.parametrize("path", ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/finnes-ikke.html"])
+@pytest.mark.parametrize("path", ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/finnes-ikke.html", "/personvern.html"])
 def test_pages_pass_automated_accessibility_checks(page, path):
     page.goto(path)
     page.wait_for_load_state("networkidle")
@@ -408,3 +408,19 @@ def test_sort_menu_opens_closes_and_works_with_the_keyboard(page):
     toggle.click()
     page.keyboard.press("Escape")
     expect(menu).to_be_hidden()
+
+
+def test_privacy_page_reveals_the_contact_address_on_click(page):
+    page.goto("/personvern.html")
+    assert "hotmail.com" not in page.locator("main").inner_text()
+    page.get_by_role("button", name="vis e-postadresse").click()
+    expect(page.get_by_role("link", name="haameti@hotmail.com")).to_have_attribute("href", "mailto:haameti@hotmail.com")
+
+
+def test_pages_make_no_requests_to_other_sites(page, site):
+    seen = []
+    page.on("request", lambda r: seen.append(r.url))
+    for path in ["/", "/upload.html", "/produkt.html?navn=Lettmelk", "/personvern.html"]:
+        page.goto(path)
+        page.wait_for_load_state("networkidle")
+    assert [u for u in seen if not u.startswith(site[0])] == []

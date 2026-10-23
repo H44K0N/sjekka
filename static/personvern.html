@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sjekka – Personvern</title>
+    <meta name="description" content="Hvilke opplysninger Sjekka behandler, hvorfor, og hvilke rettigheter du har.">
+    <meta name="theme-color" content="#0d0c0b">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header class="top">
+        <a href="/" class="mark">sjekka</a>
+        <nav>
+            <a href="/">utforsk</a>
+            <a href="/upload.html">last opp</a>
+        </nav>
+    </header>
+
+    <main class="narrow policy">
+        <section>
+            <p class="meta">Sist oppdatert 23. oktober 2026</p>
+            <h1>Personvern</h1>
+            <p class="lede">Sjekka samler matpriser fra kvitteringer folk deler. Vi tar bare vare på det som trengs for å vise prisene, og ingenting som sier hvem du er.</p>
+        </section>
+
+        <section>
+            <h2>Hvem er ansvarlig</h2>
+            <p>Sjekka drives av Haakon Meyer Tischbein, privatperson i Oslo. Spørsmål om personvern kan du sende til <button type="button" class="reveal" data-a="haa" data-b="meti" data-c="hotmail.com">vis e-postadresse</button>.</p>
+
+            <h2>Hva vi behandler, og hvor lenge</h2>
+            <dl class="facts">
+                <div>
+                    <dt>Kvitteringsbildet</dt>
+                    <dd>Sendes til Google Gemini, som leser av butikk, dato, varer og priser. Bildet lagres på serveren vår til det er lest, og slettes da. Hvis avlesningen feiler, beholder vi bildet i inntil 30 dager for å kunne prøve på nytt. Bildet vises aldri på nettstedet.</dd>
+                </div>
+                <div>
+                    <dt>Det som står på kvitteringen</dt>
+                    <dd>Butikkjede, butikk og sted, kjøpsdato, varer, priser og sum, slik Gemini leste dem. Dette lagres uten tidsbegrensning og danner prisoversikten. Vi lagrer ikke navn, e-post, kortnummer, medlemsnummer eller IP-adresse sammen med kvitteringen, så den kan ikke knyttes til deg.</dd>
+                </div>
+                <div>
+                    <dt>IP-adressen din</dt>
+                    <dd>Brukes til å begrense hvor mange kvitteringer hver enkelt kan laste opp, og holdes da bare i minnet i inntil én time. Serverloggene inneholder også IP-adresse og hvilken side som ble åpnet; de slettes automatisk etter hvert som nye logger skrives.</dd>
+                </div>
+                <div>
+                    <dt>Sikkerhetskopier</dt>
+                    <dd>Databasen kopieres hver natt. Kopiene slettes etter 14 dager.</dd>
+                </div>
+                <div>
+                    <dt>Informasjonskapsler</dt>
+                    <dd>Sjekka bruker ingen. Forhåndsvisningen av kvitteringen ligger bare i nettleserfanen din og forsvinner når du lukker den. Cloudflare, som beskytter nettstedet, kan sette en nødvendig informasjonskapsel for å skille mennesker fra roboter.</dd>
+                </div>
+            </dl>
+
+            <h2>Hvorfor vi kan behandle dem</h2>
+            <p>Grunnlaget er berettiget interesse (personvernforordningen artikkel 6 nr. 1 bokstav f): å drive en åpen oversikt over matpriser, og å beskytte tjenesten mot misbruk. Det er frivillig å laste opp kvitteringer. Vi tar ingen automatiserte avgjørelser om deg.</p>
+
+            <h2>Hvem andre som får opplysninger</h2>
+            <dl class="facts">
+                <div>
+                    <dt>Google</dt>
+                    <dd>Leser kvitteringsbildet gjennom Gemini API, og bruker det ikke til å forbedre egne produkter. Kan behandles i USA.</dd>
+                </div>
+                <div>
+                    <dt>Cloudflare</dt>
+                    <dd>Formidler og beskytter all trafikk til nettstedet. Kan behandles i USA.</dd>
+                </div>
+                <div>
+                    <dt>netcup (Tyskland)</dt>
+                    <dd>Leverer serveren der opplysningene lagres, innenfor EU.</dd>
+                </div>
+            </dl>
+            <p>Overføring til USA skjer med grunnlag i EU–US Data Privacy Framework og EUs standardavtaler. Vi selger eller deler ikke opplysninger med noen andre.</p>
+
+            <h2>Dine rettigheter</h2>
+            <p>Du kan be om innsyn i, retting eller sletting av opplysninger om deg, protestere mot behandlingen eller be om at den begrenses. Fordi vi ikke lagrer hvem som lastet opp hva, kan vi bare finne en kvittering hvis du forteller oss butikk, dato og omtrent når du lastet den opp. Mener du at vi behandler opplysninger i strid med reglene, kan du klage til <a href="https://www.datatilsynet.no/">Datatilsynet</a>.</p>
+
+            <h2>Logoer</h2>
+            <p>Butikklogoene er varemerker som tilhører kjedene, og brukes bare for å vise hvor en pris kommer fra. De er hentet fra Wikimedia Commons; Extra-logoen er laget av Coop Norge og lisensiert under <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.no">CC BY-SA 4.0</a> (<a href="https://commons.wikimedia.org/wiki/File:Extra_butikklogo.png">kilde</a>).</p>
+        </section>
+    </main>
+
+    <footer>
+        <span>sjekka · <a href="/personvern.html">personvern</a></span>
+        <span>Har du sjekka i dag?</span>
+    </footer>
+
+    <script>
+        // The address is only put together on click, so it isn't in the page source
+        document.querySelector(".reveal").addEventListener("click", e => {
+            const { a, b, c } = e.currentTarget.dataset;
+            const link = document.createElement("a");
+            link.href = `mailto:${a}${b}@${c}`;
+            link.textContent = `${a}${b}@${c}`;
+            e.currentTarget.replaceWith(link);
+            link.focus();
+        });
+    </script>
+</body>
+</html>

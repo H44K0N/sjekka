@@ -24,6 +24,10 @@ extraction_logger.setLevel(logging.INFO)
 
 MAX_ATTEMPTS = 8
 POLL_INTERVAL = 5
+# Photos of failed jobs are kept for retrying by hand, but not for ever
+# (the privacy page promises 30 days)
+FAILED_PHOTO_DAYS = 30
+CLEANUP_INTERVAL = timedelta(hours=1)
 # Rate limits, timeouts and Gemini being overloaded are worth retrying.
 RETRYABLE_CODES = {408, 429, 500, 502, 503, 504}
 
@@ -162,6 +166,20 @@ async def process_job(job: models.Job, db: Session):
         db.commit()
 
 
+def delete_old_failed_photos(db: Session) -> int:
+    """Deletes photos of jobs that failed more than FAILED_PHOTO_DAYS ago."""
+    cutoff = models.utcnow() - timedelta(days=FAILED_PHOTO_DAYS)
+    deleted = 0
+    for job in db.query(models.Job).filter(models.Job.status == "failed", models.Job.updated_at < cutoff):
+        path = UPLOAD_DIR / job.filename
+        if path.exists():
+            path.unlink()
+            deleted += 1
+    if deleted:
+        logger.info(f"Deleted {deleted} photos of jobs that failed over {FAILED_PHOTO_DAYS} days ago")
+    return deleted
+
+
 def next_job(db: Session) -> models.Job | None:
     """The oldest pending job whose retry delay has passed. Jobs waiting to
     retry don't hold up the ones behind them."""
@@ -189,9 +207,13 @@ async def run_worker():
     db.commit()
     db.close()
 
+    last_cleanup = None
     while True:
         db = SessionLocal()
         try:
+            if last_cleanup is None or models.utcnow() - last_cleanup > CLEANUP_INTERVAL:
+                delete_old_failed_photos(db)
+                last_cleanup = models.utcnow()
             job = next_job(db)
             if job:
                 await process_job(job, db)
