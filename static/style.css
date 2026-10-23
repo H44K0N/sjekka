@@ -222,7 +222,7 @@ a.card:hover { border-color: var(--hover); background: rgba(236, 230, 220, 0.04)
 }
 
 /* store chains: logo on a light chip (most logos are made for white), or
-   the chain's colours as text */
+   the name as text */
 .chain {
   display: inline-flex;
   align-items: center;
@@ -238,7 +238,6 @@ a.card:hover { border-color: var(--hover); background: rgba(236, 230, 220, 0.04)
 }
 .chain.logo { padding: 3px 8px; background: #fff; border-radius: 6px; }
 .chain.logo img { display: block; height: 20px; width: auto; }
-.chain.colored { padding: 0 9px; border-radius: 6px; font-weight: 500; }
 
 .notice {
   padding: 48px 0;
