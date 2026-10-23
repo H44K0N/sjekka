@@ -41,7 +41,7 @@ jobs:
       - name: Lint
         run: |
           ruff check --output-format=github .
-          shellcheck deploy/*.sh
+          shellcheck deploy/*.sh docs/video/*.sh
 
       - name: Test
         # Unit, integration, deploy-script and browser tests. E2E_REQUIRED
