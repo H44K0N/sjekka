@@ -194,13 +194,22 @@ def test_upload_flow(page, site, tmp_path):
     expect(page.locator("#file-name")).to_have_text("kvittering.jpg")
     expect(button).to_be_enabled()
 
+    saved_before = set((site[1] / "uploads").iterdir())
     button.click()
-    page.wait_for_url("**/takk.html?id=*.jpg")
-    expect(page.locator("#img")).to_be_visible()
+    page.wait_for_url("**/takk.html")
     expect(page.locator("#queue")).to_contain_text("i kø")
+    assert len(set((site[1] / "uploads").iterdir()) - saved_before) == 1
 
-    filename = page.url.split("id=")[1]
-    assert (site[1] / "uploads" / filename).exists()
+    # The photo comes from this tab, not from the server
+    img = page.locator("#img")
+    expect(img).to_be_visible()
+    assert img.get_attribute("src").startswith("data:image/jpeg;")
+
+
+def test_thank_you_page_without_a_photo(page):
+    page.goto("/takk.html")
+    expect(page.locator("h1")).to_have_text("Takk.")
+    expect(page.locator("#img")).to_be_hidden()
 
 
 def test_upload_rejects_non_images_before_sending(page, tmp_path):

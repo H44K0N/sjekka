@@ -159,5 +159,5 @@ def get_stats(db: Session = Depends(get_db)):
         "pending_jobs": pending_jobs,
     }
 
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+# Receipt photos are deliberately not served: they can show card digits.
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

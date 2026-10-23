@@ -71,11 +71,11 @@ def test_same_receipt_uploaded_twice_counts_once(client, db, fake_gemini):
     assert statuses == ["done", "duplicate"]
 
 
-def test_receipt_photo_is_served_for_the_thank_you_page(client, db):
+def test_receipt_photos_are_never_served(client, db):
+    # They can show card digits; the photo is stored but not readable over HTTP.
     filename = upload(client)
-    res = client.get(f"/uploads/{filename}")
-    assert res.status_code == 200
-    assert res.headers["content-type"] == "image/jpeg"
+    for path in [f"/uploads/{filename}", f"/{filename}", f"/data/uploads/{filename}"]:
+        assert client.get(path).status_code == 404
 
 
 def test_missing_photo_fails_the_job_without_calling_gemini(client, db, monkeypatch):

@@ -44,11 +44,13 @@
     </footer>
 
     <script>
-        const id = new URLSearchParams(window.location.search).get("id");
-        if (id) {
+        // Set by upload.html in this tab; the server never serves photos back.
+        let preview = null;
+        try { preview = sessionStorage.getItem("sjekka-receipt"); } catch {}
+        if (preview && preview.startsWith("data:image/jpeg;")) {
             const img = document.getElementById("img");
             img.addEventListener("load", () => { img.hidden = false; });
-            img.src = `/uploads/${encodeURIComponent(id)}`;
+            img.src = preview;
         }
 
         fetch("/stats")
