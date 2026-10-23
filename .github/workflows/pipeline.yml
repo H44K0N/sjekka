@@ -119,9 +119,15 @@ jobs:
 
       - name: Check public URL
         run: |
+          # Log each attempt's status so a failure shows whether it was DNS or
+          # a timeout (000), the tunnel (502) or Cloudflare blocking (403).
           for _ in $(seq 20); do
-            curl -sf https://sjekka.tischbein.dev/health && exit 0
+            code=$(curl -s -o /tmp/health -w '%{http_code}' --max-time 10 \
+              https://sjekka.tischbein.dev/health || true)
+            echo "HTTP $code"
+            [ "$code" = 200 ] && exit 0
             sleep 3
           done
-          echo "https://sjekka.tischbein.dev/health is not responding" >&2
+          echo "https://sjekka.tischbein.dev/health is not responding; last body:" >&2
+          head -c 500 /tmp/health >&2 || true
           exit 1
