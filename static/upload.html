@@ -110,6 +110,24 @@
             choose(e.dataTransfer.files[0]);
         });
 
+        // Receipt photos aren't served back by the server (they can show card
+        // digits), so the thank-you page gets a small copy from this tab.
+        function rememberPreview() {
+            try {
+                sessionStorage.removeItem("sjekka-receipt");
+                const img = drop.querySelector("img");
+                if (!img || !img.naturalWidth) return;
+                const scale = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight));
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.round(img.naturalWidth * scale);
+                canvas.height = Math.round(img.naturalHeight * scale);
+                canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+                sessionStorage.setItem("sjekka-receipt", canvas.toDataURL("image/jpeg", 0.7));
+            } catch {
+                // Storage full or blocked: the thank-you page just shows no photo
+            }
+        }
+
         btn.addEventListener("click", async () => {
             if (!file) return;
             btn.disabled = true;
@@ -122,7 +140,8 @@
                 const res = await fetch("/upload", { method: "POST", body: form });
                 const data = await res.json().catch(() => ({}));
                 if (res.ok) {
-                    window.location.href = `/takk.html?id=${encodeURIComponent(data.id)}`;
+                    rememberPreview();
+                    window.location.href = "/takk.html";
                     return;
                 }
                 setStatus(`Opplastingen feilet: ${data.detail || res.statusText}`, true);

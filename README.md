@@ -53,7 +53,7 @@ Visible on the explore page
 
 ### Security
 
-- Uploaded receipt photos are served publicly at `/uploads/<id>.jpg`. Filenames are random UUIDs, but a receipt can show card digits, store and time of purchase
+- Receipt photos are stored in `data/uploads` but never served, since a receipt can show card digits, store and time of purchase. The thank-you page shows a small copy kept in the uploader's own browser tab
 - `/upload` has no authentication. Every upload costs a Gemini call, so uploads are limited to 10 per client per hour and 200 per day (`UPLOADS_PER_IP_PER_HOUR`, `UPLOADS_PER_DAY`). A Cloudflare rate-limiting rule in front would stop floods before they reach the app
 
 ### Code
@@ -84,7 +84,7 @@ uvicorn app.main:app
 
 The database, uploaded photos and extraction log are written to `./data/` (set `DATA_DIR` to change it).
 
-`test_data/sjekka.db` is a small sample database: one Kiwi receipt with six items, plus twelve queued jobs whose photos aren't in the repo. Copy it to `./data/sjekka.db` to start with data. Without it, an empty database is created on first run.
+`test_data/sjekka.db` is a small sample database: one Kiwi receipt with six items. Copy it to `./data/sjekka.db` to start with data. Without it, an empty database is created on first run.
 
 Before pushing, run the same checks as CI:
 
@@ -149,6 +149,12 @@ docker compose start app
 - **Database:** SQLite
 - **Frontend:** Plain HTML / CSS / JS
 - **Infrastructure:** Docker on a VPS, Cloudflare Tunnel, GitHub Actions
+
+---
+
+## AI use
+
+Gemini reads the receipts, and much of the code since October 2026 was written with Claude Code. [docs/AI.md](docs/AI.md) describes what the AI does, what was decided by a person, and how the AI's work is checked.
 
 ---
 

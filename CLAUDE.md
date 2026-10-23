@@ -35,6 +35,7 @@ CI (`.github/workflows/pipeline.yml`) runs exactly this, requires the browser te
 
 ## Workflow
 
+- Add a line for each change to the log in `docs/AI.md`, and keep its facts (test counts, guardrails) current.
 - Branch from `main`, open a PR, wait for CI. Merge (`gh pr merge --rebase`) only when the user says so: merging to `main` deploys to production.
 - After a merge, watch the run. Judge the deploy by the **Deploy** step: `deploy.sh` checks container health and rolls back. The "Check public URL" step always gets HTTP 403 from Cloudflare's bot protection (kept on purpose) and only logs a warning.
 - Changes to `compose.yaml` or `deploy/` reach the server only when `setup-vps.sh` is re-run with sudo, which the user does: copy the files with `scp -r compose.yaml deploy vps:/tmp/sjekka-setup/` and give them the command from the README.
