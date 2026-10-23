@@ -15,6 +15,7 @@ for directory in (DATA_DIR, UPLOAD_DIR, LOG_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 UPLOADS_PER_IP_PER_HOUR = int(os.getenv("UPLOADS_PER_IP_PER_HOUR", "10"))
 UPLOADS_PER_DAY = int(os.getenv("UPLOADS_PER_DAY", "200"))

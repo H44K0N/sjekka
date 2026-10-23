@@ -1,10 +1,8 @@
 from google import genai
 from google.genai import types
-import json
-import time
-import random
 from pathlib import Path
-from app.config import GEMINI_API_KEY
+from app.config import GEMINI_API_KEY, GEMINI_MODEL
+from app.schema import ExtractedReceipt
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -44,9 +42,6 @@ Your only job is to extract structured data from receipt images accurately.
 
 **total_price**: Exact amount charged on the receipt for this line.
 
-**price_per_unit**:
-  - For g/ml: (total_price / pack_size / quantity) * 100 → price per 100g or 100ml
-  - For stk: total_price / pack_size → price per single item
 
 **confidence**: Your confidence in the extracted data.
   - "high": receipt is clear, all fields certain
@@ -82,7 +77,6 @@ Receipt line: "GILDE KJØTTDEIG 400G  89.00"
   "quantity": 400,
   "unit": "g",
   "pack_size": 1,
-  "price_per_unit": 22.25,
   "total_price": 89.00,
   "is_member_price": false,
   "deal": null,
@@ -99,7 +93,6 @@ Receipt line: "LABAN SEIGMENN 260G  x3  38.70"
   "quantity": 260,
   "unit": "g",
   "pack_size": 3,
-  "price_per_unit": 4.96,
   "total_price": 38.70,
   "is_member_price": false,
   "deal": "3 x kr 12.90",
@@ -116,7 +109,6 @@ Receipt line: "TINE LETTMELK 0,5% 1L  24.90"
   "quantity": 1000,
   "unit": "ml",
   "pack_size": 1,
-  "price_per_unit": 2.49,
   "total_price": 24.90,
   "is_member_price": false,
   "deal": null,
@@ -129,47 +121,22 @@ Receipt line: "PANT  2.00"
 Receipt line: "BÆREPOSE  3.00"
 → SKIP — do not include
 
-## OUTPUT SCHEMA
+## OUTPUT
 
-{
-  "store_chain": "e.g. Kiwi, Rema 1000, Meny",
-  "store_location": "e.g. Byporten or null",
-  "region": "e.g. Oslo or null",
-  "purchase_date": "YYYY-MM-DD or null",
-  "items": [ ...one object per unique line item... ],
-  "total": 91.20
-}
+Follow the response schema. Use store_chain e.g. "Kiwi", "Rema 1000", "Meny"; store_location e.g. "Byporten" or null; region e.g. "Oslo" or null; purchase_date as YYYY-MM-DD or null; total is the receipt total.
 """
 
-def extract_receipt(image_path: Path) -> dict:
-    with open(image_path, "rb") as f:
-        image_data = f.read()
-
-    max_retries = 10
-    base_delay = 2
-
-    for attempt in range(max_retries):
-        try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=[
-                    types.Part.from_bytes(data=image_data, mime_type="image/jpeg"),
-                    PROMPT
-                ],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json"
-                )
-            )
-
-            return json.loads(response.text)
-
-        except Exception as e:
-            if attempt == max_retries - 1:
-                raise
-
-            if "503" not in str(e) and "UNAVAILABLE" not in str(e):
-                raise
-
-            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
-            print(f"503 error, retrying in {delay:.1f}s (attempt {attempt + 1}/{max_retries})")
-            time.sleep(delay)
+def extract_receipt(image_path: Path) -> ExtractedReceipt:
+    """One Gemini call. Retries are the worker's job, see app/worker.py."""
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=[
+            types.Part.from_bytes(data=image_path.read_bytes(), mime_type="image/jpeg"),
+            PROMPT,
+        ],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=ExtractedReceipt,
+        ),
+    )
+    return ExtractedReceipt.model_validate_json(response.text)
