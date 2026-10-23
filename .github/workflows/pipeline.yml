@@ -34,9 +34,19 @@ jobs:
           cache-dependency-path: requirements*.txt
 
       - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Browser for the browser tests
+        # The runner image ships Google Chrome. Installing Playwright's own
+        # Chromium and its system packages took 5-10 minutes on a slow apt
+        # mirror, so that's only the fallback.
         run: |
-          pip install -r requirements-dev.txt
-          playwright install --with-deps chromium
+          if chrome="$(command -v google-chrome)"; then
+            "$chrome" --version
+            echo "CHROMIUM_PATH=$chrome" >> "$GITHUB_ENV"
+          else
+            playwright install --with-deps chromium
+          fi
 
       - name: Lint
         run: |
