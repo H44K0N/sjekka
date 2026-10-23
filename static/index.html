@@ -51,11 +51,15 @@
             <ul class="chips" id="categories"></ul>
             <div class="listbar">
                 <p class="count" id="count" aria-live="polite"></p>
-                <div class="sort" role="group" aria-label="Sorter">
-                    <span>Sorter:</span>
-                    <button type="button" data-sort="navn">navn</button>
-                    <button type="button" data-sort="pris">lavest pris</button>
-                    <button type="button" data-sort="nyest">nyest</button>
+                <div class="sort">
+                    <button type="button" class="sort-toggle" id="sort-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="sort-menu">
+                        <span class="sort-label">Sorter:</span> <span id="sort-current">navn</span> <span class="caret" aria-hidden="true"></span>
+                    </button>
+                    <div class="sort-menu" id="sort-menu" role="menu" aria-label="Sorter produktene" hidden>
+                        <button type="button" role="menuitemradio" data-sort="navn"><b>Navn</b><span>A–Å</span></button>
+                        <button type="button" role="menuitemradio" data-sort="pris"><b>Lavest pris</b><span>billigste først</span></button>
+                        <button type="button" role="menuitemradio" data-sort="nyest"><b>Nyest</b><span>sist registrert</span></button>
+                    </div>
                 </div>
             </div>
             <div class="grid" id="grid"></div>
@@ -119,9 +123,10 @@
                 (activeCategory === null || p.category === activeCategory) &&
                 (!query || p.canonical_name.toLowerCase().includes(query) || (p.brand || "").toLowerCase().includes(query))
             ).sort((a, b) => SORTS[sortBy](a, b) || SORTS.navn(a, b));
-            for (const btn of document.querySelectorAll("[data-sort]")) {
-                btn.setAttribute("aria-pressed", String(btn.dataset.sort === sortBy));
+            for (const item of document.querySelectorAll("[data-sort]")) {
+                item.setAttribute("aria-checked", String(item.dataset.sort === sortBy));
             }
+            document.getElementById("sort-current").textContent = SORT_NAMES[sortBy];
             saveView();
 
             document.getElementById("count").textContent =
@@ -167,9 +172,41 @@
         }
 
         document.getElementById("search").addEventListener("input", renderGrid);
-        for (const btn of document.querySelectorAll("[data-sort]")) {
-            btn.addEventListener("click", () => { sortBy = btn.dataset.sort; renderGrid(); });
+        // The sort menu: tap to reveal, pick one, it folds away again
+        const SORT_NAMES = { navn: "navn", pris: "lavest pris", nyest: "nyest" };
+        const toggle = document.getElementById("sort-toggle");
+        const menu = document.getElementById("sort-menu");
+        const items = [...menu.querySelectorAll("[data-sort]")];
+
+        function openMenu(focusItem = true) {
+            menu.hidden = false;
+            toggle.setAttribute("aria-expanded", "true");
+            requestAnimationFrame(() => requestAnimationFrame(() => menu.classList.add("open")));
+            if (focusItem) (items.find(i => i.dataset.sort === sortBy) || items[0]).focus();
         }
+        function closeMenu(returnFocus = true) {
+            if (menu.hidden) return;
+            menu.classList.remove("open");
+            menu.hidden = true;
+            toggle.setAttribute("aria-expanded", "false");
+            if (returnFocus) toggle.focus();
+        }
+        toggle.addEventListener("click", () => menu.hidden ? openMenu(false) : closeMenu(false));
+        function choose(item) { sortBy = item.dataset.sort; renderGrid(); closeMenu(); }
+        for (const item of items) item.addEventListener("click", () => choose(item));
+        menu.addEventListener("keydown", e => {
+            const i = items.indexOf(document.activeElement);
+            if (e.key === "ArrowDown") { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+            if (e.key === "ArrowUp") { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+            // Handled here: letting the browser activate the item would, after
+            // focus moves back, also activate the toggle and reopen the menu
+            if ((e.key === "Enter" || e.key === " ") && i >= 0) { e.preventDefault(); choose(items[i]); }
+        });
+        toggle.addEventListener("keydown", e => { if (e.key === "ArrowDown") { e.preventDefault(); openMenu(); } });
+        document.addEventListener("click", e => { if (!e.target.closest(".sort")) closeMenu(false); });
+        // Escape closes it wherever focus is (a tap leaves focus on the toggle)
+        document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenu(); });
+
         load();
     </script>
 </body>

@@ -176,10 +176,74 @@ h1 {
 
 .listbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; margin: 32px 0 12px; }
 .listbar .count { margin: 0; }
-.sort { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-family: var(--mono); font-size: 12px; color: var(--soft); }
-.sort button { padding: 0; font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px solid transparent; cursor: pointer; }
-.sort button:hover { color: var(--text); }
-.sort button[aria-pressed="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+/* sort: a pill that unfolds a small menu */
+.sort { position: relative; }
+.sort-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 200ms, background 200ms;
+}
+.sort-toggle:hover, .sort-toggle[aria-expanded="true"] { border-color: var(--hover); background: rgba(236, 230, 220, 0.04); }
+.sort-label { color: var(--soft); }
+.caret {
+  width: 6px;
+  height: 6px;
+  margin: 0 2px 3px 4px;
+  border-right: 1.5px solid var(--soft);
+  border-bottom: 1.5px solid var(--soft);
+  transform: rotate(45deg);
+  transition: transform 250ms cubic-bezier(.2, .8, .2, 1), margin 250ms;
+}
+.sort-toggle[aria-expanded="true"] .caret { transform: rotate(225deg); margin-bottom: -2px; }
+.sort-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  min-width: 220px;
+  padding: 6px;
+  background: #151311;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
+  transform-origin: top right;
+  transition: opacity 180ms, transform 220ms cubic-bezier(.2, .8, .2, 1);
+}
+.sort-menu.open { opacity: 1; transform: none; }
+.sort-menu button {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  column-gap: 8px;
+  width: 100%;
+  padding: 9px 12px 9px 8px;
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.sort-menu button::before { content: ""; grid-row: span 2; align-self: center; justify-self: center; }
+.sort-menu button[aria-checked="true"]::before {
+  width: 5px; height: 9px; margin-top: -3px;
+  border-right: 1.5px solid var(--accent); border-bottom: 1.5px solid var(--accent);
+  transform: rotate(45deg);
+}
+.sort-menu button:hover, .sort-menu button:focus-visible { background: rgba(236, 230, 220, 0.05); outline: none; }
+.sort-menu b { font-family: "Libron", Georgia, serif; font-size: 16px; font-weight: 400; }
+.sort-menu button[aria-checked="true"] b { color: var(--accent); }
+.sort-menu span { font-family: var(--mono); font-size: 11px; color: var(--soft); }
 
 /* product cards */
 .grid {
