@@ -154,7 +154,7 @@ docker compose start app
 
 ## Showcase video
 
-`docs/video/make.sh` records a 1080p walkthrough of the app and its architecture: the real app and worker on demo data, driven by Playwright, with the Gemini call replaced by a fixed answer. It writes `docs/video/sjekka-showcase.mp4` (not committed). Rerun it after visible changes; the slides' facts (like the test count) are in `docs/video/slides.html`.
+`docs/video/make.sh` records a narrated 1080p walkthrough of the app and its architecture: the real app and worker on demo data, driven by Playwright, with the Gemini call replaced by a fixed answer. The voice-over is generated locally with [Kokoro](https://github.com/thewh1teagle/kokoro-onnx), an open-source text-to-speech model; the narration in `docs/video/narration.py` sets the pace, since each scene holds until its line is spoken. Setup is in the comment at the top of `make.sh`; without the voice model it makes a silent version. It writes `docs/video/sjekka-showcase.mp4` (not committed). Rerun it after visible changes; facts in the script and slides (like the test count) are in `narration.py` and `slides.html`.
 
 ---
 

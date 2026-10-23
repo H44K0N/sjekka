@@ -76,3 +76,4 @@ The AI's work wasn't right the first time every time. Recorded so the process ca
 | #10 | Remove redundant code | Each removal checked for references first |
 | #11 | Private receipt photos, sample database cleanup, this document | |
 | #12 | Showcase video and the scripts that record it | Gemini simulated in the recording; stated on the end card |
+| #13 | AI voice-over for the video (Kokoro text-to-speech) | Script written by Claude; pronunciation checked by transcribing the track with Whisper |
