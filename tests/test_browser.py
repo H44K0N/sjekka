@@ -188,6 +188,8 @@ def test_upload_flow(page, site, tmp_path):
     page.goto("/upload.html")
     button = page.locator("#btn")
     expect(button).to_be_disabled()
+    # Uploaders are told where the photo goes before they send it
+    expect(page.locator("#privacy")).to_contain_text("Google Gemini")
 
     page.set_input_files("#receipt", jpeg_file(tmp_path))
     expect(page.locator("#drop img")).to_be_visible()

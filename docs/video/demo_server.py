@@ -87,6 +87,6 @@ def fake_gemini(path):
 
 
 seed()
-worker.extract_receipt = fake_gemini
+worker.extract_receipt = lambda path: fake_gemini(path).model_dump_json()
 worker.POLL_INTERVAL = 0.5
 uvicorn.run("app.main:app", host="127.0.0.1", port=int(sys.argv[2]), log_level="warning")

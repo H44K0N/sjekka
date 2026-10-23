@@ -39,7 +39,7 @@ def restore_extractor():
 
 
 def test_saves_receipt_with_computed_unit_prices(client, db):
-    job = run(db, lambda path: receipt())
+    job = run(db, lambda path: receipt().model_dump_json())
     assert job.status == "done"
     items = {i.raw_name: i for i in db.query(models.ReceiptItem)}
     mince = items["GILDE KJØTTDEIG 400G"]
@@ -51,15 +51,15 @@ def test_saves_receipt_with_computed_unit_prices(client, db):
 
 
 def test_duplicate_receipt_is_not_saved_twice(client, db):
-    run(db, lambda path: receipt(), filename="a.jpg")
-    job = run(db, lambda path: receipt(), filename="b.jpg")
+    run(db, lambda path: receipt().model_dump_json(), filename="a.jpg")
+    job = run(db, lambda path: receipt().model_dump_json(), filename="b.jpg")
     assert job.status == "duplicate"
     assert db.query(models.Receipt).count() == 1
 
 
 def test_same_store_and_day_with_other_items_is_not_a_duplicate(client, db):
-    run(db, lambda path: receipt(), filename="a.jpg")
-    job = run(db, lambda path: receipt(items=receipt().items[:1]), filename="b.jpg")
+    run(db, lambda path: receipt().model_dump_json(), filename="a.jpg")
+    job = run(db, lambda path: receipt(items=receipt().items[:1]).model_dump_json(), filename="b.jpg")
     assert job.status == "done"
     assert db.query(models.Receipt).count() == 2
 
@@ -107,6 +107,50 @@ def test_waiting_job_does_not_block_the_queue(client, db):
 
 @pytest.mark.parametrize("missing", [{"store_chain": None}, {"purchase_date": None}])
 def test_receipts_without_store_or_date_are_never_duplicates(client, db, missing):
-    run(db, lambda path: receipt(**missing), filename="a.jpg")
-    job = run(db, lambda path: receipt(**missing), filename="b.jpg")
+    run(db, lambda path: receipt(**missing).model_dump_json(), filename="a.jpg")
+    job = run(db, lambda path: receipt(**missing).model_dump_json(), filename="b.jpg")
     assert job.status == "done"
+
+
+def photo(name):
+    from app.config import UPLOAD_DIR
+    path = UPLOAD_DIR / name
+    path.write_bytes(b"jpeg")
+    return path
+
+
+def test_raw_answer_and_model_are_kept(client, db):
+    raw = receipt().model_dump_json()
+    job = run(db, lambda path: raw)
+    assert job.raw_response == raw
+    assert job.model == worker.GEMINI_MODEL
+
+
+@pytest.mark.parametrize("second", [False, True])
+def test_photo_is_deleted_once_read(client, db, second):
+    if second:  # a duplicate is also fully handled
+        run(db, lambda path: receipt().model_dump_json(), filename="first.jpg")
+    path = photo("p.jpg")
+    job = run(db, lambda path: receipt().model_dump_json(), filename="p.jpg")
+    assert job.status == ("duplicate" if second else "done")
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("code", [503, 400])
+def test_photo_is_kept_when_reading_fails(client, db, code):
+    path = photo("p.jpg")
+    def extract(_):
+        raise api_error(code)
+    run(db, extract, filename="p.jpg")
+    assert path.exists()
+
+
+def test_invalid_answer_fails_but_keeps_the_raw_answer_and_photo(client, db):
+    raw = '{"items": [{"raw_name": "LEGO", "canonical_name": "Lego", "category": "Leker"}]}'
+    path = photo("p.jpg")
+    job = run(db, lambda _: raw, filename="p.jpg")
+    assert job.status == "failed"
+    assert "invalid receipt" in job.error
+    assert job.raw_response == raw
+    assert path.exists()
+    assert db.query(models.Receipt).count() == 0

@@ -27,7 +27,8 @@ CI (`.github/workflows/pipeline.yml`) runs exactly this, requires the browser te
 
 - **Tests never call Gemini.** Fake `worker.extract_receipt` or `extractor.client.models.generate_content`. Browser tests run the app with `RUN_WORKER=0`.
 - **Every change gets tests.** Prefer checking that a new test fails when the code is broken on purpose.
-- **Schema changes need a migration.** `create_all` only creates missing tables; it never adds columns to the existing production database. Write and test a migration for any model change.
+- **Schema changes need a migration.** `create_all` only creates missing tables; it never adds columns to the existing production database. New columns go in `app/migrations.py` (tested in `tests/test_migrations.py`); anything bigger needs a real migration tool.
+- **Photos are personal data.** They go to Gemini and are deleted once read; keep the raw answer (`jobs.raw_response`) instead. Never serve them.
 - **One app process only.** The worker runs inside it and the upload rate limit is in memory, so never add uvicorn workers or replicas.
 - **Timestamps are naive UTC** via `models.utcnow()`, matching the stored data.
 - **User-facing text is Norwegian (bokmål)**, including API error messages shown in the UI. Code, comments and commits are English.

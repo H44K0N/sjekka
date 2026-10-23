@@ -33,7 +33,7 @@ def fake_gemini(monkeypatch):
 
     def extract(path):
         calls.append(path)
-        return kiwi_receipt(path)
+        return kiwi_receipt(path).model_dump_json()
 
     monkeypatch.setattr(worker, "extract_receipt", extract)
     return calls

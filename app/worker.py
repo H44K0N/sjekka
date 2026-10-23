@@ -12,7 +12,7 @@ from app.database import SessionLocal
 from app import models
 from app.extractor import extract_receipt
 from app.schema import ExtractedItem, ExtractedReceipt
-from app.config import UPLOAD_DIR, LOG_DIR
+from app.config import GEMINI_MODEL, UPLOAD_DIR, LOG_DIR
 
 logger = logging.getLogger("sjekka.worker")
 
@@ -116,10 +116,12 @@ async def process_job(job: models.Job, db: Session):
     job.updated_at = models.utcnow()
     db.commit()
 
+    raw = None
     try:
-        data = await asyncio.to_thread(extract_receipt, filepath)
-
-        extraction_logger.info(f"FILE: {job.filename}\n{data.model_dump_json(indent=2)}\n{'=' * 60}")
+        raw = await asyncio.to_thread(extract_receipt, filepath)
+        job.raw_response, job.model = raw, GEMINI_MODEL
+        extraction_logger.info(f"FILE: {job.filename} ({GEMINI_MODEL})\n{raw}\n{'=' * 60}")
+        data = ExtractedReceipt.model_validate_json(raw)
 
         duplicate = find_duplicate(db, data)
         if duplicate:
@@ -133,9 +135,14 @@ async def process_job(job: models.Job, db: Session):
 
         job.updated_at = models.utcnow()
         db.commit()
+        # The extracted data is saved, so the photo is no longer needed. It can
+        # show personal details; photos of failed jobs stay for retrying.
+        filepath.unlink(missing_ok=True)
 
     except Exception as e:
         db.rollback()
+        if raw is not None:
+            job.raw_response, job.model = raw, GEMINI_MODEL
 
         if is_retryable(e) and job.attempts < MAX_ATTEMPTS:
             job.status = "pending"

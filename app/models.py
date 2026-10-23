@@ -67,5 +67,9 @@ class Job(Base):
     status = Column(String, default="pending")  # pending, processing, done, failed
     attempts = Column(Integer, default=0)
     error = Column(String, nullable=True)
+    # Gemini's answer exactly as returned, and the model that gave it, kept
+    # even when it fails validation (see app/migrations.py)
+    raw_response = Column(String, nullable=True)
+    model = Column(String, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
