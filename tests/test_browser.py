@@ -303,13 +303,17 @@ def test_unknown_product_page(page):
     expect(page.locator("#notice")).to_have_text("Fant ingen priser for dette produktet.")
 
 
+SEEDED = {'<img src=x onerror="window.pwned=1">', "Seigmenn", "Agurk", "Lettmelk", "Kjøttdeig"}
+
+
 def card_names(page):
-    return page.locator(".card h3").all_text_contents()
+    """The seeded products in display order; other tests may add more to the shared server."""
+    return [n for n in page.locator(".card h3").all_text_contents() if n in SEEDED]
 
 
 def test_sorting_by_price_and_newest(page):
     page.goto("/")
-    expect(cards(page)).to_have_count(5)
+    expect(cards(page).first).to_be_visible()
     page.get_by_role("button", name="lavest pris").click()
     # One item each: <img…> 10,00 · Seigmenn 38,70/3 = 12,90 · Agurk 30/2 = 15,00 · Lettmelk 24,90 · Kjøttdeig 89,00
     assert card_names(page) == ['<img src=x onerror="window.pwned=1">', "Seigmenn", "Agurk", "Lettmelk", "Kjøttdeig"]
@@ -332,5 +336,9 @@ def test_view_is_kept_in_the_url(page):
 
 
 def test_unknown_category_in_url_falls_back_to_all(page):
+    page.goto("/")
+    expect(cards(page).first).to_be_visible()
+    total = cards(page).count()
     page.goto("/?kategori=Finnes%20ikke")
-    expect(cards(page)).to_have_count(5)
+    expect(cards(page)).to_have_count(total)
+    expect(page.get_by_role("button", name="Alle")).to_have_attribute("aria-pressed", "true")
