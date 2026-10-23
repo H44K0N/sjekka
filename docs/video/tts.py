@@ -12,15 +12,15 @@ import soundfile as sf
 from kokoro_onnx import Kokoro
 
 sys.path.insert(0, str(Path(__file__).parent))
-from narration import CUES, SPEED, VOICE  # noqa: E402
+from narration import CUES, SPEED, VOICE, spoken  # noqa: E402
 
 models, out = Path(sys.argv[1]), Path(sys.argv[2])
 out.mkdir(parents=True, exist_ok=True)
 kokoro = Kokoro(str(models / "kokoro-v1.0.onnx"), str(models / "voices-v1.0.bin"))
 
 durations = {}
-for cue, line in CUES.items():
-    samples, rate = kokoro.create(line.get("say", line["text"]), voice=VOICE, speed=SPEED, lang="en-us")
+for cue, text in CUES.items():
+    samples, rate = kokoro.create(spoken(text), voice=VOICE, speed=SPEED, lang="en-us")
     sf.write(out / f"{cue}.wav", samples, rate)
     durations[cue] = round(len(samples) / rate, 2)
     print(f"{cue:10} {durations[cue]:5.1f}s")

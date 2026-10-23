@@ -12,7 +12,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-from narration import CUES
+from narration import CUES, spoken
 
 HERE = Path(__file__).parent
 BASE = sys.argv[1]
@@ -64,7 +64,7 @@ class Director:
         """Start a narration line now; show it as the caption on app pages."""
         self.started[cue] = round(time.monotonic() - self.t0, 2)
         if caption:
-            self.caption(CUES[cue]["text"])
+            self.caption(CUES[cue])
 
     def done(self, cue, pad=0.5):
         """Hold until the line has been spoken, plus a short pause."""
@@ -83,8 +83,8 @@ class Director:
     def caption(self, text=None):
         self.page.evaluate("t => window.__caption(t)", text)
 
-    def step(self, n):
-        self.page.evaluate(f"window.step({n})")
+    def step(self, n, text=None):
+        self.page.evaluate("([n, t]) => window.step(n, t)", [n, text])
 
     def move_to(self, locator):
         box = locator.bounding_box()
@@ -121,7 +121,7 @@ def durations():
     if voice:
         return json.loads((Path(voice) / "durations.json").read_text())
     # About 15 characters a second, like the real voice
-    return {cue: len(line.get("say", line["text"])) / 15 for cue, line in CUES.items()}
+    return {cue: len(spoken(text)) / 15 for cue, text in CUES.items()}
 
 
 def main():
@@ -188,7 +188,7 @@ def main():
         d.goto("/__slides?s=arch&manual", cursor=False)
         d.wait(1)
         for n in range(1, 9):
-            d.step(n)
+            d.step(n, CUES[f"arch{n}"])  # the slide shows the spoken line
             d.say(f"arch{n}", caption=False)
             d.done(f"arch{n}", 0.5)
         d.wait(0.8)
