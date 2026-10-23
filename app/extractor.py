@@ -126,8 +126,9 @@ Receipt line: "BÆREPOSE  3.00"
 Follow the response schema. Use store_chain e.g. "Kiwi", "Rema 1000", "Meny"; store_location e.g. "Byporten" or null; region e.g. "Oslo" or null; purchase_date as YYYY-MM-DD or null; total is the receipt total.
 """
 
-def extract_receipt(image_path: Path) -> ExtractedReceipt:
-    """One Gemini call. Retries are the worker's job, see app/worker.py."""
+def extract_receipt(image_path: Path) -> str:
+    """One Gemini call, returning its JSON answer as text. The worker stores
+    that raw answer and validates it; retries are its job too."""
     response = client.models.generate_content(
         model=GEMINI_MODEL,
         contents=[
@@ -139,4 +140,4 @@ def extract_receipt(image_path: Path) -> ExtractedReceipt:
             response_schema=ExtractedReceipt,
         ),
     )
-    return ExtractedReceipt.model_validate_json(response.text)
+    return response.text

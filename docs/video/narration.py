@@ -19,7 +19,7 @@ CUES = {
     "search": "Search by product, or by brand.",
     "filter": "Prices are compared per 100 grams, per 100 millilitres, or per item, so you can see what's actually cheap.",
     "upload": "Uploading takes seconds. The photo is checked right in the browser before anything is sent.",
-    "thanks": "The receipt is queued instantly. The photo stays private: the server never shows it to anyone. This copy comes from your own browser.",
+    "thanks": "The receipt is queued instantly. The photo is only sent to Gemini to be read, and deleted once that's done. This preview comes from your own browser.",
     "arch1": "Behind the scenes, it starts in the browser, on a phone or a laptop.",
     "arch2": "Traffic comes in through a Cloudflare tunnel, so the server doesn't expose a single open port.",
     "arch3": "FastAPI checks every photo, fixes its rotation, and rate-limits uploads, because each one costs an AI call.",

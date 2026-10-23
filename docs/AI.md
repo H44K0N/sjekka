@@ -16,7 +16,7 @@ The model is treated as an unreliable component, so its output is constrained an
 - **Duplicates.** A receipt with the same store, date and lines as one already saved is not stored twice.
 - **Failures.** Rate limits and outages are retried with backoff; anything else fails the job with the error saved, rather than retrying forever.
 - **Cost and abuse.** Every upload costs a Gemini call, so uploads are rate-limited per client and per day.
-- **Privacy.** Photos are sent to Google for extraction and stored on the server, but never served back over HTTP.
+- **Privacy.** Photos are sent to Google's Gemini API to be read, and the upload page says so. The server never serves them and deletes each photo once it has been read. Gemini's raw answer is kept, so the data can be reprocessed later without the photo.
 - **Tests never call Gemini.** It's replaced with fakes, so tests are free, fast and deterministic. Extraction quality itself still has to be checked with real receipts.
 
 Known limits: Gemini can misread blurry or cut-off receipts, and similar products with different names ("Kjøttdeig" vs "Kjøttdeig storfe") aren't merged yet.
@@ -77,3 +77,4 @@ The AI's work wasn't right the first time every time. Recorded so the process ca
 | #11 | Private receipt photos, sample database cleanup, this document | |
 | #12 | Showcase video and the scripts that record it | Gemini simulated in the recording; stated on the end card |
 | #13 | AI voice-over for the video (Kokoro text-to-speech) | Script written by Claude; pronunciation checked by transcribing the track with Whisper |
+| #14 | Privacy notice, photos deleted after reading, raw Gemini answers kept | Haakon caught that the video called the photos private while they're sent to Google |

@@ -53,7 +53,8 @@ Visible on the explore page
 
 ### Security
 
-- Receipt photos are stored in `data/uploads` but never served, since a receipt can show card digits, store and time of purchase. The thank-you page shows a small copy kept in the uploader's own browser tab
+- Receipt photos are sent to Google's Gemini API to be read, so Google's API terms apply (on the free tier Google may use them to improve its products; the paid tier says it doesn't). The upload page says so. On the server, photos are never served and are deleted once read; photos of failed jobs stay for retrying. The thank-you page shows a small copy kept in the uploader's own browser tab
+- Gemini's raw answer and the model name are kept on each job (`jobs.raw_response`, `jobs.model`), so extraction and product matching can be reworked later without the photos
 - `/upload` has no authentication. Every upload costs a Gemini call, so uploads are limited to 10 per client per hour and 200 per day (`UPLOADS_PER_IP_PER_HOUR`, `UPLOADS_PER_DAY`). A Cloudflare rate-limiting rule in front would stop floods before they reach the app
 
 ### Code

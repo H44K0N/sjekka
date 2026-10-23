@@ -21,6 +21,7 @@ from app.config import (
 from app.database import engine, get_db
 from app import models
 from app import worker
+from app.migrations import migrate
 
 # iPhones save photos as HEIC
 register_heif_opener()
@@ -30,6 +31,8 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO, force=True)
 logger = logging.getLogger("sjekka")
 
 models.Base.metadata.create_all(bind=engine)
+for column in migrate(engine):
+    logger.info(f"Added column {column}")
 
 
 @asynccontextmanager
