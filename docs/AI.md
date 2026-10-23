@@ -27,7 +27,7 @@ Known limits: Gemini can misread blurry or cut-off receipts, and similar product
 
 | When | Work | AI involvement |
 |---|---|---|
-| 27–28 Apr 2026 | Original app: upload, database, Gemini extraction, job queue, explore page | Not recorded in the git history. **TODO (Haakon): describe how AI was or wasn't used here.** |
+| 27–28 Apr 2026 | Original app: upload, database, Gemini extraction, job queue, explore page | Scaffolded by Haakon with help from AI. Not marked in the commits. |
 | 15 Oct 2026 | Stopped tracking `.env`, moved the sample database | Not recorded. **TODO (Haakon).** |
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (PR #1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | Everything in PRs #2–#11 (log below) | Claude Code (Claude Opus 5.5) |
