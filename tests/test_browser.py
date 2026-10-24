@@ -736,8 +736,8 @@ def test_list_says_how_many_prices_are_estimated(page):
     expect(page.locator("#verdict-facts")).to_have_text("1 pris anslått")
 
 
-# Chains we have no free logo for yet; they show their name instead
-NO_LOGO = {"Oda"}
+# Chains we have no logo for yet; they show their name instead
+NO_LOGO = set()
 
 
 def test_every_known_chain_has_a_logo_that_loads(page):
