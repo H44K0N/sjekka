@@ -93,14 +93,11 @@
         let cheapest = null;  // the cheapest store's latest price, once loaded
         const day = p => p.purchase_date ? new Date(p.purchase_date).getTime() : null;
 
-        function render(product) {
-            document.title = `Sjekka – ${product.canonical_name}`;
-            $("name").textContent = product.canonical_name;
-            if (product.category) $("category").textContent = ` · ${product.category}`;
-
+        // Any product can go on the list, also one only seen in this week's flyers
+        function listButton(productName) {
             $("product-actions").hidden = false;
             const showListed = () => {
-                const on = ShoppingList.has(product.canonical_name);
+                const on = ShoppingList.has(productName);
                 // The label says the state, so it isn't also a pressed toggle
                 $("list-button").classList.toggle("on", on);
                 $("list-button").textContent = on ? "På handlelisten ✓" : "Legg på handlelisten";
@@ -108,11 +105,19 @@
                 $("list-link").hidden = !on;
             };
             $("list-button").addEventListener("click", () => {
-                if (ShoppingList.has(product.canonical_name)) ShoppingList.remove(product.canonical_name);
-                else ShoppingList.add(product.canonical_name);
+                if (ShoppingList.has(productName)) ShoppingList.remove(productName);
+                else ShoppingList.add(productName);
                 showListed();
             });
             showListed();
+        }
+
+        function render(product) {
+            document.title = `Sjekka – ${product.canonical_name}`;
+            $("name").textContent = product.canonical_name;
+            if (product.category) $("category").textContent = ` · ${product.category}`;
+
+            listButton(product.canonical_name);
 
             const prices = product.prices.filter(p => p.total_price != null);
             receipts = prices;
@@ -232,7 +237,12 @@
             if (!name) { $("notice").textContent = "Ingen produkt valgt."; return; }
             try {
                 const res = await fetch(`/products/${encodeURIComponent(name)}`);
-                if (res.status === 404) { $("name").textContent = name; $("notice").textContent = "Ingen kvitteringer har denne varen ennå."; return; }
+                if (res.status === 404) {
+                    $("name").textContent = name;
+                    $("notice").textContent = "Ingen kvitteringer har denne varen ennå.";
+                    listButton(name);
+                    return;
+                }
                 if (!res.ok) throw new Error();
                 render(await res.json());
             } catch {
@@ -244,6 +254,8 @@
         const offersLoaded = fetch(`/offers?navn=${encodeURIComponent(name)}`).then(r => r.ok ? r.json() : []).catch(() => []);
         load().then(() => offersLoaded).then(mine => {
             if (!mine.length) return;
+            // Only flyer prices so far: say where the prices above come from
+            if (!cheapest && name) $("notice").textContent = "Ingen kvitteringer ennå. Prisene over er fra kundeavisene.";
             $("offers-list").replaceChildren(...mine.map(o => {
                 const li = el("li");
                 const line = el("div", "offer-line");
