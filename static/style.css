@@ -926,3 +926,8 @@ footer a[aria-current="page"] { color: var(--text); }
   .promo { grid-template-columns: 1fr; }
   .promo .tall { order: -1; max-width: 320px; margin: 0 auto; width: 100%; }
 }
+
+/* Front page: a search that matches this week's offers links to them */
+.offer-hits { display: inline-block; margin: 0 0 16px; padding: 8px 14px; font-size: 15px; color: var(--accent);
+  border: 1px solid var(--hover); border-radius: 999px; transition: background 150ms; }
+.offer-hits:hover { background: rgba(236, 230, 220, 0.04); }

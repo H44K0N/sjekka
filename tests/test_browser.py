@@ -206,7 +206,8 @@ def test_search_matches_name_and_brand(page):
     expect(cards(page)).to_have_count(1)
     page.fill("#search", "finnes ikke")
     expect(cards(page)).to_have_count(0)
-    expect(page.locator("#notice")).to_have_text("Ingen produkter passer til søket.")
+    expect(page.locator("#notice")).to_have_text("Ingen kvitteringer har det du søker etter ennå.")
+    expect(page.locator("#offer-hits")).to_be_hidden()
 
 
 def test_category_filter(page):
@@ -902,3 +903,16 @@ def test_about_page_puts_the_phone_film_first_on_a_phone(browser, site):
     tall, wide = phone.locator(".promo .tall").bounding_box(), phone.locator(".promo .wide").bounding_box()
     assert tall["y"] < wide["y"]
     phone.close()
+
+
+def test_a_search_that_matches_offers_links_to_them(page):
+    page.goto("/")
+    expect(cards(page).first).to_be_visible()
+    # No receipt has saffron buns, but Rema's flyer does
+    page.fill("#search", "safran")
+    expect(cards(page)).to_have_count(0)
+    link = page.locator("#offer-hits")
+    expect(link).to_have_text("1 vare på tilbud denne uka passer «safran» →")
+    link.click()
+    expect(page).to_have_url(re.compile(r"/tilbud\.html\?q=safran$"))
+    expect(page.locator(".card")).to_have_count(1)
