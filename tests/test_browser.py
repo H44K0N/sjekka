@@ -927,3 +927,16 @@ def test_a_product_only_in_flyers_can_go_on_the_list(page):
     expect(page.get_by_role("button", name="På handlelisten ✓")).to_be_visible()
     page.goto("/handleliste.html")
     assert list_names(page) == ["Safranboller"]
+
+
+def test_a_name_without_prices_suggests_ones_that_have_them(page):
+    page.goto("/handleliste.html?v=Melk~2")
+    item = page.locator(".list-item", has_text="Melk")
+    expect(item.locator(".hint .none")).to_have_text("ingen priser ennå")
+    swap = item.get_by_role("button", name="Bytt Melk med Lettmelk")
+    expect(swap).to_have_text("Lettmelk")
+    swap.click()
+    # Swapped, with its count, and now priced
+    assert list_names(page) == ["Lettmelk"]
+    expect(page.locator(".list-item", has_text="Lettmelk").locator(".qty")).to_contain_text("2")
+    expect(page.locator(".list-item", has_text="Lettmelk").locator(".hint")).to_contain_text("billigst hos")
