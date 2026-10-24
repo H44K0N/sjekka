@@ -236,6 +236,21 @@ def test_offers_endpoint_lists_the_best_deals_first(clean, db):
     assert (soda["each"], soda["per_unit"]) == (25, 1.67)
 
 
+def test_offers_endpoint_filters(clean, db):
+    add_receipt_price(db, "Kaffe", "Kiwi", 100, days_ago=10)
+    add_flyer(db, "Kiwi", [{"canonical_name": "Kaffe", "total_price": 99}, {"canonical_name": "Melk", "total_price": 20}])
+    add_flyer(db, "Meny", [{"canonical_name": "Kaffe", "total_price": 60}])
+    assert [(o["chain"], o["total_price"]) for o in clean.get("/offers?navn=Kaffe").json()] == [("Meny", 60), ("Kiwi", 99)]
+    best = clean.get("/offers?best=1").json()
+    assert [(o["canonical_name"], o["chain"]) for o in best] == [("Kaffe", "Meny"), ("Melk", "Kiwi")]
+
+
+def test_offers_are_compressed(clean, db):
+    add_flyer(db, "Kiwi", [{"canonical_name": f"Vare {i}", "total_price": i + 1} for i in range(30)])
+    res = clean.get("/offers", headers={"Accept-Encoding": "gzip"})
+    assert res.headers["content-encoding"] == "gzip"
+
+
 def test_offers_endpoint_when_there_are_none(clean):
     assert clean.get("/offers").json() == []
 

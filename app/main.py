@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -47,6 +48,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+# A week of flyers is a lot of JSON
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Fonts, logos and images rarely change, so browsers (and Cloudflare) may keep
 # them for a week. Pages, CSS and JS keep the default and revalidate, since
@@ -268,10 +271,15 @@ def price_basket(shopping_list: ShoppingList, db: Session = Depends(get_db)):
 
 
 @app.get("/offers")
-def get_offers(db: Session = Depends(get_db)):
+def get_offers(navn: str | None = None, best: bool = False, db: Session = Depends(get_db)):
     """This week's flyer offers, each judged against what receipts say the
-    product usually costs."""
-    return flyers.offer_list(db, date.today())
+    product usually costs, best first. `navn` keeps one product's offers;
+    `best` keeps only the best offer per product (for the product cards)."""
+    offers = flyers.offer_list(db, date.today(), name=navn)
+    if best:
+        seen = set()
+        offers = [o for o in offers if o["canonical_name"] not in seen and not seen.add(o["canonical_name"])]
+    return offers
 
 
 @app.get("/stats")

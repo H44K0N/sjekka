@@ -89,14 +89,16 @@ def import_flyer(db: Session, path: Path, chain: str | None = None, valid_from: 
     return flyer
 
 
-def active_offers(db: Session, today: date) -> list[tuple[models.FlyerOffer, models.Flyer]]:
-    return (
+def active_offers(db: Session, today: date, name: str | None = None) -> list[tuple[models.FlyerOffer, models.Flyer]]:
+    query = (
         db.query(models.FlyerOffer, models.Flyer)
         .join(models.Flyer, models.FlyerOffer.flyer_id == models.Flyer.id)
         .filter(models.Flyer.valid_from <= today, models.Flyer.valid_to >= today,
                 models.FlyerOffer.total_price.isnot(None))
-        .all()
     )
+    if name:
+        query = query.filter(models.FlyerOffer.canonical_name == name)
+    return query.all()
 
 
 @dataclass
@@ -154,9 +156,10 @@ def judge(offer: models.FlyerOffer, flyer: models.Flyer, receipts) -> dict:
     return verdict
 
 
-def offer_list(db: Session, today: date) -> list[dict]:
-    """Every offer valid today, with its verdict, biggest real discount first."""
-    offers = active_offers(db, today)
+def offer_list(db: Session, today: date, name: str | None = None) -> list[dict]:
+    """Every offer valid today (or just one product's), with its verdict,
+    biggest real discount first."""
+    offers = active_offers(db, today, name)
     names = {o.canonical_name for o, _ in offers}
     receipts: dict[str, list] = {}
     if names:

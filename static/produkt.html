@@ -219,9 +219,8 @@
         }
         // This week's flyer offers for the product, if any. Waits for the
         // prices, so a cheaper offer can take over "Billigst nå".
-        const offersLoaded = fetch("/offers").then(r => r.ok ? r.json() : []).catch(() => []);
-        load().then(() => offersLoaded).then(all => {
-            const mine = all.filter(o => o.canonical_name === name);
+        const offersLoaded = fetch(`/offers?navn=${encodeURIComponent(name)}`).then(r => r.ok ? r.json() : []).catch(() => []);
+        load().then(() => offersLoaded).then(mine => {
             if (!mine.length) return;
             $("offers-list").replaceChildren(...mine.map(o => {
                 const li = el("li");

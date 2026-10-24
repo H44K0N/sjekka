@@ -184,7 +184,7 @@
 
         async function loadOffers() {
             try {
-                const res = await fetch("/offers");
+                const res = await fetch("/offers?best=1");
                 if (!res.ok) return;
                 // Listed best first, so the first per product is the one to show
                 for (const o of await res.json()) {
