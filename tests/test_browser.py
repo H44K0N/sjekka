@@ -163,7 +163,7 @@ def test_multipacks_show_the_price_of_one(page):
     candy = cards(page).filter(has_text="Seigmenn")
     expect(candy.locator(".price")).to_have_text("12,90 kr")
     cucumber = cards(page).filter(has_text="Agurk")
-    expect(cucumber.locator(".unit")).to_have_text("15,00 kr / stk")
+    expect(cucumber.locator(".unit")).to_have_text("15 kr / stk")
 
 
 def test_dates_read_naturally(page):
@@ -318,7 +318,8 @@ def test_cards_show_chain_logos_or_colours(page):
 def test_card_opens_the_product_page(page):
     page.goto("/")
     milk = cards(page).filter(has_text="Lettmelk")
-    expect(milk.locator(".stores")).to_have_text("Sammenlign priser i 2 butikker")
+    # The other stores with a price are on the product page
+    expect(milk.locator(".more-stores")).to_have_text("+1 butikker til")
     milk.click()
     page.wait_for_url("**/produkt.html?navn=Lettmelk")
     expect(page.locator("h1")).to_have_text("Lettmelk")
@@ -495,13 +496,15 @@ def test_list_finds_the_cheapest_store_for_the_whole_list(page):
     ranks = page.locator(".rank")
     expect(ranks).to_have_count(2)
     expect(ranks.nth(1).locator(".chain img")).to_have_attribute("alt", "Kiwi")
-    expect(ranks.nth(1)).to_contain_text("1 av 2 priser fra kvitteringer")
+    # Rema has every price from a receipt, so there is nothing to flag
+    expect(page.locator("#verdict-facts")).to_be_hidden()
     expect(page.locator("#method")).to_be_visible()
+    expect(page.locator("#method .note")).to_be_hidden()
 
     # Each line says where it's cheapest
     milk = page.locator(".list-item", has_text="Lettmelk")
     expect(milk.locator(".hint .chain img")).to_have_attribute("alt", "Rema 1000")
-    expect(milk.locator(".hint")).to_contain_text("22,90 kr · 1000 ml")
+    expect(milk.locator(".hint")).to_contain_text("22,90 kr")
 
     # Counts change the totals
     milk.get_by_role("button", name="Flere Lettmelk").click()
@@ -515,6 +518,7 @@ def test_list_finds_the_cheapest_store_for_the_whole_list(page):
     expect(kiwi.locator(".rank-row")).to_have_attribute("aria-expanded", "true")
     expect(kiwi.locator("tr.estimated")).to_contain_text("Kjøttdeig")
     expect(kiwi.locator("tr.estimated")).to_contain_text("anslått")
+    expect(kiwi.locator(".coverage")).to_have_text("1 av 2 priser fra kvitteringer, resten anslått.")
 
     # It survives a reload
     page.reload()
@@ -533,7 +537,7 @@ def test_products_without_prices_stay_on_the_list(page):
     page.get_by_role("combobox", name="Legg til vare").fill("agurk")
     page.keyboard.press("Enter")
     expect(page.locator("#unknown")).to_contain_text("Safran")
-    expect(page.locator("#verdict-total")).to_have_text("15,00 kr")
+    expect(page.locator("#verdict-total")).to_have_text("15 kr")
 
 
 def test_removing_and_clearing_with_undo(page):
@@ -597,11 +601,16 @@ def test_offers_page_judges_each_offer(page):
     expect(offers).to_have_count(2)
     candy = offers.first
     expect(candy.locator("h3")).to_have_text("Seigmenn")
-    expect(candy.locator(".deal-verdict")).to_have_text("Ekte tilbud: 23 % under vanlig pris på 4,96 kr / 100 g")
+    # A short verdict; the explanation and the flyer's own text are folded away
+    expect(candy.locator(".verdict-tag")).to_have_text("Ekte tilbud −23 %")
+    expect(candy.locator(".deal-verdict")).to_be_hidden()
+    candy.get_by_text("Detaljer").click()
+    expect(candy.locator(".deal-verdict")).to_have_text("23 % under vanlig pris i butikken, som var 4,96 kr / 100 g.")
     expect(candy.locator(".chain img")).to_have_attribute("alt", "Meny")
     buns = offers.nth(1)
-    expect(buns.locator(".deal-verdict")).to_contain_text("Butikken sier 38 % under førpris på 40,00 kr")
-    expect(buns.locator(".raw")).to_have_text("SAFRANBOLLER 6 stk")
+    expect(buns.locator(".verdict-tag")).to_have_text("Butikken sier −38 %")
+    expect(buns.locator(".deal-verdict")).to_contain_text("Kundeavisen sier 38 % under førpris på 40 kr")
+    expect(buns.locator(".raw")).to_have_text("I kundeavisen: «SAFRANBOLLER 6 stk»")
 
     page.get_by_role("button", name="Rema 1000", exact=True).click()
     expect(offers).to_have_count(1)
@@ -620,12 +629,12 @@ def test_offers_page_judges_each_offer(page):
 
 def test_offer_shows_on_the_card_and_product_page(page):
     page.goto("/")
-    expect(cards(page).filter(has_text="Seigmenn").locator(".deal-tag")).to_have_text("Tilbud hos Meny: 9,90 kr")
+    expect(cards(page).filter(has_text="Seigmenn").locator(".deal-tag")).to_have_text("Tilbud 9,90 kr hos Meny")
     expect(cards(page).filter(has_text="Lettmelk").locator(".deal-tag")).to_have_count(0)
 
     page.goto("/produkt.html?navn=Seigmenn")
     expect(page.locator("#offers-now")).to_be_visible()
-    expect(page.locator("#offers-now .deal-verdict")).to_contain_text("Ekte tilbud")
+    expect(page.locator("#offers-now .verdict-tag")).to_contain_text("Ekte tilbud")
     expect(page.locator("#best .label")).to_have_text("Billigst nå, på tilbud")
     expect(page.locator("#best-price")).to_have_text("9,90 kr")
 
@@ -636,4 +645,4 @@ def test_shopping_list_uses_offers(page):
     expect(candy.locator(".offer-tag")).to_have_text("tilbud")
     expect(page.locator(".list-item", has_text="Safranboller").locator(".hint .chain img")).to_have_attribute("alt", "Rema 1000")
     expect(page.locator("#unknown")).to_be_hidden()
-    expect(page.locator("#verdict-note")).to_contain_text("på tilbud her nå")
+    expect(page.locator("#verdict-facts")).to_contain_text("1 vare på tilbud")

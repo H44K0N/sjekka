@@ -26,7 +26,7 @@
             <a href="/" aria-current="page">utforsk</a>
             <a href="/tilbud.html">tilbud</a>
             <a href="/handleliste.html">handleliste <span class="list-count" data-list-count hidden></span></a>
-            <a href="/upload.html">last opp</a>
+            <a href="/upload.html" class="cta">last opp</a>
         </nav>
     </header>
 
@@ -151,10 +151,18 @@
                 body.append(el("p", "price", each));
                 if (unit) body.append(el("p", "unit", unit));
                 const deal = offerFor.get(p.canonical_name);
-                if (deal) body.append(el("p", "deal-tag", `Tilbud hos ${deal.chain}: ${kr.format(deal.each)} kr`));
-                if (p.store_count > 1) body.append(el("p", "stores", `Sammenlign priser i ${p.store_count} butikker`));
+                if (deal) body.append(el("p", "deal-tag", `Tilbud ${offerPrice(deal)} hos ${deal.chain}`));
                 const where = el("p", "where");
-                where.append(chainBadge(p.store_chain), el("span", "", daysAgo(p.purchase_date)));
+                const shop = el("span", "shop");
+                shop.append(chainBadge(p.store_chain));
+                // Prices from more stores are on the product page
+                if (p.store_count > 1) {
+                    const more = el("span", "more-stores", `+${p.store_count - 1}`);
+                    more.title = `Priser fra ${p.store_count} butikker`;
+                    more.append(el("span", "visually-hidden", " butikker til"));
+                    shop.append(more);
+                }
+                where.append(shop, el("span", "", daysAgo(p.purchase_date)));
                 const card = el("article", "card");
                 card.append(body, where, ShoppingList.toggle(p.canonical_name));
                 return card;
