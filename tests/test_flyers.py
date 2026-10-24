@@ -167,6 +167,18 @@ def test_only_offers_valid_today_are_active(clean, db):
     assert names == ["Nå", "Siste dag"]
 
 
+
+def test_listing_offers_leaves_the_raw_flyer_data_unread(clean, db):
+    # Every offer row would otherwise carry its flyer's whole raw answer:
+    # 1,500 offers took over a gigabyte and killed the 512 MB container.
+    flyer = add_flyer(db, "Kiwi", [{"canonical_name": "Nå", "total_price": 1}])
+    flyer.raw_response = "x" * 100_000
+    db.commit()
+    db.expunge_all()
+    [(_, loaded)] = flyers.active_offers(db, TODAY)
+    assert "raw_response" not in loaded.__dict__
+    assert loaded.raw_response == "x" * 100_000
+
 # Is it really an offer?
 
 def judged(db, name, chain, price, **extra):
