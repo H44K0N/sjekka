@@ -202,6 +202,7 @@ def get_products(db: Session = Depends(get_db)):
         products.append({
             "canonical_name": item.canonical_name,
             "brand": item.brand,
+            "variant": item.variant,
             "category": item.category,
             "unit": item.unit,
             "quantity": item.quantity,

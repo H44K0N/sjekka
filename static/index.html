@@ -147,7 +147,8 @@
                 const title = el("h3");
                 title.append(link);
                 body.append(title);
-                if (p.brand) body.append(el("p", "brand", p.brand));
+                const about = describe(p);
+                if (about) body.append(el("p", "brand", about));
                 body.append(el("p", "price", each));
                 if (unit) body.append(el("p", "unit", unit));
                 const deal = offerFor.get(p.canonical_name);
