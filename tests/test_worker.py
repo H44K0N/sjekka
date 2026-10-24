@@ -70,11 +70,18 @@ def test_repair_fixes_multipacks_saved_before_and_only_once(client, db):
                            quantity=1000, unit="g", pack_size=1, total_price=169.0, price_per_unit=16.9),
         models.FlyerOffer(flyer_id=flyer.id, raw_name="COLA 6X0,5L", canonical_name="Cola",
                           quantity=500, unit="ml", pack_size=1, total_price=90.0, price_per_unit=18.0),
+        models.FlyerOffer(flyer_id=flyer.id, raw_name="Yoghurt 4-pk TINE 4x150 g", canonical_name="Yoghurt",
+                          quantity=150, unit="g", pack_size=4, total_price=20.0, price_per_unit=3.33, deal="4 for 20"),
+        models.FlyerOffer(flyer_id=flyer.id, raw_name="Battery 0,5 l", canonical_name="Energidrikk",
+                          quantity=500, unit="ml", pack_size=2, total_price=30.0, price_per_unit=3.0, deal="2 for 30"),
     ])
     db.commit()
 
-    assert worker.repair_multipacks(db) == 2
+    assert worker.repair_multipacks(db) == 3
     assert worker.repair_multipacks(db) == 0
+    pack = db.query(models.FlyerOffer).filter_by(canonical_name="Yoghurt").one()
+    assert (pack.quantity, pack.pack_size, pack.deal, pack.price_per_unit) == (600, 1, None, 3.33)
+    assert db.query(models.FlyerOffer).filter_by(canonical_name="Energidrikk").one().pack_size == 2
     rows = {r.canonical_name: r for r in [*db.query(models.ReceiptItem), *db.query(models.FlyerOffer)]}
     assert (rows["Yoghurt"].quantity, rows["Yoghurt"].price_per_unit) == (600, 3.33)
     assert (rows["Cola"].quantity, rows["Cola"].price_per_unit) == (3000, 3.0)

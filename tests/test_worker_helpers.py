@@ -58,6 +58,29 @@ def test_multipack_quantity(raw, quantity, unit, pack, expected):
     assert worker.multipack_quantity(raw, quantity, unit, pack) == expected
 
 
+# Real Tjek texts: multipacks, and multi-buys that only look alike
+@pytest.mark.parametrize("text, pieces, one_pack", [
+    ("Yoghurt 4-pk TINE, et utvalg, 4x150 g 33,33/kg", 4, True),
+    ("SOLO, SOLO SUPER OG PEPSI MAX 15 pk +pant 0.33 l x 15 bx", 15, True),
+    ("COCA-COLA U/SUKKER 4PK Coca-cola, 4pk, 14,32 pr. l", 4, True),
+    ("COCA-COLA ZERO 6 x 1,5 liter, pr. l 9,89 + pant", 6, True),
+    ("BRUSBRETT 20 x 0,33 l Fra 15,00/l", 20, True),
+    ("Pepsi 1,5 l x 2", 2, True),
+    ("Grandiosa 2 pk", 2, True),
+    ("Battery 0,5 l med og uten sukker NYHET! + pant", 2, False),
+    ("BATTERIER ENERGIZER 24 pk AA og AAA", 2, False),
+    ("Coop pizza 340-410 g Fra 79,27/kg. 1 stk 38,90-51,90", 2, False),
+    ("XTRA AIRFRYER FILTER 20x20/23x23/16x16 cm. 50 stk i pk", 2, False),
+    ("SØRLANDSCHIPS VERDENS TYNNESTE 4 VARIANTER 230/240 g", 3, False),
+    ("Coop brus 1,5 l Fra 9,83/l. 1 flaske 17,40-19,40", 2, False),
+    ("Xtra 2 varianter", 2, False),
+    ("Yoghurt 4x150g", 1, False),
+    (None, 4, False),
+])
+def test_pieces_are_one_pack(text, pieces, one_pack):
+    assert worker.pieces_are_one_pack(text, pieces) is one_pack
+
+
 @pytest.mark.parametrize("value, expected", [
     ("2026-10-20", date(2026, 10, 20)),
     ("20.10.2026", None),
