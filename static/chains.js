@@ -10,7 +10,9 @@ const CHAINS = [
     { match: /joker/i, logo: "/chains/joker.png" },
     { match: /spar/i, logo: "/chains/spar.svg" },
     { match: /extra/i, logo: "/chains/extra.png" },
-    // Others (Bunnpris, Obs, Oda…) show as plain text until we have a logo
+    { match: /\bobs\b/i, logo: "/chains/obs.png" },
+    { match: /bunnpris/i, logo: "/chains/bunnpris.png" },
+    // Others (Oda…) show as plain text until we have a logo
 ];
 
 function chainBadge(name) {
