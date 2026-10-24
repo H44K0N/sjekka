@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import deferred, relationship
 from datetime import datetime, timezone
 from app.database import Base
 
@@ -85,7 +85,8 @@ class Flyer(Base):
     valid_from = Column(Date, nullable=False)
     valid_to = Column(Date, nullable=False)
     source = Column(String)                 # file name or URL it came from
-    raw_response = Column(String)
+    # Hundreds of kB per flyer: loaded only when asked for, not with every offer
+    raw_response = deferred(Column(String))
     model = Column(String)
     created_at = Column(DateTime, default=utcnow)
     offers = relationship("FlyerOffer", back_populates="flyer", cascade="all, delete-orphan")
