@@ -32,7 +32,7 @@ CI (`.github/workflows/pipeline.yml`) runs exactly this, requires the browser te
 - **One app process only.** The worker runs inside it and the upload rate limit is in memory, so never add uvicorn workers or replicas.
 - **Timestamps are naive UTC** via `models.utcnow()`, matching the stored data.
 - **User-facing text is Norwegian (bokmål)**, including API error messages shown in the UI. Code, comments and commits are English.
-- **Design mirrors tischbein.dev:** Libron + Google Sans Code, the colour tokens in `style.css`, hairline cards, pill buttons. No gradients, no emoji, no decorative fluff. Build DOM with `textContent`, never `innerHTML` with data.
+- **Design mirrors tischbein.dev:** Libron everywhere (no second font), the colour tokens in `style.css`, hairline cards, pill buttons. No gradients, no emoji, no decorative fluff. Build DOM with `textContent`, never `innerHTML` with data.
 
 ## Workflow
 

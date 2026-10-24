@@ -26,7 +26,7 @@ OVERLAY = """
   document.addEventListener("DOMContentLoaded", () => { document.documentElement.style.zoom = String(Z); });
   const css = `
     #__cap { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 99999;
-      max-width: 1040px; padding: 12px 22px; border-radius: 999px; font: 15px/1.4 "Google Sans Code", ui-monospace, monospace;
+      max-width: 1040px; padding: 12px 22px; border-radius: 999px; font: 16px/1.4 "Libron", Georgia, serif;
       color: #ece6dc; background: rgba(13,12,11,0.94); border: 1px solid rgba(201,180,143,0.45);
       opacity: 0; transition: opacity 350ms; pointer-events: none; text-align: center; }
     #__cur { position: fixed; z-index: 100000; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%;
