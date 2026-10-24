@@ -26,7 +26,7 @@
             <a href="/">utforsk</a>
             <a href="/tilbud.html">tilbud</a>
             <a href="/handleliste.html" aria-current="page">handleliste <span class="list-count" data-list-count hidden></span></a>
-            <a href="/upload.html">last opp</a>
+            <a href="/upload.html" class="cta">last opp</a>
         </nav>
     </header>
 
@@ -69,6 +69,7 @@
                     <span class="label">Billigst for hele listen</span>
                     <div class="verdict-row"><span id="verdict-chain"></span><b id="verdict-total"></b></div>
                     <p class="verdict-note" id="verdict-note"></p>
+                    <p class="verdict-facts" id="verdict-facts"></p>
                 </div>
 
                 <div class="split" id="split" hidden>
@@ -86,7 +87,10 @@
                 <a class="sticky-total" id="sticky" href="#verdict" hidden aria-hidden="true" tabindex="-1">
                     <span class="label">Billigst</span><span id="sticky-chain"></span><b id="sticky-total"></b><span class="arrow">↓</span>
                 </a>
-                <p class="note" id="method" hidden>Tilbud fra kundeavisene regnes med mens de gjelder. Mangler en butikk pris på en vare, anslår vi den ut fra varens vanlige pris og hvor dyr butikken er på varer vi kan sammenligne. Anslåtte priser er merket. Jo flere kvitteringer, jo færre anslag: <a href="/upload.html">last opp din</a>.</p>
+                <details class="fold method" id="method" hidden>
+                    <summary>Slik regner vi</summary>
+                    <p class="note">Vi bruker den siste prisen hver butikk har på kvitteringene, og tilbud fra kundeavisene mens de gjelder. Mangler en butikk pris på en vare, anslår vi den ut fra varens vanlige pris og hvor dyr butikken er på varer vi kan sammenligne. Trykk på en butikk for å se hver vare. Jo flere kvitteringer, jo færre anslag: <a href="/upload.html">last opp din</a>.</p>
+                </details>
                 <p class="notice" id="notice" hidden></p>
             </div>
         </section>
@@ -192,12 +196,11 @@
                 const hint = el("span", "hint");
                 if (line) {
                     const best = line.prices[line.cheapest];
-                    hint.append("billigst hos ", chainBadge(line.cheapest),
-                        el("span", "each", line.size ? `${money(best.price / line.count)} · ${line.size}` : money(best.price / line.count)));
+                    hint.append("billigst hos ", chainBadge(line.cheapest), el("span", "each", money(best.price / line.count)));
                     if (best.offer_until) {
                         const tag = el("span", "offer-tag", "tilbud");
-                        tag.title = [best.deal, until(best.offer_until)].filter(Boolean).join(", ");
-                        hint.append(tag, el("span", "", until(best.offer_until)));
+                        tag.title = until(best.offer_until);
+                        hint.append(tag);
                     }
                 } else if (unknown.has(item.name)) {
                     hint.textContent = "ingen priser ennå";
@@ -250,7 +253,7 @@
             const stores = result?.stores || [];
             const show = items.length > 0 && result;
             $("verdict").hidden = $("ranking-wrap").hidden = !(show && stores.length);
-            $("method").hidden = !(show && stores.some(s => s.estimated));
+            $("method").hidden = !(show && stores.length);
             $("split").hidden = !(show && result.split);
 
             const notice = $("notice");
@@ -274,10 +277,11 @@
             } else if (stores.length === 1) {
                 notes.push("Bare denne butikken har priser på varene dine ennå.");
             }
-            const priced = best.known + best.estimated;
-            if (best.offers) notes.push(`${best.offers === 1 ? "Én vare" : `${best.offers} varer`} er på tilbud her nå.`);
-            if (best.estimated) notes.push(`${best.known} av ${priced} priser fra kvitteringer, resten anslått.`);
             $("verdict-note").textContent = notes.join(" ");
+            const facts = [];
+            if (best.offers) facts.push(`${best.offers === 1 ? "1 vare" : `${best.offers} varer`} på tilbud`);
+            if (best.estimated) facts.push(`${best.estimated} ${best.estimated === 1 ? "pris" : "priser"} anslått`);
+            $("verdict-facts").replaceChildren(...facts.map(f => el("span", "fact", f)));
 
             if (result.split) {
                 const s = result.split;
@@ -305,10 +309,6 @@
 
                 const who = el("span", "who");
                 who.append(chainBadge(store.chain));
-                const coverage = store.estimated
-                    ? `${store.known} av ${store.known + store.estimated} priser fra kvitteringer`
-                    : "alle prisene fra kvitteringer";
-                who.append(el("span", "coverage", coverage));
 
                 const diff = store.total - best.total;
                 const bar = el("span", "gap-bar");
@@ -347,7 +347,10 @@
                     );
                     table.tBodies[0].append(tr);
                 }
-                detail.append(table);
+                const coverage = store.estimated
+                    ? `${store.known} av ${store.known + store.estimated} priser fra kvitteringer, resten anslått.`
+                    : "Alle prisene er fra kvitteringer.";
+                detail.append(table, el("p", "coverage", coverage));
                 li.append(row, detail);
                 return li;
             }));

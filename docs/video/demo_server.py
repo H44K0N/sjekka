@@ -6,13 +6,14 @@ from datetime import date, timedelta
 from pathlib import Path
 
 DATA = sys.argv[1]
-os.environ.update(DATA_DIR=DATA, GEMINI_API_KEY="demo")
+os.environ.update(DATA_DIR=DATA, GEMINI_API_KEY="demo", FLYER_REFRESH_HOURS="0")
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)  # the app serves static/ relative to the repo root
 
 import uvicorn  # noqa: E402
 from app import models, worker  # noqa: E402
+from app.basket import chain_name  # noqa: E402
 from app.database import SessionLocal, engine  # noqa: E402
 from app.schema import ExtractedItem, ExtractedReceipt  # noqa: E402
 
@@ -55,10 +56,39 @@ SEED = [
 ]
 
 
+# This week's flyer offers: name, brand, qty, unit, pack, price, before-price, chain
+OFFERS = [
+    ("Kjøttdeig", "Gilde", 400, "g", 1, 44.90, 59.90, "Rema 1000"),
+    ("Lettmelk", "Tine", 1000, "ml", 1, 23.90, None, "Meny"),
+    ("Laksefilet", "Lerøy", 400, "g", 1, 69.90, 89.90, "Kiwi"),
+    ("Grovbrød", "Bakers", 750, "g", 1, 29.90, 42.90, "Kiwi"),
+    ("Farris", "Ringnes", 1500, "ml", 3, 50.00, None, "Coop Extra"),
+    ("Taco Kit", "Old El Paso", 350, "g", 1, 39.00, 54.90, "Meny"),
+    ("Pizza Grandiosa", "Stabburet", 575, "g", 2, 99.00, None, "Kiwi"),
+]
+
+
+def seed_offers(db):
+    # Started yesterday, so receipts from before it count as the usual price
+    by_chain = {}
+    for name, brand, qty, unit, pack, price, before, chain in OFFERS:
+        flyer = by_chain.get(chain) or models.Flyer(
+            chain=chain_name(chain), valid_from=today - timedelta(days=1), valid_to=today + timedelta(days=5), source="demo")
+        by_chain[chain] = flyer
+        each = price / pack
+        flyer.offers.append(models.FlyerOffer(
+            raw_name=f"{name.upper()} {qty:g} {unit}, {brand}", canonical_name=name, brand=brand,
+            quantity=qty, unit=unit, pack_size=pack, total_price=price, pre_price=before,
+            price_per_unit=round(each / qty * 100, 2), deal=f"{pack} for {price:g}" if pack > 1 else None,
+        ))
+    db.add_all(by_chain.values())
+
+
 def seed():
     db = SessionLocal()
     if db.query(models.Receipt).count():
         return
+    seed_offers(db)
     for name, brand, cat, qty, unit, pack, price, store, days in SEED:
         receipt = models.Receipt(image_filename="demo.jpg", store_chain=store,
                                  purchase_date=today - timedelta(days=days))

@@ -26,7 +26,7 @@
             <a href="/">utforsk</a>
             <a href="/tilbud.html" aria-current="page">tilbud</a>
             <a href="/handleliste.html">handleliste <span class="list-count" data-list-count hidden></span></a>
-            <a href="/upload.html">last opp</a>
+            <a href="/upload.html" class="cta">last opp</a>
         </nav>
     </header>
 
@@ -48,7 +48,10 @@
             <div class="grid" id="grid"></div>
             <div class="more" id="more" hidden><button type="button" class="button" id="more-button">Vis flere</button></div>
             <p class="notice" id="notice">Henter tilbud …</p>
-            <p class="note">Ekte tilbud: minst 15 % under butikkens egen pris fra før tilbudet. Prisene sammenlignes per 100 g, per 100 ml eller per stykk. Kundeavisene hentes fra <a href="https://etilbudsavis.no">eTilbudsavis</a> flere ganger om dagen, for butikker i Oslo-området. Jo flere kvitteringer, jo flere tilbud kan vi sjekke: <a href="/upload.html">last opp din</a>.</p>
+            <details class="fold method">
+                <summary>Slik sjekker vi tilbudene</summary>
+                <p class="note">Et ekte tilbud er minst 15 % under butikkens egen pris fra før tilbudet startet. Prisene sammenlignes per 100 g, per 100 ml eller per stykk. Kundeavisene hentes fra <a href="https://etilbudsavis.no">eTilbudsavis</a> flere ganger om dagen, for butikker i Oslo-området. Jo flere kvitteringer, jo flere tilbud kan vi sjekke: <a href="/upload.html">last opp din</a>.</p>
+            </details>
         </section>
     </main>
 
@@ -116,14 +119,16 @@
                 body.append(title);
                 const brand = [o.brand, o.variant].filter(Boolean).join(" · ");
                 if (brand) body.append(el("p", "brand", brand));
-                // What the flyer itself says, since names are matched loosely
-                if (o.raw_name) body.append(el("p", "raw", o.raw_name));
-                const price = el("p", "price", o.pack_size > 1 && o.deal ? o.deal : `${kr.format(o.each)} kr`);
-                body.append(price);
+                body.append(el("p", "price", offerPrice(o)));
                 const unit = o.unit === "g" || o.unit === "ml" ? `${kr.format(o.per_unit)} kr / 100 ${o.unit}` : o.pack_size > 1 ? `${kr.format(o.each)} kr / stk` : "";
                 const facts = [unit, o.is_member_price ? "medlemspris" : "", o.pack_size === 1 && o.deal ? o.deal : ""].filter(Boolean);
                 if (facts.length) body.append(el("p", "unit", facts.join(" · ")));
-                body.append(offerVerdict(o));
+                body.append(verdictTag(o));
+                // The explanation and what the flyer itself says (names are
+                // matched loosely) are there for whoever wants them
+                const details = [offerVerdict(o)];
+                if (o.raw_name) details.push(el("p", "raw", `I kundeavisen: «${o.raw_name}»`));
+                body.append(fold("Detaljer", ...details));
 
                 const where = el("p", "where");
                 where.append(chainBadge(o.chain), el("span", "", until(o.valid_to)));
