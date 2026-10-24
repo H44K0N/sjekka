@@ -735,3 +735,19 @@ def test_list_says_how_many_prices_are_estimated(page):
     expect(page.locator("#verdict .chain img")).to_have_attribute("alt", "Rema 1000")
     expect(page.locator("#verdict-facts")).to_have_text("1 pris anslått")
 
+
+# Chains we have no free logo for yet; they show their name instead
+NO_LOGO = {"Oda"}
+
+
+def test_every_known_chain_has_a_logo_that_loads(page):
+    from app.basket import CHAINS
+    page.goto("/")
+    names = [name for _, name in CHAINS]
+    badges = page.evaluate("""async names => Promise.all(names.map(async name => {
+        const img = chainBadge(name).querySelector("img");
+        if (!img) return [name, null];
+        await img.decode().catch(() => {});
+        return [name, img.naturalWidth > 0];
+    }))""", names)
+    assert dict(badges) == {name: None if name in NO_LOGO else True for name in names}

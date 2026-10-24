@@ -177,7 +177,7 @@ docker compose start app
 
 ## Store logos
 
-The chain logos in `static/chains/` come from Wikimedia Commons. Rema 1000, Kiwi, Meny, Coop Prix, Coop Mega, Joker and Spar are text logos marked public domain. The Extra logo is by Coop Norge, licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) ([source](https://commons.wikimedia.org/wiki/File:Extra_butikklogo.png)), resized. All are trademarks of their chains and are only used to show which store a price is from. Chains without a logo show as text. Matching is in `static/chains.js`.
+The chain logos in `static/chains/` come from Wikimedia Commons. Rema 1000, Kiwi, Meny, Coop Prix, Coop Mega, Joker and Spar are text logos marked public domain, and so is the Obs logo (Coop Norge, [source](https://commons.wikimedia.org/wiki/File:Coop_obs_hypermarked.jpg), cropped to the badge). The Bunnpris logo is from Bunnpris' own media bank, licensed with attribution ([source](https://commons.wikimedia.org/wiki/File:Bunnpris_Logo.png)). The Extra logo is by Coop Norge, licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) ([source](https://commons.wikimedia.org/wiki/File:Extra_butikklogo.png)), resized. All are trademarks of their chains and are only used to show which store a price is from. Chains without a logo (now only Oda) show as text, and a test checks that every chain in `app/basket.py` has a logo that loads. Matching is in `static/chains.js`.
 
 ---
 
