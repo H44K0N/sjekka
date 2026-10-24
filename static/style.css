@@ -303,7 +303,8 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.chain.logo { padding: 3px 8px; background: #fff; border-radius: 6px; }
+/* Logos sit straight on the page: each has its own colour block or a bright
+   edge, so none needs a white badge to read on the dark background */
 .chain.logo img { display: block; height: 20px; width: auto; max-width: 88px; object-fit: contain; }
 .shop { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .more-stores {
