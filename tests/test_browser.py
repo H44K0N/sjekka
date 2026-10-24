@@ -916,3 +916,14 @@ def test_a_search_that_matches_offers_links_to_them(page):
     link.click()
     expect(page).to_have_url(re.compile(r"/tilbud\.html\?q=safran$"))
     expect(page.locator(".card")).to_have_count(1)
+
+
+def test_a_product_only_in_flyers_can_go_on_the_list(page):
+    # No receipt has saffron buns; Rema's flyer does
+    page.goto("/produkt.html?navn=Safranboller")
+    expect(page.locator("#offers-now .offer-line")).to_have_count(1)
+    expect(page.locator("#notice")).to_have_text("Ingen kvitteringer ennå. Prisene over er fra kundeavisene.")
+    page.get_by_role("button", name="Legg på handlelisten").click()
+    expect(page.get_by_role("button", name="På handlelisten ✓")).to_be_visible()
+    page.goto("/handleliste.html")
+    assert list_names(page) == ["Safranboller"]
