@@ -24,6 +24,7 @@
         <a href="/" class="mark">sjekka</a>
         <nav>
             <a href="/">utforsk</a>
+            <a href="/handleliste.html">handleliste <span class="list-count" data-list-count hidden></span></a>
             <a href="/upload.html">last opp</a>
         </nav>
     </header>
@@ -33,6 +34,10 @@
             <p class="meta"><a href="/" class="back">← Alle produkter</a><span id="category"></span></p>
             <h1 id="name">…</h1>
             <p class="lede" id="summary"></p>
+            <div class="product-actions" id="product-actions" hidden>
+                <button type="button" class="button" id="list-button" aria-pressed="false">Legg på handlelisten</button>
+                <a class="text-link" id="list-link" href="/handleliste.html" hidden>Se hvor listen er billigst <span class="arrow">→</span></a>
+            </div>
             <div class="best" id="best" hidden>
                 <span class="label">Billigst nå</span>
                 <span class="best-row"><span id="best-chain"></span><b id="best-price"></b><span id="best-unit"></span></span>
@@ -64,6 +69,7 @@
 
     <script src="/common.js"></script>
     <script src="/chains.js"></script>
+    <script src="/list.js"></script>
     <script>
         const name = new URLSearchParams(location.search).get("navn");
         const $ = id => document.getElementById(id);
@@ -79,6 +85,19 @@
             document.title = `Sjekka – ${product.canonical_name}`;
             $("name").textContent = product.canonical_name;
             if (product.category) $("category").textContent = ` · ${product.category}`;
+
+            $("product-actions").hidden = false;
+            const showListed = () => {
+                const on = ShoppingList.has(product.canonical_name);
+                $("list-button").setAttribute("aria-pressed", String(on));
+                $("list-link").hidden = !on;
+            };
+            $("list-button").addEventListener("click", () => {
+                if (ShoppingList.has(product.canonical_name)) ShoppingList.remove(product.canonical_name);
+                else ShoppingList.add(product.canonical_name);
+                showListed();
+            });
+            showListed();
 
             const prices = product.prices.filter(p => p.total_price != null);
             const byStore = new Map();

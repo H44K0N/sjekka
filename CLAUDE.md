@@ -6,9 +6,10 @@ Crowdsourced Norwegian grocery prices: people upload receipt photos, Gemini extr
 
 - `app/main.py`: FastAPI app. `/upload` (validation, rate limits, EXIF rotation, HEIC), `/products`, `/stats`, and the static site.
 - `app/worker.py`: background loop in the same process. Takes pending jobs, calls Gemini, saves receipts. Retries 408/429/5xx with backoff, detects duplicate receipts, computes `price_per_unit`, normalises names.
+- `app/basket.py`: prices a shopping list per chain for `POST /basket` (pure functions, unit-tested). Groups chain names by pattern; keep `CHAINS` in step with `static/chains.js`.
 - `app/extractor.py`: the prompt and the single Gemini call. `app/schema.py`: Pydantic response schema (allowed categories and units).
 - `app/models.py`: SQLAlchemy models. `app/config.py`: all env settings.
-- `static/`: plain HTML/CSS/JS, one shared `style.css`. No build step.
+- `static/`: plain HTML/CSS/JS, one shared `style.css`. No build step. `list.js` holds the shopping list in `localStorage` (guarded; falls back to memory) and fills the header count on every page.
 - `deploy/`: `deploy.sh` (CI's forced SSH command), `backup.sh` + systemd timer, `setup-vps.sh`.
 - `tests/`: see the table in the README.
 

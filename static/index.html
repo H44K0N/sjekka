@@ -24,6 +24,7 @@
         <a href="/" class="mark">sjekka</a>
         <nav>
             <a href="/" aria-current="page">utforsk</a>
+            <a href="/handleliste.html">handleliste <span class="list-count" data-list-count hidden></span></a>
             <a href="/upload.html">last opp</a>
         </nav>
     </header>
@@ -71,6 +72,7 @@
 
     <script src="/common.js"></script>
     <script src="/chains.js"></script>
+    <script src="/list.js"></script>
     <script>
         let allProducts = [];
         // Search, category and sort live in the URL, so a view can be shared
@@ -135,18 +137,39 @@
             document.getElementById("grid").replaceChildren(...filtered.map(p => {
                 const { each, unit } = prices(p);
                 const body = el("div", "body");
-                body.append(el("h3", "", p.canonical_name));
+                // The name is the link, stretched over the whole card, so the
+                // list button can sit inside the card without nesting in a link
+                const link = el("a", "", p.canonical_name);
+                link.href = `/produkt.html?navn=${encodeURIComponent(p.canonical_name)}`;
+                const title = el("h3");
+                title.append(link);
+                body.append(title);
                 if (p.brand) body.append(el("p", "brand", p.brand));
                 body.append(el("p", "price", each));
                 if (unit) body.append(el("p", "unit", unit));
                 if (p.store_count > 1) body.append(el("p", "stores", `Sammenlign priser i ${p.store_count} butikker`));
                 const where = el("p", "where");
                 where.append(chainBadge(p.store_chain), el("span", "", daysAgo(p.purchase_date)));
-                const card = el("a", "card");
-                card.href = `/produkt.html?navn=${encodeURIComponent(p.canonical_name)}`;
-                card.append(body, where);
+                const card = el("article", "card");
+                card.append(body, where, listToggle(p.canonical_name));
                 return card;
             }));
+        }
+
+        function listToggle(name) {
+            const button = el("button", "list-toggle");
+            button.type = "button";
+            const show = () => {
+                const on = ShoppingList.has(name);
+                button.setAttribute("aria-pressed", String(on));
+            };
+            button.setAttribute("aria-label", `Legg ${name} på handlelisten`);
+            button.addEventListener("click", () => {
+                if (ShoppingList.has(name)) ShoppingList.remove(name); else ShoppingList.add(name);
+                show();
+            });
+            show();
+            return button;
         }
 
         async function load() {

@@ -112,7 +112,8 @@ def cards(page):
 AXE = Path(__file__).parent / "vendor" / "axe.min.js"  # axe-core, pinned (MPL-2.0)
 
 
-@pytest.mark.parametrize("path", ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/finnes-ikke.html", "/personvern.html"])
+@pytest.mark.parametrize("path", ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/finnes-ikke.html", "/personvern.html",
+                                  "/handleliste.html", "/handleliste.html?v=Lettmelk~2&v=Kj%C3%B8ttdeig&v=Safran"])
 def test_pages_pass_automated_accessibility_checks(page, path):
     page.goto(path)
     page.wait_for_load_state("networkidle")
@@ -176,10 +177,10 @@ def test_search_matches_name_and_brand(page):
 
 def test_category_filter(page):
     page.goto("/")
-    page.get_by_role("button", name="Meieri").click()
+    page.get_by_role("button", name="Meieri", exact=True).click()
     expect(cards(page)).to_have_count(1)
-    expect(page.get_by_role("button", name="Meieri")).to_have_attribute("aria-pressed", "true")
-    page.get_by_role("button", name="Alle").click()
+    expect(page.get_by_role("button", name="Meieri", exact=True)).to_have_attribute("aria-pressed", "true")
+    page.get_by_role("button", name="Alle", exact=True).click()
     expect(cards(page)).to_have_count(5)
 
 
@@ -192,8 +193,9 @@ def test_product_names_are_not_rendered_as_html(page):
 def test_no_horizontal_scroll_on_a_phone(browser, site):
     context = browser.new_context(base_url=site[0], viewport={"width": 360, "height": 740})
     page = context.new_page()
-    for path in ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk"]:
+    for path in ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/handleliste.html?v=Lettmelk&v=Agurk"]:
         page.goto(path)
+        page.wait_for_load_state("networkidle")
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), path
     context.close()
 
@@ -363,14 +365,14 @@ def test_sorting_by_price_and_newest(page):
 
 def test_view_is_kept_in_the_url(page):
     page.goto("/")
-    page.get_by_role("button", name="Meieri").click()
+    page.get_by_role("button", name="Meieri", exact=True).click()
     sort_by(page, "Lavest pris")
     page.fill("#search", "melk")
     expect(page).to_have_url(re.compile(r"\?q=melk&kategori=Meieri&sorter=pris$"))
 
     page.goto("/?kategori=Kj%C3%B8tt&sorter=nyest")
     expect(cards(page)).to_have_count(1)
-    expect(page.get_by_role("button", name="Kjøtt")).to_have_attribute("aria-pressed", "true")
+    expect(page.get_by_role("button", name="Kjøtt", exact=True)).to_have_attribute("aria-pressed", "true")
     expect(page.locator("#sort-current")).to_have_text("nyest")
 
 
@@ -380,7 +382,7 @@ def test_unknown_category_in_url_falls_back_to_all(page):
     total = cards(page).count()
     page.goto("/?kategori=Finnes%20ikke")
     expect(cards(page)).to_have_count(total)
-    expect(page.get_by_role("button", name="Alle")).to_have_attribute("aria-pressed", "true")
+    expect(page.get_by_role("button", name="Alle", exact=True)).to_have_attribute("aria-pressed", "true")
 
 
 def test_sort_menu_opens_closes_and_works_with_the_keyboard(page):
@@ -424,3 +426,152 @@ def test_pages_make_no_requests_to_other_sites(page, site):
         page.goto(path)
         page.wait_for_load_state("networkidle")
     assert [u for u in seen if not u.startswith(site[0])] == []
+
+
+# The shopping list
+
+def list_names(page):
+    return page.locator(".list-item .what a").all_text_contents()
+
+
+def test_plus_on_a_card_puts_the_product_on_the_list(page):
+    page.goto("/")
+    toggle = cards(page).filter(has_text="Lettmelk").get_by_role("button", name="Legg Lettmelk på handlelisten")
+    expect(toggle).to_have_attribute("aria-pressed", "false")
+    toggle.click()
+    expect(toggle).to_have_attribute("aria-pressed", "true")
+    expect(page.locator(".top [data-list-count]")).to_have_text("1")
+    # The card still opens the product page; the button doesn't
+    assert page.url.endswith("/")
+
+    page.goto("/handleliste.html")
+    assert list_names(page) == ["Lettmelk"]
+    page.goto("/")
+    toggle = cards(page).filter(has_text="Lettmelk").locator(".list-toggle")
+    expect(toggle).to_have_attribute("aria-pressed", "true")
+    toggle.click()
+    expect(page.locator(".top [data-list-count]")).to_be_hidden()
+
+
+def test_product_page_button(page):
+    page.goto("/produkt.html?navn=Kj%C3%B8ttdeig")
+    button = page.get_by_role("button", name="Legg på handlelisten")
+    button.click()
+    expect(button).to_have_attribute("aria-pressed", "true")
+    expect(page.locator("#list-link")).to_be_visible()
+    page.locator("#list-link").click()
+    page.wait_for_url("**/handleliste.html")
+    assert list_names(page) == ["Kjøttdeig"]
+
+
+def test_list_finds_the_cheapest_store_for_the_whole_list(page):
+    page.goto("/handleliste.html")
+    expect(page.locator("#empty")).to_be_visible()
+    add = page.get_by_role("combobox", name="Legg til vare")
+    add.fill("melk")
+    expect(page.get_by_role("option").first).to_have_text(re.compile("^Lettmelk"))
+    page.keyboard.press("Enter")
+    add.fill("kjøtt")
+    page.get_by_role("option", name=re.compile("^Kjøttdeig")).click()
+    expect(page.locator(".list-item")).to_have_count(2)
+    expect(add).to_be_focused()
+
+    # Rema: 22,90 + 89,00. Kiwi has milk at 24,90 and an estimated mince
+    verdict = page.locator("#verdict")
+    expect(verdict.locator(".chain img")).to_have_attribute("alt", "Rema 1000")
+    expect(page.locator("#verdict-total")).to_have_text("111,90 kr")
+    ranks = page.locator(".rank")
+    expect(ranks).to_have_count(2)
+    expect(ranks.nth(1).locator(".chain img")).to_have_attribute("alt", "Kiwi")
+    expect(ranks.nth(1)).to_contain_text("1 av 2 priser fra kvitteringer")
+    expect(page.locator("#method")).to_be_visible()
+
+    # Each line says where it's cheapest
+    milk = page.locator(".list-item", has_text="Lettmelk")
+    expect(milk.locator(".hint .chain img")).to_have_attribute("alt", "Rema 1000")
+    expect(milk.locator(".hint")).to_contain_text("22,90 kr · 1000 ml")
+
+    # Counts change the totals
+    milk.get_by_role("button", name="Flere Lettmelk").click()
+    expect(page.locator("#verdict-total")).to_have_text("134,80 kr")
+    milk.get_by_role("button", name="Færre Lettmelk").click()
+    expect(page.locator("#verdict-total")).to_have_text("111,90 kr")
+
+    # The breakdown marks estimated prices
+    kiwi = ranks.nth(1)
+    kiwi.locator(".rank-row").click()
+    expect(kiwi.locator(".rank-row")).to_have_attribute("aria-expanded", "true")
+    expect(kiwi.locator("tr.estimated")).to_contain_text("Kjøttdeig")
+    expect(kiwi.locator("tr.estimated")).to_contain_text("anslått")
+
+    # It survives a reload
+    page.reload()
+    assert list_names(page) == ["Lettmelk", "Kjøttdeig"]
+
+
+def test_products_without_prices_stay_on_the_list(page):
+    page.goto("/handleliste.html")
+    page.get_by_role("combobox", name="Legg til vare").fill("safran")
+    expect(page.get_by_role("option")).to_have_text(re.compile("«safran»"))
+    page.keyboard.press("Enter")
+    expect(page.locator(".list-item", has_text="Safran").locator(".hint")).to_have_text("ingen priser ennå")
+    expect(page.locator("#notice")).to_contain_text("Ingen av varene har priser ennå")
+    expect(page.locator("#verdict")).to_be_hidden()
+
+    page.get_by_role("combobox", name="Legg til vare").fill("agurk")
+    page.keyboard.press("Enter")
+    expect(page.locator("#unknown")).to_contain_text("Safran")
+    expect(page.locator("#verdict-total")).to_have_text("15,00 kr")
+
+
+def test_removing_and_clearing_with_undo(page):
+    page.goto("/handleliste.html?v=Lettmelk&v=Agurk")
+    expect(page.locator(".list-item")).to_have_count(2)
+    page.get_by_role("button", name="Fjern Lettmelk").click()
+    assert list_names(page) == ["Agurk"]
+    expect(page.get_by_role("button", name="Fjern Agurk")).to_be_focused()
+
+    page.get_by_role("button", name="Tøm listen").click()
+    expect(page.locator(".list-item")).to_have_count(0)
+    expect(page.locator(".top [data-list-count]")).to_be_hidden()
+    page.get_by_role("button", name="Listen er tømt. Angre").click()
+    assert list_names(page) == ["Agurk"]
+
+
+def test_shared_list_link(page, browser, site):
+    page.goto("/handleliste.html?v=Lettmelk~3&v=Agurk")
+    # An empty list just takes the shared one, and the link is tidied away
+    expect(page.locator(".list-item")).to_have_count(2)
+    expect(page.locator(".list-item", has_text="Lettmelk").locator(".qty span")).to_have_text("3")
+    expect(page).to_have_url(re.compile(r"/handleliste\.html$"))
+
+    # Sharing builds the same kind of link
+    page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+    page.get_by_role("button", name="Del listen").click()
+    expect(page.locator("#share-status")).to_have_text("Lenken er kopiert.")
+    link = page.evaluate("navigator.clipboard.readText()")
+    assert link.endswith("/handleliste.html?v=Lettmelk%7E3&v=Agurk")
+
+    # With a list of your own, you choose
+    page.goto("/handleliste.html?v=Kj%C3%B8ttdeig")
+    expect(page.locator("#shared")).to_be_visible()
+    expect(page.locator("#shared-text")).to_contain_text("1 vare")
+    page.get_by_role("button", name="Legg til i min liste").click()
+    expect(page.locator("#shared")).to_be_hidden()
+    assert list_names(page) == ["Lettmelk", "Agurk", "Kjøttdeig"]
+
+    page.goto("/handleliste.html?v=Agurk")
+    page.get_by_role("button", name="Bruk den delte").click()
+    assert list_names(page) == ["Agurk"]
+
+
+def test_phone_shows_the_total_while_the_result_is_out_of_sight(browser, site):
+    context = browser.new_context(base_url=site[0], viewport={"width": 390, "height": 700})
+    page = context.new_page()
+    page.goto("/handleliste.html?v=Lettmelk&v=Kj%C3%B8ttdeig&v=Agurk&v=Seigmenn")
+    sticky = page.locator("#sticky")
+    expect(sticky).to_be_visible()
+    expect(sticky).to_contain_text("kr")
+    page.locator("#verdict").scroll_into_view_if_needed()
+    expect(sticky).to_be_hidden()
+    context.close()
