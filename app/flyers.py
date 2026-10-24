@@ -6,6 +6,7 @@ go to Gemini, and the offers are stored with the dates they apply. Receipts
 stay the source of truth for what things normally cost; offers are kept
 apart and only count while they're valid."""
 import time
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -157,9 +158,15 @@ def judge(offer: models.FlyerOffer, flyer: models.Flyer, receipts) -> dict:
     return verdict
 
 
+# Checked bargains first, then what the flyer itself claims (biggest first),
+# then the weaker kinds. "Lowest known" ranks below a claim: with few
+# receipts it mostly means no other chain has a price yet.
+ORDER = {"real": 0, "claimed": 1, "small": 2, "cheapest_known": 3, "unknown": 4, "not": 5, "cheaper_elsewhere": 6}
+
+
 def offer_list(db: Session, today: date, name: str | None = None) -> list[dict]:
-    """Every offer valid today (or just one product's), with its verdict,
-    biggest real discount first."""
+    """Every offer valid today (or just one product's), with its verdict, in
+    the order they're worth looking at (see ORDER)."""
     offers = active_offers(db, today, name)
     names = {o.canonical_name for o, _ in offers}
     receipts: dict[str, list] = {}
@@ -196,6 +203,14 @@ def offer_list(db: Session, today: date, name: str | None = None) -> list[dict]:
             "valid_to": str(flyer.valid_to),
             "verdict": judge(offer, flyer, receipts.get(offer.canonical_name, [])),
         })
-    order = {"real": 0, "small": 1, "cheapest_known": 2, "claimed": 3, "unknown": 4, "not": 5, "cheaper_elsewhere": 6}
-    result.sort(key=lambda o: (order[o["verdict"]["kind"]], -(o["verdict"]["discount"] or 0), o["canonical_name"]))
+    def worth(o):
+        return ORDER[o["verdict"]["kind"]], -(o["verdict"]["discount"] or 0), o["canonical_name"]
+    result.sort(key=worth)
+    # Within each kind, every product shows its best offer before any shows
+    # a second, so ten energy drinks don't fill the top of the page
+    shown = Counter()
+    for o in result:
+        o["_nth"] = shown[o["canonical_name"]]
+        shown[o["canonical_name"]] += 1
+    result.sort(key=lambda o: (worth(o)[0], o.pop("_nth"), *worth(o)[1:]))
     return result
