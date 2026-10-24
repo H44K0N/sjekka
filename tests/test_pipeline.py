@@ -5,6 +5,7 @@ from datetime import date
 import pytest
 
 from app import models, worker
+from app.config import UPLOAD_DIR
 from app.schema import ExtractedItem, ExtractedReceipt
 from tests import helpers
 
@@ -142,3 +143,22 @@ def test_worker_loop_survives_unexpected_errors(client, db, fake_gemini, monkeyp
     upload(client)
 
     run_worker_until(lambda: db.query(models.Job).one().status == "done", db)
+
+
+def test_a_receipt_uploaded_as_csv_goes_all_the_way_through(client, db, monkeypatch):
+    sent = []
+
+    def extract(path):
+        sent.append(path.read_text(encoding="utf-8"))
+        return kiwi_receipt(path).model_dump_json()
+
+    monkeypatch.setattr(worker, "extract_receipt", extract)
+    csv = "Vare;Pris\nTINE LETTMELK 1L;24,90\nGILDE KJØTTDEIG 400G;89,00\n".encode("cp1252")
+    res = helpers.upload(client, csv, name="kvittering.csv")
+    filename = res.json()["id"]
+    drain_queue(db)
+
+    assert "KJØTTDEIG" in sent[0]  # Gemini got the text, decoded
+    assert client.get(f"/jobs/{filename}").json()["status"] == "done"
+    assert {p["canonical_name"] for p in client.get("/products").json()} == {"Lettmelk", "Kjøttdeig"}
+    assert not (UPLOAD_DIR / filename).exists()  # deleted once read, like a photo

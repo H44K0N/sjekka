@@ -47,8 +47,11 @@
                 <input type="file" id="camera" accept="image/*" capture="environment">Ta bilde med kamera
             </label>
             <p class="note tips">Best resultat: hele kvitteringen i bildet, flatt underlag og godt lys.</p>
+            <p class="note other-file"><label class="file-link">
+                <input type="file" id="receipt-file" accept=".pdf,.csv,.json,application/pdf,text/csv,application/json">Har du kvitteringen som fil? Last opp PDF, CSV eller JSON i stedet
+            </label></p>
             <p class="file" id="file" hidden><span id="file-name"></span><span id="file-size"></span></p>
-            <p class="note" id="privacy">Bildet sendes til Google Gemini, som leser kvitteringen. Bildet slettes når det er lest, mens butikk, varer og priser lagres. <a href="/personvern.html">Mer om personvern</a></p>
+            <p class="note" id="privacy">Bildet eller filen sendes til Google Gemini, som leser kvitteringen. Den slettes når den er lest, mens butikk, varer og priser lagres. <a href="/personvern.html">Mer om personvern</a></p>
 
             <div class="actions">
                 <button class="button primary" id="btn" type="button" disabled>Last opp <span class="arrow">→</span></button>
@@ -78,15 +81,20 @@
             statusEl.classList.toggle("error", isError);
         }
 
+        // A receipt as a file instead of a photo: a PDF, or a CSV or JSON export
+        const isReceiptFile = f => /\.(pdf|csv|json)$/i.test(f.name) || ["application/pdf", "text/csv", "application/json"].includes(f.type);
+
         function choose(f) {
             if (!f) return;
+            const asFile = isReceiptFile(f);
             // Some phones send HEIC with no type; the server checks the file itself.
-            if (f.type && !TYPES.includes(f.type)) {
-                setStatus("Filen må være et bilde (JPEG, PNG, WebP eller HEIC).", true);
+            if (!asFile && f.type && !TYPES.includes(f.type)) {
+                setStatus("Filen må være et bilde (JPEG, PNG, WebP eller HEIC), eller PDF, CSV eller JSON.", true);
                 return;
             }
-            if (f.size > MAX_MB * 1024 * 1024) {
-                setStatus(`Bildet er for stort. Maks ${MAX_MB} MB.`, true);
+            const maxMb = asFile && !/\.pdf$/i.test(f.name) && f.type !== "application/pdf" ? 1 : MAX_MB;
+            if (f.size > maxMb * 1024 * 1024) {
+                setStatus(`${asFile ? "Filen" : "Bildet"} er for stort. Maks ${maxMb} MB.`, true);
                 return;
             }
             file = f;
@@ -110,7 +118,9 @@
                 document.getElementById("prompt").hidden = true;
                 document.getElementById("hint").textContent = "Trykk for å velge et annet bilde";
             } else {
-                document.getElementById("prompt").textContent = "Bilde valgt";
+                document.getElementById("prompt").hidden = false;
+                document.getElementById("prompt").textContent = asFile ? "Fil valgt" : "Bilde valgt";
+                document.getElementById("hint").textContent = asFile ? "Trykk for å velge et bilde i stedet" : "Trykk for å velge et annet bilde";
             }
         }
 
@@ -118,6 +128,8 @@
         // Phones open the camera straight away from this one
         const camera = document.getElementById("camera");
         camera.addEventListener("change", () => choose(camera.files[0]));
+        const receiptFile = document.getElementById("receipt-file");
+        receiptFile.addEventListener("change", () => choose(receiptFile.files[0]));
 
         drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("dragging"); });
         drop.addEventListener("dragleave", () => drop.classList.remove("dragging"));

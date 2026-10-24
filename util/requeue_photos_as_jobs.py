@@ -8,8 +8,9 @@ from app.config import UPLOAD_DIR
 
 db = SessionLocal()
 
-images = list(UPLOAD_DIR.glob('*.jpg'))
-print(f"Found {len(images)} images")
+# Photos, and receipts uploaded as PDF, CSV or JSON files
+images = [p for p in UPLOAD_DIR.iterdir() if p.suffix in (".jpg", ".pdf", ".csv", ".json")]
+print(f"Found {len(images)} uploads")
 
 for img in images:
     existing = db.query(models.Job).filter(models.Job.filename == img.name).first()

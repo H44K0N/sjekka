@@ -954,3 +954,26 @@ def test_offers_ask_for_receipts_while_most_cannot_be_checked(page):
     expect(ask.get_by_role("link", name="Last den opp")).to_have_attribute("href", "/upload.html")
     page.get_by_role("button", name="Meny", exact=True).click()
     expect(ask).to_be_hidden()
+
+
+def test_a_receipt_can_be_uploaded_as_a_file(page, tmp_path):
+    page.goto("/upload.html")
+    link = page.get_by_text("Har du kvitteringen som fil? Last opp PDF, CSV eller JSON i stedet")
+    expect(link).to_be_visible()
+    receipt = tmp_path / "kvittering.csv"
+    receipt.write_text("Vare;Pris\nTine Lettmelk 1 l;24,90\n", encoding="utf-8")
+    page.set_input_files("#receipt-file", str(receipt))
+    expect(page.locator("#prompt")).to_have_text("Fil valgt")
+    expect(page.locator("#file-name")).to_have_text("kvittering.csv")
+    page.locator("#btn").click()
+    page.wait_for_url("**/takk.html*")
+    expect(page.locator(".lede")).to_contain_text("Bildet eller filen slettes")
+
+
+def test_the_upload_page_turns_away_other_files(page, tmp_path):
+    page.goto("/upload.html")
+    other = tmp_path / "notes.txt"
+    other.write_text("hei")
+    page.set_input_files("#receipt-file", str(other))
+    expect(page.locator("#status")).to_contain_text("PDF, CSV eller JSON")
+    expect(page.locator("#btn")).to_be_disabled()

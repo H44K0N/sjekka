@@ -11,7 +11,7 @@
 - **Look up a price.** Search for a product and see what it cost in each store, from real receipts, with its price history.
 - **Price your whole shopping list.** Write down what you need and see what the list costs in every chain, cheapest first. Missing prices are estimated, and marked as estimates.
 - **See if an offer is really an offer.** This week's flyer offers from ten chains, each checked against what the product cost before the sale.
-- **Share a receipt.** Take a photo; Sjekka reads the store, the items and the prices, and every receipt makes the prices better for everyone.
+- **Share a receipt.** Take a photo, or upload a receipt you have as a file (a PDF, or a CSV or JSON export from a store app, bank or online shop). Sjekka reads the store, the items and the prices, and every receipt makes the prices better for everyone.
 
 It's free, needs no account, and sets no cookies of its own.
 
@@ -23,7 +23,7 @@ Receipt photo ──► Gemini reads it ──► prices per store ──┐
 Weekly flyers ──► Gemini names each offer ──► offers ─────┘     shopping list, offer check
 ```
 
-1. **Receipts.** A photo is uploaded, shrunk, and put in a queue. Google's Gemini reads the store, date and each line into fixed fields. Sjekka checks the answer, works out comparable prices (per 100 g, per 100 ml or per item), and deletes the photo.
+1. **Receipts.** A photo (shrunk first) or a receipt file is uploaded and put in a queue. Google's Gemini reads the store, date and each line into fixed fields. Sjekka checks the answer, works out comparable prices (per 100 g, per 100 ml or per item), and deletes the photo.
 2. **Flyers.** Every six hours Sjekka fetches new grocery flyers from eTilbudsavis. Prices and sizes come from the flyer; Gemini only gives each offer the same product name a receipt would use, so the two can be compared.
 3. **Comparing.** An offer is "real" when it's at least 15 % below what receipts show the chain usually charged. A shopping list is priced per chain from the latest receipts and current offers; where a chain has no price for a product, it's estimated from how expensive that chain is on products both sell.
 
@@ -87,6 +87,7 @@ About 350 tests, and none of them call Gemini: it's replaced with fakes, so they
 | File | Covers |
 |---|---|
 | `test_upload.py`, `test_upload_edge_cases.py` | Upload checks, formats (HEIC too), rotation, resizing, rate limits |
+| `test_receipt_files.py` | Receipts as PDF, CSV or JSON: recognised by content, checked, stored as UTF-8 |
 | `test_api.py` | `/products`, `/stats`, pages, caching and content-hashed scripts, the about page and its films |
 | `test_jobs.py` | `/jobs/{id}`, which the thank-you page follows |
 | `test_worker.py`, `test_worker_helpers.py` | Saving receipts, unit prices, multipacks, loose produce, names, duplicates, retries |
