@@ -1,3 +1,6 @@
+import hashlib
+import re
+from pathlib import Path
 from datetime import date
 
 from app import models
@@ -138,7 +141,25 @@ def test_fonts_and_logos_are_cached_for_a_week(client):
 
 def test_pages_and_scripts_are_not_long_cached(client):
     for path in ["/", "/style.css", "/common.js", "/health"]:
-        assert "max-age=604800" not in client.get(path).headers.get("cache-control", ""), path
+        assert "max-age" not in client.get(path).headers.get("cache-control", ""), path
+
+
+def test_pages_link_scripts_and_styles_by_content(client):
+    # Cloudflare keeps JS and CSS for hours but not pages. A page from a new
+    # deploy once ran against the old common.js and showed no offers at all.
+    pages = ["/"] + [f"/{p.name}" for p in Path("static").glob("*.html")]
+    for page in pages:
+        html = client.get(page).text
+        assert not re.search(r'(?:src|href)="/[\w.-]+\.(?:js|css)"', html), f"{page} links an unversioned asset"
+        for name, version in re.findall(r'(?:src|href)="/([\w.-]+\.(?:js|css))\?v=(\w+)"', html):
+            assert version == hashlib.sha256(Path("static", name).read_bytes()).hexdigest()[:10], (page, name)
+            res = client.get(f"/{name}?v={version}")
+            assert res.status_code == 200, (page, name)
+            assert res.headers["cache-control"] == "public, max-age=31536000, immutable", (page, name)
+
+
+def test_an_old_script_version_is_not_kept(client):
+    assert client.get("/common.js?v=0000000000").headers["cache-control"] == "no-cache"
 
 
 def test_missing_pages_get_the_404_page(client):
