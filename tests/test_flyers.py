@@ -255,6 +255,27 @@ def test_offers_endpoint_lists_the_best_deals_first(clean, db):
     assert (soda["each"], soda["per_unit"]) == (25, 1.67)
 
 
+def test_a_flyer_claim_ranks_above_lowest_known(clean, db):
+    add_receipt_price(db, "Melk", "Meny", 25, days_ago=3)
+    add_flyer(db, "Kiwi", [
+        {"canonical_name": "Melk", "total_price": 20},                     # lowest known: Meny has 25
+        {"canonical_name": "Ost", "total_price": 60, "pre_price": 100},    # the flyer says -40 %
+        {"canonical_name": "Brød", "total_price": 30, "pre_price": 40},    # the flyer says -25 %
+    ])
+    data = clean.get("/offers").json()
+    assert [(o["canonical_name"], o["verdict"]["kind"]) for o in data] == [
+        ("Ost", "claimed"), ("Brød", "claimed"), ("Melk", "cheapest_known")]
+
+
+def test_each_product_shows_its_best_offer_before_any_shows_a_second(clean, db):
+    add_flyer(db, "Kiwi", [{"canonical_name": "Energidrikk", "total_price": p, "pre_price": 40} for p in (10, 12, 14)])
+    add_flyer(db, "Meny", [{"canonical_name": "Kaffe", "total_price": 30, "pre_price": 40}])
+    names = [(o["canonical_name"], o["total_price"]) for o in clean.get("/offers").json()]
+    # Kaffe's -25 % claim beats the second and third energy drink
+    assert names == [("Energidrikk", 10), ("Kaffe", 30), ("Energidrikk", 12), ("Energidrikk", 14)]
+    assert [o["total_price"] for o in clean.get("/offers?best=1").json()] == [10, 30]
+
+
 def test_offers_endpoint_filters(clean, db):
     add_receipt_price(db, "Kaffe", "Kiwi", 100, days_ago=10)
     add_flyer(db, "Kiwi", [{"canonical_name": "Kaffe", "total_price": 99}, {"canonical_name": "Melk", "total_price": 20}])
