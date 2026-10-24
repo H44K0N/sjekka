@@ -15,7 +15,6 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import httpx
-from google.genai import types
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -23,9 +22,9 @@ from app import models
 from app.basket import CHAINS, chain_name
 from app.config import FLYER_REFRESH_HOURS, GEMINI_MODEL
 from app.database import SessionLocal
-from app.extractor import DEFINITIONS, client
+from app.extractor import DEFINITIONS, client, json_answer, known_names
 from app.schema import Category
-from app.worker import normalize_name, pieces_are_one_pack
+from app.worker import known_product_names, normalize_name, pieces_are_one_pack
 
 logger = logging.getLogger("sjekka.flyers")
 
@@ -134,14 +133,14 @@ equipment. Those get category "Annet" and are left out of Sjekka.
 """
 
 
-def gemini_names(offers: list[dict]) -> tuple[dict[int, OfferName], str]:
+def gemini_names(offers: list[dict], known=()) -> tuple[dict[int, OfferName], str]:
     """One text-only Gemini call naming every offer. Returns names by index
     and the raw answer."""
     lines = "\n".join(f"{i} | {text_of(o)}" for i, o in enumerate(offers))
     response = client.models.generate_content(
         model=GEMINI_MODEL,
-        contents=[NAMES_PROMPT.format(definitions=DEFINITIONS, lines=lines)],
-        config=types.GenerateContentConfig(response_mime_type="application/json", response_schema=OfferNames),
+        contents=[NAMES_PROMPT.format(definitions=DEFINITIONS, lines=lines) + known_names(known)],
+        config=json_answer(OfferNames),
     )
     raw = response.text
     return {n.index: n for n in OfferNames.model_validate_json(raw).offers}, raw
@@ -224,7 +223,9 @@ def refresh_new_flyers(client: httpx.Client | None = None) -> int:
     client = client or httpx.Client(timeout=30, headers={"User-Agent": USER_AGENT})
     imported = 0
     with SessionLocal() as db:
-        for label, flyer, error in refresh(db, client, gemini_names, only_new=True):
+        # Offers named like the receipts and flyers already in, so they meet
+        known = known_product_names(db)
+        for label, flyer, error in refresh(db, client, lambda offers: gemini_names(offers, known), only_new=True):
             if error:
                 logger.error(f"Flyer {label}: {error}")
             elif flyer:

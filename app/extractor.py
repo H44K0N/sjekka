@@ -15,7 +15,12 @@ DEFINITIONS = """## DEFINITIONS
   - "TINE LETTMELK 1L" → "Lettmelk"
   - "LABAN SEIGMENN 260G" → "Seigmenn"
   - "JACOBS TRØFFELSALAMI 80G" → "Trøffelsalami"
-  - Always Title Case. Always generic. Never include brand or size.
+  - "MONSTER ULTRA WHITE 0,5L" → "Energidrikk" (brand "Monster", variant "Ultra White")
+  - "AASS PREMIUM FATØL 0,5L" → "Øl" (brand "Aass", variant "Premium Fatøl")
+  - "BIG ONE PIZZA CLASSIC" → "Pizza" (brand "Big One", variant "Classic")
+  - "BALLERINA KJEKS BROWNIE" → "Kjeks" (brand "Ballerina", variant "Brownie")
+  - Always Title Case. Always generic. Never include brand or size. Norwegian
+    spelling ("Avokado", not "Avocado").
 
 **brand**: The brand name only, or null if unknown/store brand.
   - "GILDE KJØTTDEIG" → "Gilde"
@@ -136,6 +141,29 @@ Receipt line: "BÆREPOSE  3.00"
 Follow the response schema. Use store_chain e.g. "Kiwi", "Rema 1000", "Meny"; store_location e.g. "Byporten" or null; region e.g. "Oslo" or null; purchase_date as YYYY-MM-DD or null; total is the receipt total.
 """
 
+def json_answer(schema) -> types.GenerateContentConfig:
+    """Every call answers in JSON by a schema. Thinking is off: reading and
+    naming need none, and on gemini-2.5-flash it uses the same budget as the
+    answer, so a long list got cut off mid-way (a Trumf part did). The limit
+    is the model's largest."""
+    return types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=schema,
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
+        max_output_tokens=65536,
+    )
+
+
+def known_names(names) -> str:
+    """The names Sjekka already uses, for a prompt: reusing them is what
+    lets a receipt line, a Trumf line and a flyer offer meet as one product."""
+    if not names:
+        return ""
+    return ("\n## KNOWN PRODUCT NAMES\n\nThese canonical names are already in use. When a line is the same kind of "
+            "product as one of them, use that name exactly (brand, size and variant go in their own fields). Make a "
+            "new generic name only when none fits.\n\n" + ", ".join(names) + "\n")
+
+
 def receipt_part(path: Path):
     """The receipt as Gemini gets it: a photo or PDF as a file, a CSV or JSON
     export as text (see app/receipt_files.py)."""
@@ -156,30 +184,24 @@ skip it, as it's read whole from the neighbouring part.
 """
 
 
-def extract_receipts(path: Path) -> str:
+def extract_receipts(path: Path, known=()) -> str:
     """For a receipt file (PDF, CSV, JSON): one Gemini call returning a list
     of receipts, as raw JSON text."""
     response = client.models.generate_content(
         model=GEMINI_MODEL,
-        contents=[receipt_part(path), PROMPT + FILE_PROMPT],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=ExtractedReceipts,
-        ),
+        contents=[receipt_part(path), PROMPT + FILE_PROMPT + known_names(known)],
+        config=json_answer(ExtractedReceipts),
     )
     return response.text
 
 
-def extract_receipt(path: Path) -> str:
+def extract_receipt(path: Path, known=()) -> str:
     """One Gemini call, returning its JSON answer as text. The worker stores
     that raw answer and validates it; retries are its job too."""
     response = client.models.generate_content(
         model=GEMINI_MODEL,
-        contents=[receipt_part(path), PROMPT],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=ExtractedReceipt,
-        ),
+        contents=[receipt_part(path), PROMPT + known_names(known)],
+        config=json_answer(ExtractedReceipt),
     )
     return response.text
 
@@ -211,7 +233,7 @@ Extract every advertised product offer from the flyer.
 MIME_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".pdf": "application/pdf"}
 
 
-def extract_flyer(path: Path) -> str:
+def extract_flyer(path: Path, known=()) -> str:
     """One Gemini call for a flyer (a PDF or a page image), returning the raw
     JSON answer. Flyers are imported by hand (util/import_flyer.py)."""
     mime = MIME_TYPES.get(path.suffix.lower())
@@ -219,10 +241,7 @@ def extract_flyer(path: Path) -> str:
         raise ValueError(f"Unsupported flyer file: {path.name} (use PDF, JPEG, PNG or WebP)")
     response = client.models.generate_content(
         model=GEMINI_MODEL,
-        contents=[types.Part.from_bytes(data=path.read_bytes(), mime_type=mime), FLYER_PROMPT],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=ExtractedFlyer,
-        ),
+        contents=[types.Part.from_bytes(data=path.read_bytes(), mime_type=mime), FLYER_PROMPT + known_names(known)],
+        config=json_answer(ExtractedFlyer),
     )
     return response.text

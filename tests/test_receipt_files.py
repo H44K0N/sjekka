@@ -164,7 +164,7 @@ def test_every_receipt_in_a_part_is_saved_and_repeats_are_dropped(client, db, mo
         [receipt(3), receipt(4)],
         [receipt(5, "Meny"), ExtractedReceipt(items=[])],  # an empty entry is skipped
     ])
-    monkeypatch.setattr(worker, "extract_receipts", lambda path: ExtractedReceipts(receipts=next(answers)).model_dump_json())
+    monkeypatch.setattr(worker, "extract_receipts", lambda path, known=(): ExtractedReceipts(receipts=next(answers)).model_dump_json())
     while job := worker.next_job(db):
         asyncio.run(worker.process_job(job, db))
 

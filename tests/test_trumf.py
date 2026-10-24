@@ -36,7 +36,7 @@ NAMES = {
 
 
 def namer(calls=None):
-    def name(texts):
+    def name(texts, known=()):
         if calls is not None:
             calls.append(texts)
         return {i: trumf.LineName(index=i, **NAMES[t]) for i, t in enumerate(texts)}, json.dumps({"named": texts})
@@ -77,7 +77,7 @@ def test_a_receipt_that_does_not_add_up_is_logged(caplog):
 
 def test_an_uploaded_history_is_read_without_gemini_reading_prices(client, db, monkeypatch):
     monkeypatch.setattr(trumf, "gemini_names", namer())
-    monkeypatch.setattr(worker, "extract_receipts", lambda path: pytest.fail("Trumf files aren't read by Gemini"))
+    monkeypatch.setattr(worker, "extract_receipts", lambda path, known=(): pytest.fail("Trumf files aren't read by Gemini"))
     res = helpers.upload(client, json.dumps(HISTORY, ensure_ascii=False).encode(), name="trumf.json")
     while job := worker.next_job(db):
         asyncio.run(worker.process_job(job, db))
@@ -95,3 +95,26 @@ def test_an_uploaded_history_is_read_without_gemini_reading_prices(client, db, m
     while job := worker.next_job(db):
         asyncio.run(worker.process_job(job, db))
     assert db.query(models.Receipt).count() == 2
+
+
+def test_lines_are_named_sixty_at_a_time():
+    many = [{"dato": "01.10.2026", "butikknavn": "KIWI 505", "totaltBelop": str(130 * 10.0), "varelinjer": [
+        {"varenavn": f"VARE {n:03d}", "vareAntallVekt": "1.000", "vareBelop": "10.00"} for n in range(130)]}]
+    calls = []
+
+    def name(texts, known=()):
+        calls.append(len(texts))
+        return {i: trumf.LineName(index=i, canonical_name=t.title(), category="Annet") for i, t in enumerate(texts)}, "{}"
+    receipts, raw = trumf.read(many, name)
+    assert calls == [60, 60, 10] and len(receipts[0].items) == 130
+    assert json.loads(raw) == [{}, {}, {}]  # every answer kept
+
+
+def test_the_worker_names_trumf_lines_with_the_known_names(client, db, monkeypatch):
+    seen = []
+    monkeypatch.setattr(trumf, "gemini_names", lambda texts, known=(): (seen.append(list(known)), namer()(texts))[1])
+    monkeypatch.setattr(worker, "known_product_names", lambda session: ["Lettmelk", "Appelsiner"])
+    helpers.upload(client, json.dumps(HISTORY, ensure_ascii=False).encode(), name="trumf.json")
+    while job := worker.next_job(db):
+        asyncio.run(worker.process_job(job, db))
+    assert seen == [["Lettmelk", "Appelsiner"]]

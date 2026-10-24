@@ -29,7 +29,8 @@ CI (`.github/workflows/pipeline.yml`) runs exactly this, requires the browser te
 
 ## Rules
 
-- **Tests never call Gemini.** Fake `worker.extract_receipt` or `extractor.client.models.generate_content`. Browser tests run the app with `RUN_WORKER=0`.
+- **Tests never call Gemini.** Fake `worker.extract_receipt` or `extractor.client.models.generate_content`; fakes take `(path, known=())` like the real calls.
+- **Every Gemini call** uses `extractor.json_answer(schema)` (no thinking, room for long answers) and gets `known_product_names` through `extractor.known_names`, so receipts, Trumf lines and offers share names. Browser tests run the app with `RUN_WORKER=0`.
 - **Every change gets tests.** Prefer checking that a new test fails when the code is broken on purpose.
 - **Schema changes need a migration.** `create_all` only creates missing tables; it never adds columns to the existing production database. New columns go in `app/migrations.py` (tested in `tests/test_migrations.py`); anything bigger needs a real migration tool.
 - **Photos and receipt files are personal data.** Photos are deleted once read; receipt files are kept for `KEEP_FILES_DAYS` (the privacy page says 12 months) to improve the reading. Keep the raw answer (`jobs.raw_response`). Never serve either.

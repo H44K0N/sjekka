@@ -16,7 +16,7 @@ def upload(client, ip="203.0.113.1"):
     return res.json()["id"]
 
 
-def kiwi_receipt(path):
+def kiwi_receipt(path, known=()):
     return ExtractedReceipt(
         store_chain="Kiwi", purchase_date=date.today().isoformat(), total=113.9,
         items=[
@@ -32,7 +32,7 @@ def kiwi_receipt(path):
 def fake_gemini(monkeypatch):
     calls = []
 
-    def extract(path):
+    def extract(path, known=()):
         calls.append(path)
         return kiwi_receipt(path).model_dump_json()
 
@@ -149,7 +149,7 @@ def test_worker_loop_survives_unexpected_errors(client, db, fake_gemini, monkeyp
 def test_a_receipt_uploaded_as_csv_goes_all_the_way_through(client, db, monkeypatch):
     sent = []
 
-    def extract(path):
+    def extract(path, known=()):
         sent.append(path.read_text(encoding="utf-8"))
         return ExtractedReceipts(receipts=[kiwi_receipt(path)]).model_dump_json()
 
