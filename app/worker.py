@@ -15,6 +15,7 @@ from app.database import SessionLocal
 from app import models
 from app.extractor import extract_receipt, extract_receipts
 from app import trumf
+from app.basket import chain_name
 from app.schema import ExtractedItem, ExtractedReceipt, ExtractedReceipts
 from app.config import GEMINI_MODEL, KEEP_FILES_DAYS, LOG_DIR, ORIGINALS_DIR, UPLOAD_DIR
 
@@ -144,17 +145,61 @@ def parse_date(value: str | None) -> date | None:
         return None
 
 
+# Two receipts are the same purchase when chain and day match and most
+# prices do. A photo and a Trumf export of one shop differ in how the
+# store and lines are written, and in a line or two (bags, deposits), so
+# exact matching misses them. On production data, receipts from the same
+# chain and day were either this similar or under 30 % alike.
+SAME_PURCHASE = 0.8
+
+
+def prices_of(items) -> Counter:
+    return Counter(round(i.total_price, 2) for i in items if i.total_price is not None)
+
+
+def same_purchase(a: Counter, b: Counter) -> bool:
+    n = max(sum(a.values()), sum(b.values()))
+    if n <= 2:  # too few lines to judge by share: all must match
+        return n > 0 and a == b
+    return sum((a & b).values()) / n >= SAME_PURCHASE
+
+
 def find_duplicate(db: Session, data: ExtractedReceipt) -> models.Receipt | None:
-    """A receipt from the same store and day with exactly the same lines."""
+    """A receipt already saved for the same purchase: same chain and day,
+    and the same prices, however the store and lines were written."""
     purchase_date = parse_date(data.purchase_date)
     if not data.store_chain or not purchase_date:
         return None
-    lines = Counter((i.raw_name, i.total_price) for i in data.items)
-    candidates = db.query(models.Receipt).filter_by(store_chain=data.store_chain, purchase_date=purchase_date)
-    for receipt in candidates:
-        if Counter((i.raw_name, i.total_price) for i in receipt.items) == lines:
+    chain, prices = chain_name(data.store_chain), prices_of(data.items)
+    for receipt in db.query(models.Receipt).filter_by(purchase_date=purchase_date):
+        if chain_name(receipt.store_chain) == chain and same_purchase(prices, prices_of(receipt.items)):
             return receipt
     return None
+
+
+def repair_duplicates(db: Session) -> int:
+    """Removes receipts saved twice before find_duplicate knew a photo and a
+    Trumf export of one shop are the same purchase. Keeps the first saved.
+    Safe to run again."""
+    removed = 0
+    groups: dict[tuple, list[models.Receipt]] = {}
+    for receipt in db.query(models.Receipt).filter(models.Receipt.purchase_date.isnot(None)).order_by(models.Receipt.id):
+        groups.setdefault((chain_name(receipt.store_chain), receipt.purchase_date), []).append(receipt)
+    for group in groups.values():
+        kept: list[models.Receipt] = []
+        for receipt in group:
+            original = next((k for k in kept if same_purchase(prices_of(k.items), prices_of(receipt.items))), None)
+            if original is None:
+                kept.append(receipt)
+                continue
+            logger.info(f"Duplicate receipt {receipt.id} ({receipt.image_filename}) of {original.id} "
+                        f"({original.image_filename}), {receipt.store_chain} {receipt.purchase_date}: removed")
+            for item in receipt.items:
+                db.delete(item)
+            db.delete(receipt)
+            removed += 1
+    db.commit()
+    return removed
 
 
 def save_receipt(db: Session, job: models.Job, data: ExtractedReceipt) -> models.Receipt:
@@ -315,6 +360,7 @@ async def run_worker():
         logger.info(f"Reset stuck job: {job.filename}")
     db.commit()
     repair_multipacks(db)
+    repair_duplicates(db)
     db.close()
 
     last_cleanup = None
