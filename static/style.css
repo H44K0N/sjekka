@@ -550,7 +550,7 @@ main.planner-page { max-width: 1040px; }
 .hint { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--soft); font-variant-numeric: tabular-nums; }
 .hint .chain { height: 20px; }
 .hint .each { white-space: nowrap; }
-.hint.none { font-style: italic; }
+.hint .none { font-style: italic; }
 .qty { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; }
 .qty button {
   width: 30px; height: 30px;
@@ -931,3 +931,7 @@ footer a[aria-current="page"] { color: var(--text); }
 .offer-hits { display: inline-block; margin: 0 0 16px; padding: 8px 14px; font-size: 15px; color: var(--accent);
   border: 1px solid var(--hover); border-radius: 999px; transition: background 150ms; }
 .offer-hits:hover { background: rgba(236, 230, 220, 0.04); }
+/* A list item without prices offers known names like it */
+.did-you-mean { padding: 1px 9px; font: inherit; font-size: 13px; color: var(--text); background: none;
+  border: 1px solid var(--hover); border-radius: 999px; cursor: pointer; transition: background 150ms; }
+.did-you-mean:hover { background: rgba(236, 230, 220, 0.06); }

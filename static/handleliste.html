@@ -130,6 +130,18 @@
             return [...fromReceipts, ...offersOnly];
         }
 
+        // Known names that contain a name without prices: "Melk" -> Lettmelk,
+        // Helmelk. Ones ending with it first (a kind of milk, not milk
+        // chocolate), then the shortest
+        function similar(name) {
+            const q = name.toLowerCase();
+            const onList = new Set(ShoppingList.read().map(i => i.name.toLowerCase()));
+            const names = [...new Set(known().map(p => p.canonical_name))]
+                .filter(n => n.toLowerCase() !== q && n.toLowerCase().includes(q) && !onList.has(n.toLowerCase()));
+            return names.sort((a, b) => (b.toLowerCase().endsWith(q) - a.toLowerCase().endsWith(q)) || a.length - b.length ||
+                a.localeCompare(b, "nb")).slice(0, 3);
+        }
+
         function suggest() {
             const q = input.value.trim().toLowerCase();
             options = [];
@@ -218,8 +230,24 @@
                         hint.append(tag);
                     }
                 } else if (unknown.has(item.name)) {
-                    hint.textContent = "ingen priser ennå";
-                    hint.classList.add("none");
+                    hint.append(el("span", "none", "ingen priser ennå"));
+                    // Names match exactly, so "Melk" finds no prices while
+                    // "Lettmelk" has them: offer the names that do
+                    const alike = similar(item.name);
+                    if (alike.length) {
+                        hint.append(el("span", "", "· mente du"));
+                        for (const other of alike) {
+                            const swap = el("button", "did-you-mean", other);
+                            swap.type = "button";
+                            swap.setAttribute("aria-label", `Bytt ${item.name} med ${other}`);
+                            swap.addEventListener("click", () => {
+                                ShoppingList.remove(item.name);
+                                ShoppingList.add(other, item.count);
+                                update();
+                            });
+                            hint.append(swap);
+                        }
+                    }
                 }
                 main.append(hint);
 
@@ -499,8 +527,10 @@
 
         handleShared();
         update();
-        fetch("/products").then(r => r.ok ? r.json() : []).then(p => { products = p; if (input.value) suggest(); }).catch(() => {});
-        fetch("/offers?best=1").then(r => r.ok ? r.json() : []).then(o => { offerNames = o; if (input.value) suggest(); }).catch(() => {});
+        // Once the known names are in, suggestions and "mente du" can use them
+        const namesLoaded = () => { if (input.value) suggest(); renderList(); };
+        fetch("/products").then(r => r.ok ? r.json() : []).then(p => { products = p; namesLoaded(); }).catch(() => {});
+        fetch("/offers?best=1").then(r => r.ok ? r.json() : []).then(o => { offerNames = o; namesLoaded(); }).catch(() => {});
     </script>
 </body>
 </html>
