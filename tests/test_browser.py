@@ -124,7 +124,7 @@ AXE = Path(__file__).parent / "vendor" / "axe.min.js"  # axe-core, pinned (MPL-2
 
 
 @pytest.mark.parametrize("path", ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/finnes-ikke.html", "/personvern.html",
-                                  "/handleliste.html", "/handleliste.html?v=Lettmelk~2&v=Kj%C3%B8ttdeig&v=Safran",
+                                  "/om.html", "/handleliste.html", "/handleliste.html?v=Lettmelk~2&v=Kj%C3%B8ttdeig&v=Safran",
                                   "/tilbud.html", "/produkt.html?navn=Seigmenn"])
 def test_pages_pass_automated_accessibility_checks(page, path):
     page.goto(path)
@@ -457,7 +457,7 @@ def test_privacy_page_reveals_the_contact_address_on_click(page):
 def test_pages_make_no_requests_to_other_sites(page, site):
     seen = []
     page.on("request", lambda r: seen.append(r.url))
-    for path in ["/", "/upload.html", "/produkt.html?navn=Lettmelk", "/personvern.html"]:
+    for path in ["/", "/upload.html", "/produkt.html?navn=Lettmelk", "/personvern.html", "/om.html"]:
         page.goto(path)
         page.wait_for_load_state("networkidle")
     assert [u for u in seen if not u.startswith(site[0])] == []
@@ -883,3 +883,22 @@ def test_a_clear_gap_on_estimates_is_rounded(page):
     page.goto("/handleliste.html?v=Lettmelk&v=Kj%C3%B8ttdeig")
     expect(page.locator("#verdict-note")).to_have_text("Rundt 41 kr billigere enn Kiwi, som er dyrest.")
     expect(page.locator(".rank").nth(1).locator(".amount")).to_have_text("190,70 kr+41 kr")
+
+
+def test_about_page_shows_the_films_without_loading_them(page):
+    page.goto("/om.html")
+    videos = page.locator(".promo video")
+    expect(videos).to_have_count(2)
+    # Nothing is downloaded until someone presses play
+    for i in range(2):
+        expect(videos.nth(i)).to_have_attribute("preload", "none")
+    page.get_by_role("contentinfo").get_by_role("link", name="om").click()
+    expect(page).to_have_url(re.compile("/om.html$"))
+
+
+def test_about_page_puts_the_phone_film_first_on_a_phone(browser, site):
+    phone = browser.new_page(viewport={"width": 390, "height": 844}, base_url=site[0])
+    phone.goto("/om.html")
+    tall, wide = phone.locator(".promo .tall").bounding_box(), phone.locator(".promo .wide").bounding_box()
+    assert tall["y"] < wide["y"]
+    phone.close()

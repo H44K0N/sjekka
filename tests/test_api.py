@@ -196,12 +196,24 @@ def test_pages_have_link_previews(client):
         assert 'name="twitter:card" content="summary_large_image"' in html, path
 
 
-PAGES = ["/", "/upload.html", "/takk.html", "/produkt.html", "/personvern.html", "/finnes-ikke.html"]
+PAGES = ["/", "/upload.html", "/takk.html", "/produkt.html", "/personvern.html", "/om.html", "/finnes-ikke.html",
+         "/handleliste.html", "/tilbud.html"]
 
 
-def test_every_page_links_to_the_privacy_page(client):
+def test_every_page_links_to_the_privacy_and_about_pages(client):
     for path in PAGES:
-        assert 'href="/personvern.html"' in client.get(path).text, path
+        footer = client.get(path).text.split("<footer>")[1]
+        assert 'href="/personvern.html"' in footer and 'href="/om.html"' in footer, path
+
+
+def test_the_about_page_has_both_films(client):
+    html = client.get("/om.html").text
+    for name in ["sjekka-desktop", "sjekka-mobil"]:
+        assert f'src="/video/{name}.mp4"' in html and f'poster="/video/{name}.jpg"' in html
+        video = client.get(f"/video/{name}.mp4")
+        assert video.status_code == 200 and video.headers["content-type"] == "video/mp4"
+        assert len(video.content) < 8_000_000, "keep the films small"
+        assert client.get(f"/video/{name}.jpg").status_code == 200
 
 
 def test_pages_load_nothing_from_google(client):
