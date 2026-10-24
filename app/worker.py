@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app import models
 from app.extractor import extract_receipt, extract_receipts
-from app import trumf
+from app import receipt_files, trumf
 from app.basket import chain_name
 from app.schema import ExtractedItem, ExtractedReceipt, ExtractedReceipts
 from app.config import GEMINI_MODEL, KEEP_FILES_DAYS, LOG_DIR, ORIGINALS_DIR, UPLOAD_DIR
@@ -191,6 +191,46 @@ def find_duplicate(db: Session, data: ExtractedReceipt) -> models.Receipt | None
         if chain_name(receipt.store_chain) == chain and same_purchase(prices, prices_of(receipt.items)):
             return receipt
     return None
+
+
+def reread_trumf_histories(db: Session) -> int:
+    """Reads again the Trumf histories that were read before app/trumf.py
+    existed (by Gemini reading every receipt, which missed lines and could
+    cut off): their receipts go, and the kept original is split and queued
+    again for the parser. A history is read the old way when one of its
+    jobs has a model not marked trumf:; jobs queued again have no model
+    until they're read, so this runs once per history."""
+    reread = 0
+    for original in sorted(ORIGINALS_DIR.glob("*.json")):
+        batch = original.stem
+        jobs = db.query(models.Job).filter_by(batch=batch).all()
+        if not any(job.model and not job.model.startswith(trumf.MODEL_PREFIX) for job in jobs):
+            continue
+        data = original.read_bytes()
+        try:
+            if trumf.receipts_in(json.loads(data)) is None:
+                continue
+        except json.JSONDecodeError:
+            continue
+        filenames = [job.filename for job in jobs]
+        receipts = db.query(models.Receipt).filter(models.Receipt.image_filename.in_(filenames)).all()
+        for receipt in receipts:
+            for item in receipt.items:
+                db.delete(item)
+            db.delete(receipt)
+        for job in jobs:
+            (UPLOAD_DIR / job.filename).unlink(missing_ok=True)
+            db.delete(job)
+        db.flush()
+        parts = receipt_files.split("json", data)
+        for i, part in enumerate(parts, start=1):
+            filename = f"{batch}-{i:03d}.json"
+            (UPLOAD_DIR / filename).write_bytes(part)
+            db.add(models.Job(filename=filename, batch=batch))
+        db.commit()
+        logger.info(f"Reading Trumf history {batch} again: {len(receipts)} receipts removed, {len(parts)} parts queued")
+        reread += 1
+    return reread
 
 
 def repair_chain_names(db: Session) -> int:
@@ -396,6 +436,7 @@ async def run_worker():
     repair_multipacks(db)
     repair_chain_names(db)
     repair_duplicates(db)
+    reread_trumf_histories(db)
     db.close()
 
     last_cleanup = None
