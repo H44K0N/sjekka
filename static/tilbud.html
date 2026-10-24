@@ -45,6 +45,7 @@
                 <p class="count" id="count" aria-live="polite"></p>
                 <label class="switch"><input type="checkbox" id="real-only"> Bare ekte tilbud</label>
             </div>
+            <p class="ask" id="ask" hidden></p>
             <div class="grid" id="grid"></div>
             <div class="more" id="more" hidden><button type="button" class="button" id="more-button">Vis flere</button></div>
             <p class="notice" id="notice">Henter tilbud …</p>
@@ -107,6 +108,16 @@
             $("more-button").textContent = `Vis flere (${matching.length - shown.length} til)`;
             const real = offers.filter(o => o.verdict.kind === "real").length;
             $("count").textContent = offers.length ? `${matching.length} tilbud${real ? ` · ${real} sjekket som ekte` : ""}` : "";
+
+            // Offers can only be checked against receipts. While most of those
+            // in view can't be, ask for one, from the chain being looked at
+            const unchecked = matching.filter(o => o.verdict.kind === "unknown" || o.verdict.kind === "claimed").length;
+            $("ask").hidden = !matching.length || unchecked * 2 <= matching.length;
+            const from = chain ? ` fra ${chain}` : "";
+            const link = el("a", "", "Last den opp");
+            link.href = "/upload.html";
+            $("ask").replaceChildren(`De fleste av disse tilbudene kan vi ikke sjekke ennå. Har du en kvittering${from}? `, link,
+                `, så kan vi se om ${chain ? `${chain}-tilbudene` : "tilbudene"} faktisk er billigere.`);
             $("notice").hidden = matching.length > 0;
             $("notice").textContent = offers.length ? "Ingen tilbud passer til valget." : "Ingen kundeaviser er lagt inn for denne uka ennå.";
 

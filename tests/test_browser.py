@@ -940,3 +940,17 @@ def test_a_name_without_prices_suggests_ones_that_have_them(page):
     assert list_names(page) == ["Lettmelk"]
     expect(page.locator(".list-item", has_text="Lettmelk").locator(".qty")).to_contain_text("2")
     expect(page.locator(".list-item", has_text="Lettmelk").locator(".hint")).to_contain_text("billigst hos")
+
+
+def test_offers_ask_for_receipts_while_most_cannot_be_checked(page):
+    page.goto("/tilbud.html")
+    # One checked, one not: no need to ask
+    expect(page.locator(".card")).to_have_count(2)
+    expect(page.locator("#ask")).to_be_hidden()
+    # Rema's only offer is the flyer's own claim
+    page.get_by_role("button", name="Rema 1000", exact=True).click()
+    ask = page.locator("#ask")
+    expect(ask).to_contain_text("Har du en kvittering fra Rema 1000?")
+    expect(ask.get_by_role("link", name="Last den opp")).to_have_attribute("href", "/upload.html")
+    page.get_by_role("button", name="Meny", exact=True).click()
+    expect(ask).to_be_hidden()
