@@ -20,7 +20,7 @@ CHAINS = [
     (r"kiwi", "Kiwi"),
     (r"meny", "Meny"),
     (r"prix", "Coop Prix"),
-    (r"mega", "Coop Mega"),
+    (r"\bmega\b", "Coop Mega"),  # not Megaflis, a tile shop with flyers on Tjek
     (r"extra", "Extra"),
     (r"\bobs\b", "Obs"),
     (r"joker", "Joker"),
