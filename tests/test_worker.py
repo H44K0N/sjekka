@@ -1,5 +1,5 @@
 import asyncio
-from datetime import timedelta
+from datetime import date, timedelta
 
 import pytest
 
@@ -48,6 +48,40 @@ def test_saves_receipt_with_computed_unit_prices(client, db):
     assert mince.price_per_unit == 22.25  # per 100 g
     assert items["LABAN SEIGMENN 260G"].price_per_unit == 4.96  # one bag of three
     assert items["AGURK"].price_per_unit == 15.0  # per stk
+
+
+def test_a_multipack_is_priced_for_the_whole_pack(client, db):
+    yoghurt = ExtractedItem(raw_name="Yoghurt kokos 4x150g tine", canonical_name="Yoghurt", category="Meieri",
+                            quantity=150, unit="g", total_price=20.0)
+    run(db, lambda path: receipt(items=[yoghurt], total=20.0).model_dump_json())
+    saved = db.query(models.ReceiptItem).one()
+    assert (saved.quantity, saved.pack_size, saved.price_per_unit) == (600, 1, 3.33)
+
+
+def test_repair_fixes_multipacks_saved_before_and_only_once(client, db):
+    receipt_row = models.Receipt(image_filename="r.jpg", store_chain="Meny")
+    flyer = models.Flyer(chain="Kiwi", source="t.pdf", valid_from=date(2026, 10, 20), valid_to=date(2026, 10, 26))
+    db.add_all([receipt_row, flyer])
+    db.flush()
+    db.add_all([
+        models.ReceiptItem(receipt_id=receipt_row.id, raw_name="Yoghurt kokos 4x150g tine", canonical_name="Yoghurt",
+                           quantity=150, unit="g", pack_size=1, total_price=20.0, price_per_unit=13.33),
+        models.ReceiptItem(receipt_id=receipt_row.id, raw_name="Pizza 1kg", canonical_name="Pizza",
+                           quantity=1000, unit="g", pack_size=1, total_price=169.0, price_per_unit=16.9),
+        models.FlyerOffer(flyer_id=flyer.id, raw_name="COLA 6X0,5L", canonical_name="Cola",
+                          quantity=500, unit="ml", pack_size=1, total_price=90.0, price_per_unit=18.0),
+    ])
+    db.commit()
+
+    assert worker.repair_multipacks(db) == 2
+    assert worker.repair_multipacks(db) == 0
+    rows = {r.canonical_name: r for r in [*db.query(models.ReceiptItem), *db.query(models.FlyerOffer)]}
+    assert (rows["Yoghurt"].quantity, rows["Yoghurt"].price_per_unit) == (600, 3.33)
+    assert (rows["Cola"].quantity, rows["Cola"].price_per_unit) == (3000, 3.0)
+    assert (rows["Pizza"].quantity, rows["Pizza"].price_per_unit) == (1000, 16.9)
+    db.query(models.FlyerOffer).delete()
+    db.query(models.Flyer).delete()
+    db.commit()
 
 
 def test_duplicate_receipt_is_not_saved_twice(client, db):
