@@ -210,3 +210,57 @@ def test_photos_of_long_failed_jobs_are_deleted(client, db):
     assert worker.delete_old_failed_photos(db) == 1
     assert not old.exists()
     assert recent.exists() and done_old.exists()
+
+
+def items(*prices, names=None):
+    return [ExtractedItem(raw_name=(names or {}).get(i, f"VARE {i}"), canonical_name=f"Vare {i}", category="Annet",
+                          total_price=p) for i, p in enumerate(prices)]
+
+
+def saved_receipt(db, store, day, prices, filename="photo.jpg"):
+    data = ExtractedReceipt(store_chain=store, purchase_date=day, items=items(*prices))
+    job = models.Job(filename=filename)
+    db.add(job)
+    db.flush()
+    worker.save_receipt(db, job, data)
+    db.commit()
+
+
+SHOP = [24.9, 49.8, 70.49, 37.9, 31.9, 31.9, 10.0, 43.9, 20.0, 25.0]
+
+
+def test_a_photo_and_a_trumf_export_of_one_shop_are_the_same_purchase(client, db):
+    saved_receipt(db, "MENY", "2026-10-23", SHOP)
+    # Written differently, and the export has a bag the photo reading left out
+    export = ExtractedReceipt(store_chain="MENY Sandvika Storsenter", purchase_date="2026-10-23",
+                              items=items(*SHOP, 6.75, names={0: "TINE LETTMELK 1L"}))
+    assert worker.find_duplicate(db, export) is not None
+
+
+@pytest.mark.parametrize("store, day, prices, same", [
+    ("Meny", "2026-10-23", SHOP[:5] + [99.0, 88.0, 77.0, 66.0, 55.0], False),  # half alike: another shop
+    ("Kiwi", "2026-10-23", SHOP, False),                                      # another chain
+    ("Meny", "2026-10-24", SHOP, False),                                      # another day
+])
+def test_other_shops_are_not_duplicates(client, db, store, day, prices, same):
+    saved_receipt(db, "MENY", "2026-10-23", SHOP)
+    data = ExtractedReceipt(store_chain=store, purchase_date=day, items=items(*prices))
+    assert (worker.find_duplicate(db, data) is not None) is same
+
+
+def test_a_short_receipt_must_match_exactly(client, db):
+    saved_receipt(db, "Kiwi", "2026-10-20", [24.9, 15.0])
+    def same(*prices):
+        return worker.find_duplicate(db, ExtractedReceipt(store_chain="KIWI 505", purchase_date="2026-10-20", items=items(*prices)))
+    assert same(24.9, 15.0) is not None
+    assert same(24.9, 16.0) is None
+
+
+def test_duplicates_saved_before_are_removed_once(client, db):
+    saved_receipt(db, "MENY", "2026-10-23", SHOP, "photo.jpg")
+    saved_receipt(db, "MENY Sandvika Storsenter", "2026-10-23", SHOP + [6.75], "trumf-001.json")
+    saved_receipt(db, "MENY", "2026-10-23", [99.0, 88.0, 77.0], "another-shop.jpg")
+    assert worker.repair_duplicates(db) == 1
+    assert worker.repair_duplicates(db) == 0
+    assert sorted(r.image_filename for r in db.query(models.Receipt)) == ["another-shop.jpg", "photo.jpg"]
+    assert db.query(models.ReceiptItem).count() == len(SHOP) + 3  # the copy's lines went with it

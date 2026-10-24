@@ -123,10 +123,11 @@ def test_worker_loop_resets_stuck_jobs_and_processes_them(client, db, fake_gemin
 def test_worker_loop_repairs_multipacks_when_it_starts(client, db, fake_gemini, monkeypatch):
     monkeypatch.setattr(worker, "POLL_INTERVAL", 0.01)
     repaired = []
-    monkeypatch.setattr(worker, "repair_multipacks", lambda session: repaired.append(session) or 0)
+    monkeypatch.setattr(worker, "repair_multipacks", lambda session: repaired.append("multipacks") or 0)
+    monkeypatch.setattr(worker, "repair_duplicates", lambda session: repaired.append("duplicates") or 0)
     upload(client)
     run_worker_until(lambda: db.query(models.Job).one().status == "done", db)
-    assert len(repaired) == 1
+    assert repaired == ["multipacks", "duplicates"]
 
 
 def test_worker_loop_survives_unexpected_errors(client, db, fake_gemini, monkeypatch):
