@@ -132,6 +132,19 @@ def test_import_catalog(clean, db):
     assert db.query(models.Flyer).count() == 1 and db.query(models.FlyerOffer).count() == 1
 
 
+def test_non_grocery_offers_are_left_out(clean, db):
+    def names(offers):
+        return {0: tjek.OfferName(index=0, canonical_name="Kjøttdeig", category="Kjøtt"),
+                1: tjek.OfferName(index=1, canonical_name="Laminatgulv", category="Annet", grocery=False)}, "raw"
+    offers = tjek.import_catalog(db, CATALOGS[0], OFFERS["kiwi1"], names).offers
+    assert [o.canonical_name for o in offers] == ["Kjøttdeig"]
+
+
+def test_the_prompt_asks_which_offers_are_groceries():
+    assert "**grocery**: false" in tjek.NAMES_PROMPT and "flooring" in tjek.NAMES_PROMPT
+    assert "grocery" in tjek.OfferName.model_json_schema()["properties"]
+
+
 def test_offers_gemini_skipped_are_left_out(clean, db):
     def partial(offers):
         return {0: tjek.OfferName(index=0, canonical_name="Kjøttdeig", category="Kjøtt")}, "raw"

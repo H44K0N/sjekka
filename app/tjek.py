@@ -109,6 +109,8 @@ class OfferName(BaseModel):
     brand: str | None = None
     variant: str | None = None
     category: Category
+    # Coop Mega and Obs flyers also sell flooring, tools and the like
+    grocery: bool = True
 
 
 class OfferNames(BaseModel):
@@ -121,8 +123,12 @@ For each, give the generic product name, brand and category, so the offer
 can be matched with the same product on receipts.
 
 {definitions}
-Skip nothing: return one entry per index, in order. Non-grocery items get
-category "Annet".
+Skip nothing: return one entry per index, in order.
+
+**grocery**: false for anything that is not food, drink, hygiene, cleaning,
+baby care, paper goods or pet food: building supplies, flooring, tools,
+lamps, electronics, batteries, furniture, clothing, toys, garden and kitchen
+equipment. Those get category "Annet" and are left out of Sjekka.
 
 {lines}
 """
@@ -173,7 +179,7 @@ def import_catalog(db: Session, catalog: dict, offers: list[dict], namer) -> mod
     )
     for i, o in enumerate(priced):
         name = names.get(i)
-        if not name:
+        if not name or not name.grocery:
             continue
         quantity, unit, pack = size_of(o)
         price = o["pricing"]["price"]
