@@ -28,6 +28,7 @@ def priced(wanted, rows):
     ("Coop Extra Storo", "Extra"), ("Coop Mega", "Coop Mega"), ("Coop Prix", "Coop Prix"),
     ("Coop Obs Hypermarked", "Obs"), ("EUROSPAR", "Spar"), ("Meny Ullevål", "Meny"),
     ("  bunnpris  ", "Bunnpris"), ("ukjent  butikk", "Ukjent Butikk"), ("", None), (None, None),
+    ("COOP MEGA STORO", "Coop Mega"), ("Megaflis", "Megaflis"),
 ])
 def test_chain_names_are_grouped(raw, expected):
     assert basket.chain_name(raw) == expected

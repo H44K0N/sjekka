@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from app import models, tjek
+from app import basket, models, tjek
 from util import import_tjek as cli
 
 
@@ -56,6 +56,25 @@ def clean(client, db):
 def test_only_grocery_chains_we_know():
     names = [c["branding"]["name"] for c in tjek.grocery_catalogs(fake_api(), 59.9, 10.7, 20000)]
     assert names == ["KIWI", "MENY"]
+
+
+# Every flyer Tjek listed around Oslo on 24 October 2026. Megaflis (tiles)
+# once came in as Coop Mega, with 423 offers of flooring and LED spots.
+TJEK_BRANDS = ["Afood Market", "Apotek 1", "Bohus", "Bunnpris", "Byggmakker", "Byggmax", "Coop Marked", "Coop Mega",
+               "Coop Prix", "Elon", "Europris", "Extra", "Felleskjøpet", "Gigaboks", "Holdbart", "JYSK", "Jacobs", "Jernia",
+               "Joker", "Jula", "KIWI", "Kid", "MAXBO", "MENY", "Matkroken", "Megaflis", "Møbelringen", "Nille",
+               "Nærbutikken", "Obs", "Obs! Bygg", "POWER", "REMA 1000", "Right Price Tiles", "Rusta", "SPAR", "Selfmade",
+               "Skeidar", "Spar Kjøp", "Sport Outlet", "thansen"]
+
+
+def test_every_real_flyer_brand_maps_to_the_right_chain():
+    class Listing:
+        def get(self, url, params):
+            return SimpleNamespace(raise_for_status=lambda: None,
+                                   json=lambda: [{"id": b, "branding": {"name": b}} for b in TJEK_BRANDS])
+    kept = {c["branding"]["name"]: basket.chain_name(c["branding"]["name"]) for c in tjek.grocery_catalogs(Listing(), 59.9, 10.7, 20000)}
+    assert kept == {"Bunnpris": "Bunnpris", "Coop Mega": "Coop Mega", "Coop Prix": "Coop Prix", "Extra": "Extra",
+                    "Joker": "Joker", "KIWI": "Kiwi", "MENY": "Meny", "Obs": "Obs", "REMA 1000": "Rema 1000", "SPAR": "Spar"}
 
 
 def test_offers_are_fetched_page_by_page():

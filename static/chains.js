@@ -6,7 +6,7 @@ const CHAINS = [
     { match: /kiwi/i, logo: "/chains/kiwi.png" },
     { match: /meny/i, logo: "/chains/meny.png" },
     { match: /prix/i, logo: "/chains/coop-prix.png" },
-    { match: /mega/i, logo: "/chains/coop-mega.svg" },
+    { match: /\bmega\b/i, logo: "/chains/coop-mega.svg" },
     { match: /joker/i, logo: "/chains/joker.png" },
     { match: /spar/i, logo: "/chains/spar.svg" },
     { match: /extra/i, logo: "/chains/extra.png" },
