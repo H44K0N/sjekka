@@ -483,7 +483,7 @@ def test_list_finds_the_cheapest_store_for_the_whole_list(page):
     ranks = page.locator(".rank")
     expect(ranks).to_have_count(2)
     expect(ranks.nth(1).locator(".chain img")).to_have_attribute("alt", "Kiwi")
-    expect(ranks.nth(1)).to_contain_text("1 av 2 fra kvitteringer")
+    expect(ranks.nth(1)).to_contain_text("1 av 2 priser fra kvitteringer")
     expect(page.locator("#method")).to_be_visible()
 
     # Each line says where it's cheapest
@@ -561,7 +561,7 @@ def test_shared_list_link(page, browser, site):
     assert list_names(page) == ["Lettmelk", "Agurk", "Kjøttdeig"]
 
     page.goto("/handleliste.html?v=Agurk")
-    page.get_by_role("button", name="Bruk den").click()
+    page.get_by_role("button", name="Bruk den delte").click()
     assert list_names(page) == ["Agurk"]
 
 

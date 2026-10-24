@@ -33,15 +33,15 @@
         <section>
             <p class="meta">Handleliste</p>
             <h1>Hvor er handlelisten billigst?</h1>
-            <p class="lede">Skriv opp det du skal ha. Sjekka regner ut hva hele listen koster i hver butikk, ut fra priser på ekte kvitteringer.</p>
+            <p class="lede">Skriv opp det du skal handle. Sjekka regner ut hva hele listen koster i hver butikk, ut fra priser på ekte kvitteringer.</p>
         </section>
 
         <div class="shared" id="shared" role="region" aria-label="Delt liste" hidden>
             <p id="shared-text"></p>
             <div class="shared-actions">
-                <button type="button" class="button primary small" id="shared-replace">Bruk den</button>
+                <button type="button" class="button primary small" id="shared-replace">Bruk den delte</button>
                 <button type="button" class="button small" id="shared-merge">Legg til i min liste</button>
-                <button type="button" class="button small ghost" id="shared-dismiss">Behold min</button>
+                <button type="button" class="button small ghost" id="shared-dismiss">Behold min egen</button>
             </div>
         </div>
 
@@ -54,7 +54,7 @@
                     <ul class="suggestions" id="suggestions" role="listbox" aria-label="Forslag" hidden></ul>
                 </div>
                 <ol class="list-items" id="items"></ol>
-                <p class="empty" id="empty">Listen er tom. Søk opp varer over, eller trykk <b>+</b> på et produkt under <a href="/">utforsk</a>.</p>
+                <p class="empty" id="empty">Listen er tom. Søk etter varer over, eller trykk <b>+</b> på et produkt under <a href="/">utforsk</a>.</p>
                 <button type="button" class="text-button undo" id="undo" hidden>Listen er tømt. Angre</button>
                 <div class="list-actions" id="list-actions" hidden>
                     <button type="button" class="text-button" id="share">Del listen</button>
@@ -254,7 +254,7 @@
             const unknown = show ? result.unknown : [];
             $("unknown").hidden = !unknown.length;
             $("unknown").textContent = unknown.length
-                ? `Ikke med i summen, fordi ingen har registrert pris ennå: ${unknown.join(", ")}.` : "";
+                ? `${unknown.length === 1 ? "Denne" : "Disse"} har ingen registrert pris ennå og er ikke med i summen: ${unknown.join(", ")}.` : "";
             if (!show || !stores.length) return;
 
             const best = stores[0], worst = stores[stores.length - 1];
@@ -264,7 +264,7 @@
             $("verdict-total").textContent = money(best.total);
             const notes = [];
             if (stores.length > 1 && worst.total - best.total >= 0.5) {
-                notes.push(`${money(worst.total - best.total)} billigere enn ${worst.chain}, den dyreste.`);
+                notes.push(`${money(worst.total - best.total)} billigere enn ${worst.chain}, som er dyrest.`);
             } else if (stores.length === 1) {
                 notes.push("Bare denne butikken har priser på varene dine ennå.");
             }
@@ -278,7 +278,7 @@
                 chains.append(chainBadge(s.chains[0]), el("span", "plus", "+"), chainBadge(s.chains[1]));
                 $("split-chains").replaceChildren(chains);
                 $("split-total").textContent = money(s.total);
-                $("split-save").textContent = `spar ${money(s.saving)} til`;
+                $("split-save").textContent = `spar ${money(s.saving)} ekstra`;
                 $("split-plan").replaceChildren(...s.chains.map(chain => {
                     const li = el("li");
                     const names = Object.entries(s.plan).filter(([, c]) => c === chain).map(([n]) => n);
@@ -299,8 +299,8 @@
                 const who = el("span", "who");
                 who.append(chainBadge(store.chain));
                 const coverage = store.estimated
-                    ? `${store.known} av ${store.known + store.estimated} fra kvitteringer`
-                    : `alle ${store.known} fra kvitteringer`;
+                    ? `${store.known} av ${store.known + store.estimated} priser fra kvitteringer`
+                    : "alle prisene fra kvitteringer";
                 who.append(el("span", "coverage", coverage));
 
                 const diff = store.total - best.total;
