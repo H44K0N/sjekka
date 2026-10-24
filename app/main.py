@@ -209,6 +209,7 @@ def get_products(db: Session = Depends(get_db)):
             "pack_size": item.pack_size,
             "total_price": item.total_price,
             "price_per_unit": item.price_per_unit,
+            "by_weight": worker.sold_by_weight(item.raw_name, item.unit),
             "store_chain": receipt.store_chain,
             "purchase_date": str(receipt.purchase_date),
             "store_count": store_counts.get(item.canonical_name, 1),
@@ -246,6 +247,7 @@ def get_product(name: str, db: Session = Depends(get_db)):
                 "pack_size": item.pack_size,
                 "total_price": item.total_price,
                 "price_per_unit": item.price_per_unit,
+                "by_weight": worker.sold_by_weight(item.raw_name, item.unit),
                 "is_member_price": bool(item.is_member_price),
                 "deal": item.deal,
             }

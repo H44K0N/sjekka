@@ -37,6 +37,18 @@ def test_products_returns_latest_price(client, db):
     assert products[0]["store_chain"] == "Kiwi"
 
 
+def test_products_say_what_is_sold_by_weight(client, db):
+    add_item(db, "Appelsiner", 70.49, date(2026, 10, 23), store="Meny")
+    add_item(db, "Lettmelk", 24.9, date(2026, 10, 23))
+    oranges, milk = sorted(db.query(models.ReceiptItem), key=lambda i: i.canonical_name)
+    oranges.raw_name, oranges.unit, oranges.quantity, oranges.price_per_unit = "Appelsiner kg", "g", 1570, 4.49
+    milk.raw_name = "Tine lettmelk 1l"
+    db.commit()
+    by_weight = {p["canonical_name"]: p["by_weight"] for p in client.get("/products").json()}
+    assert by_weight == {"Appelsiner": True, "Lettmelk": False}
+    assert client.get("/products/Appelsiner").json()["prices"][0]["by_weight"] is True
+
+
 def test_products_include_the_variant_and_size(client, db):
     add_item(db, "Pizza", 169.0, date(2026, 10, 23), store="Meny")
     db.query(models.ReceiptItem).one().variant = "Hjemmelaget"

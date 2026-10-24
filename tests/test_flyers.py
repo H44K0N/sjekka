@@ -276,6 +276,16 @@ def test_each_product_shows_its_best_offer_before_any_shows_a_second(clean, db):
     assert [o["total_price"] for o in clean.get("/offers?best=1").json()] == [10, 30]
 
 
+def test_offers_say_what_is_sold_by_weight(clean, db):
+    add_flyer(db, "Coop Prix", [
+        {"canonical_name": "Appelsiner", "raw_name": "APPELSINER Pr kg. Løsvekt", "total_price": 29.9, "unit": "g", "quantity": 1000},
+        {"canonical_name": "Kjøttdeig", "raw_name": "KJØTTDEIG 400 g, pr. kg 174,75", "total_price": 69.9, "unit": "g", "quantity": 400},
+    ])
+    data = {o["canonical_name"]: o for o in clean.get("/offers").json()}
+    assert (data["Appelsiner"]["by_weight"], data["Appelsiner"]["per_unit"]) == (True, 2.99)
+    assert data["Kjøttdeig"]["by_weight"] is False
+
+
 def test_offers_endpoint_filters(clean, db):
     add_receipt_price(db, "Kaffe", "Kiwi", 100, days_ago=10)
     add_flyer(db, "Kiwi", [{"canonical_name": "Kaffe", "total_price": 99}, {"canonical_name": "Melk", "total_price": 20}])
