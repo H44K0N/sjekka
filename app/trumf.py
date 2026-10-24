@@ -17,11 +17,10 @@ import logging
 import re
 from datetime import datetime
 
-from google.genai import types
 from pydantic import BaseModel
 
 from app.config import GEMINI_MODEL
-from app.extractor import DEFINITIONS, client
+from app.extractor import DEFINITIONS, client, json_answer, known_names
 from app.schema import Category, ExtractedItem, ExtractedReceipt
 
 logger = logging.getLogger("sjekka.worker")
@@ -84,14 +83,18 @@ Return one entry per index, in order; skip nothing.
 """
 
 
-def gemini_names(texts: list[str]) -> tuple[dict[int, LineName], str]:
-    """One text-only Gemini call naming every distinct line. Returns the
-    names by index and the raw answer."""
+# Lines named per Gemini call: a short answer is never cut off
+NAMES_PER_CALL = 60
+
+
+def gemini_names(texts: list[str], known=()) -> tuple[dict[int, LineName], str]:
+    """One text-only Gemini call naming the given lines. Returns the names
+    by index and the raw answer."""
     lines = "\n".join(f"{i} | {t}" for i, t in enumerate(texts))
     response = client.models.generate_content(
         model=GEMINI_MODEL,
-        contents=[NAMES_PROMPT.format(definitions=DEFINITIONS, lines=lines)],
-        config=types.GenerateContentConfig(response_mime_type="application/json", response_schema=LineNames),
+        contents=[NAMES_PROMPT.format(definitions=DEFINITIONS, lines=lines) + known_names(known)],
+        config=json_answer(LineNames),
     )
     raw = response.text
     return {n.index: n for n in LineNames.model_validate_json(raw).lines}, raw
@@ -107,8 +110,14 @@ def read(doc, namer=None) -> tuple[list[ExtractedReceipt], str]:
     receipts = receipts_in(doc)
     texts = sorted({line["varenavn"].strip() for r in receipts for line in r["varelinjer"]
                     if not NOT_A_PRODUCT.search(line["varenavn"])})
-    names, raw = (namer or gemini_names)(texts) if texts else ({}, "{}")
-    by_text = {t: names.get(i) for i, t in enumerate(texts)}
+    namer = namer or gemini_names
+    by_text, answers = {}, []
+    for start in range(0, len(texts), NAMES_PER_CALL):
+        chunk = texts[start:start + NAMES_PER_CALL]
+        names, answer = namer(chunk)
+        by_text.update({t: names.get(i) for i, t in enumerate(chunk)})
+        answers.append(json.loads(answer))
+    raw = json.dumps(answers, ensure_ascii=False)
 
     out = []
     for r in receipts:

@@ -38,6 +38,9 @@ SPLIT_MIN_KR = 25
 SPLIT_MIN_SHARE = 0.05
 
 
+GROCERY_CHAINS = {name for _, name in CHAINS}
+
+
 def chain_name(raw: str | None) -> str | None:
     if not raw or not raw.strip():
         return None
@@ -68,7 +71,8 @@ def latest_offers(rows) -> dict[tuple[str, str], Offer]:
     offers: dict[tuple[str, str], Offer] = {}
     for item, receipt in rows:
         chain = chain_name(receipt.store_chain)
-        if not chain or item.total_price is None or not item.canonical_name:
+        # Trumf also covers florists and the like (Mester Grønn): not a grocery store to compare
+        if chain not in GROCERY_CHAINS or item.total_price is None or not item.canonical_name:
             continue
         key = (item.canonical_name, chain)
         current = offers.get(key)

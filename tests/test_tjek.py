@@ -132,7 +132,7 @@ def test_gemini_names_in_one_text_call(monkeypatch):
     assert calls[0]["config"].response_schema is tjek.OfferNames
 
 
-def namer(offers):
+def namer(offers, known=()):
     return {i: tjek.OfferName(index=i, canonical_name=o["heading"].split()[0], category="Annet")
             for i, o in enumerate(offers)}, "raw"
 
@@ -159,7 +159,7 @@ def test_a_multi_buy_stays_n_for_x(clean, db):
 
 
 def test_non_grocery_offers_are_left_out(clean, db):
-    def names(offers):
+    def names(offers, known=()):
         return {0: tjek.OfferName(index=0, canonical_name="Kjøttdeig", category="Kjøtt"),
                 1: tjek.OfferName(index=1, canonical_name="Laminatgulv", category="Annet", grocery=False)}, "raw"
     offers = tjek.import_catalog(db, CATALOGS[0], OFFERS["kiwi1"], names).offers
@@ -172,7 +172,7 @@ def test_the_prompt_asks_which_offers_are_groceries():
 
 
 def test_offers_gemini_skipped_are_left_out(clean, db):
-    def partial(offers):
+    def partial(offers, known=()):
         return {0: tjek.OfferName(index=0, canonical_name="Kjøttdeig", category="Kjøtt")}, "raw"
     assert len(tjek.import_catalog(db, CATALOGS[0], OFFERS["kiwi1"], partial).offers) == 1
 
@@ -207,7 +207,7 @@ def test_cli_without_gemini_matches_known_names(clean, db, capsys):
 
 
 def test_cli_reports_failures(clean, db, capsys):
-    def broken(offers):
+    def broken(offers, known=()):
         raise RuntimeError("Gemini is down")
     assert cli.main([], client=fake_api(), namer=broken) == 1
     assert "Kiwi «KIWI uke 43»: Gemini is down" in capsys.readouterr().err
@@ -226,7 +226,7 @@ def test_cli_empty_catalog(clean, db, capsys):
 
 def test_background_refresh_imports_only_new_flyers(clean, db, monkeypatch):
     calls = []
-    monkeypatch.setattr(tjek, "gemini_names", lambda offers: (calls.append(len(offers)), namer(offers))[1])
+    monkeypatch.setattr(tjek, "gemini_names", lambda offers, known=(): (calls.append(len(offers)), namer(offers))[1])
     assert tjek.refresh_new_flyers(fake_api()) == 2
     assert calls == [2, 150]
     # The next pass finds nothing new and asks Gemini nothing
@@ -235,7 +235,7 @@ def test_background_refresh_imports_only_new_flyers(clean, db, monkeypatch):
 
 
 def test_background_refresh_logs_failures_and_goes_on(clean, db, monkeypatch, caplog):
-    def broken(offers):
+    def broken(offers, known=()):
         raise RuntimeError("quota")
     monkeypatch.setattr(tjek, "gemini_names", broken)
     assert tjek.refresh_new_flyers(fake_api()) == 0

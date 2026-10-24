@@ -9,6 +9,7 @@ from datetime import date, timedelta
 import httpx
 from google.genai import errors
 from pydantic import ValidationError
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -138,6 +139,21 @@ def repair_multipacks(db: Session) -> int:
     return fixed
 
 
+# Enough to cover what's bought often, short enough to keep each call cheap
+KNOWN_NAMES = 1500
+
+
+def known_product_names(db: Session) -> list[str]:
+    """The product names in use on receipts and in flyers, most common
+    first, for Gemini to reuse (see extractor.known_names)."""
+    counts = Counter()
+    for model in (models.ReceiptItem, models.FlyerOffer):
+        for name, n in db.query(model.canonical_name, func.count()).group_by(model.canonical_name):
+            if name:
+                counts[name] += n
+    return [name for name, _ in counts.most_common(KNOWN_NAMES)]
+
+
 def parse_date(value: str | None) -> date | None:
     try:
         return date.fromisoformat(value) if value else None
@@ -177,6 +193,22 @@ def find_duplicate(db: Session, data: ExtractedReceipt) -> models.Receipt | None
     return None
 
 
+def repair_chain_names(db: Session) -> int:
+    """Gives receipts saved before save_receipt did it one name per chain
+    ("MENY" and "MENY Sandvika Storsenter" become "Meny"). Safe to run again."""
+    fixed = 0
+    for receipt in db.query(models.Receipt).filter(models.Receipt.store_chain.isnot(None)):
+        name = chain_name(receipt.store_chain)
+        if name != receipt.store_chain:
+            receipt.store_location = receipt.store_location or receipt.store_chain
+            receipt.store_chain = name
+            fixed += 1
+    db.commit()
+    if fixed:
+        logger.info(f"Gave {fixed} receipts their chain's name")
+    return fixed
+
+
 def repair_duplicates(db: Session) -> int:
     """Removes receipts saved twice before find_duplicate knew a photo and a
     Trumf export of one shop are the same purchase. Keeps the first saved.
@@ -205,8 +237,9 @@ def repair_duplicates(db: Session) -> int:
 def save_receipt(db: Session, job: models.Job, data: ExtractedReceipt) -> models.Receipt:
     receipt = models.Receipt(
         image_filename=job.filename,
-        store_chain=data.store_chain,
-        store_location=data.store_location,
+        # One name per chain ("KIWI 305 Kjørbo" is Kiwi); the store as written stays
+        store_chain=chain_name(data.store_chain),
+        store_location=data.store_location or data.store_chain,
         region=data.region,
         purchase_date=parse_date(data.purchase_date),
     )
@@ -246,13 +279,14 @@ async def process_job(job: models.Job, db: Session):
     is_file = filepath.suffix.lower() in (".pdf", ".csv", ".json")
     raw = None
     try:
+        known = known_product_names(db)
         history = trumf.receipts_in(json.loads(filepath.read_text(encoding="utf-8"))) if filepath.suffix == ".json" else None
         if history:
             # A Trumf history: prices from the file, only the names from Gemini
-            found, raw = await asyncio.to_thread(trumf.read, history)
+            found, raw = await asyncio.to_thread(trumf.read, history, lambda texts: trumf.gemini_names(texts, known))
             job.raw_response, job.model = raw, trumf.MODEL_PREFIX + GEMINI_MODEL
         else:
-            raw = await asyncio.to_thread(extract_receipts if is_file else extract_receipt, filepath)
+            raw = await asyncio.to_thread(extract_receipts if is_file else extract_receipt, filepath, known)
             job.raw_response, job.model = raw, GEMINI_MODEL
             found = (ExtractedReceipts.model_validate_json(raw).receipts if is_file
                      else [ExtractedReceipt.model_validate_json(raw)])
@@ -360,6 +394,7 @@ async def run_worker():
         logger.info(f"Reset stuck job: {job.filename}")
     db.commit()
     repair_multipacks(db)
+    repair_chain_names(db)
     repair_duplicates(db)
     db.close()
 

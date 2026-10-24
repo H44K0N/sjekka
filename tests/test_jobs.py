@@ -29,7 +29,7 @@ def process(db, filename, extract):
 def test_done_job_lists_what_was_found(client, db, monkeypatch):
     monkeypatch.setattr(worker, "extract_receipt", worker.extract_receipt)
     job_id = uploaded(client)
-    process(db, job_id, lambda path: receipt().model_dump_json())
+    process(db, job_id, lambda path, known=(): receipt().model_dump_json())
     res = client.get(f"/jobs/{job_id}").json()
     assert res["status"] == "done"
     assert res["receipt"]["store_chain"] == "Kiwi"
@@ -41,7 +41,7 @@ def test_retrying_job_says_so(client, db, monkeypatch):
     monkeypatch.setattr(worker, "extract_receipt", worker.extract_receipt)
     job_id = uploaded(client)
 
-    def busy(path):
+    def busy(path, known=()):
         raise api_error(503)
     process(db, job_id, busy)
     assert client.get(f"/jobs/{job_id}").json()["retrying"] is True
@@ -51,7 +51,7 @@ def test_failed_job_doesnt_leak_the_error(client, db, monkeypatch):
     monkeypatch.setattr(worker, "extract_receipt", worker.extract_receipt)
     job_id = uploaded(client)
 
-    def broken(path):
+    def broken(path, known=()):
         raise api_error(400)
     process(db, job_id, broken)
     assert client.get(f"/jobs/{job_id}").json() == {"status": "failed", "retrying": False}

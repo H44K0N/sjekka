@@ -85,7 +85,7 @@ def test_extract_flyer_rejects_other_files(tmp_path):
 def test_read_flyer_retries_when_gemini_is_busy(monkeypatch, tmp_path):
     answers = [api_error(503), api_error(429), answer([])]
 
-    def fake(path):
+    def fake(path, known=()):
         a = answers.pop(0)
         if isinstance(a, Exception):
             raise a
@@ -98,13 +98,13 @@ def test_read_flyer_retries_when_gemini_is_busy(monkeypatch, tmp_path):
 
 
 def test_read_flyer_gives_up(monkeypatch, tmp_path):
-    def busy(path):
+    def busy(path, known=()):
         raise api_error(503)
     monkeypatch.setattr(flyers, "extract_flyer", busy)
     with pytest.raises(errors.APIError):
         flyers.read_flyer(flyer_file(tmp_path), sleep=lambda s: None)
 
-    def bad_request(path):
+    def bad_request(path, known=()):
         raise api_error(400)
     monkeypatch.setattr(flyers, "extract_flyer", bad_request)
     waits = []

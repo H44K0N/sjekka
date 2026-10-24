@@ -104,7 +104,7 @@ def seed():
     db.close()
 
 
-def fake_gemini(path):
+def fake_gemini(path, known=()):
     """What Gemini returns for the demo receipt in the video."""
     return ExtractedReceipt(
         store_chain="Rema 1000", store_location="Grünerløkka", region="Oslo",
@@ -125,6 +125,6 @@ def fake_gemini(path):
 
 
 seed()
-worker.extract_receipt = lambda path: fake_gemini(path).model_dump_json()
+worker.extract_receipt = lambda path, known=(): fake_gemini(path).model_dump_json()
 worker.POLL_INTERVAL = 0.5
 uvicorn.run("app.main:app", host="127.0.0.1", port=int(sys.argv[2]), log_level="warning")

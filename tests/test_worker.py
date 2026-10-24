@@ -39,7 +39,7 @@ def restore_extractor():
 
 
 def test_saves_receipt_with_computed_unit_prices(client, db):
-    job = run(db, lambda path: receipt().model_dump_json())
+    job = run(db, lambda path, known=(): receipt().model_dump_json())
     assert job.status == "done"
     items = {i.raw_name: i for i in db.query(models.ReceiptItem)}
     mince = items["GILDE KJØTTDEIG 400G"]
@@ -53,7 +53,7 @@ def test_saves_receipt_with_computed_unit_prices(client, db):
 def test_a_multipack_is_priced_for_the_whole_pack(client, db):
     yoghurt = ExtractedItem(raw_name="Yoghurt kokos 4x150g tine", canonical_name="Yoghurt", category="Meieri",
                             quantity=150, unit="g", total_price=20.0)
-    run(db, lambda path: receipt(items=[yoghurt], total=20.0).model_dump_json())
+    run(db, lambda path, known=(): receipt(items=[yoghurt], total=20.0).model_dump_json())
     saved = db.query(models.ReceiptItem).one()
     assert (saved.quantity, saved.pack_size, saved.price_per_unit) == (600, 1, 3.33)
 
@@ -92,22 +92,22 @@ def test_repair_fixes_multipacks_saved_before_and_only_once(client, db):
 
 
 def test_duplicate_receipt_is_not_saved_twice(client, db):
-    run(db, lambda path: receipt().model_dump_json(), filename="a.jpg")
-    job = run(db, lambda path: receipt().model_dump_json(), filename="b.jpg")
+    run(db, lambda path, known=(): receipt().model_dump_json(), filename="a.jpg")
+    job = run(db, lambda path, known=(): receipt().model_dump_json(), filename="b.jpg")
     assert job.status == "duplicate"
     assert db.query(models.Receipt).count() == 1
 
 
 def test_same_store_and_day_with_other_items_is_not_a_duplicate(client, db):
-    run(db, lambda path: receipt().model_dump_json(), filename="a.jpg")
-    job = run(db, lambda path: receipt(items=receipt().items[:1]).model_dump_json(), filename="b.jpg")
+    run(db, lambda path, known=(): receipt().model_dump_json(), filename="a.jpg")
+    job = run(db, lambda path, known=(): receipt(items=receipt().items[:1]).model_dump_json(), filename="b.jpg")
     assert job.status == "done"
     assert db.query(models.Receipt).count() == 2
 
 
 @pytest.mark.parametrize("code", [429, 503])
 def test_rate_limits_and_overload_are_retried(client, db, code):
-    def extract(path):
+    def extract(path, known=()):
         raise api_error(code)
     job = run(db, extract)
     assert job.status == "pending"
@@ -115,7 +115,7 @@ def test_rate_limits_and_overload_are_retried(client, db, code):
 
 
 def test_gives_up_after_max_attempts(client, db):
-    def extract(path):
+    def extract(path, known=()):
         raise api_error(503)
     job = models.Job(filename="a.jpg", attempts=worker.MAX_ATTEMPTS - 1)
     db.add(job)
@@ -126,7 +126,7 @@ def test_gives_up_after_max_attempts(client, db):
 
 
 def test_client_errors_fail_immediately(client, db):
-    def extract(path):
+    def extract(path, known=()):
         raise api_error(400)
     job = run(db, extract)
     assert job.status == "failed"
@@ -148,8 +148,8 @@ def test_waiting_job_does_not_block_the_queue(client, db):
 
 @pytest.mark.parametrize("missing", [{"store_chain": None}, {"purchase_date": None}])
 def test_receipts_without_store_or_date_are_never_duplicates(client, db, missing):
-    run(db, lambda path: receipt(**missing).model_dump_json(), filename="a.jpg")
-    job = run(db, lambda path: receipt(**missing).model_dump_json(), filename="b.jpg")
+    run(db, lambda path, known=(): receipt(**missing).model_dump_json(), filename="a.jpg")
+    job = run(db, lambda path, known=(): receipt(**missing).model_dump_json(), filename="b.jpg")
     assert job.status == "done"
 
 
@@ -162,7 +162,7 @@ def photo(name):
 
 def test_raw_answer_and_model_are_kept(client, db):
     raw = receipt().model_dump_json()
-    job = run(db, lambda path: raw)
+    job = run(db, lambda path, known=(): raw)
     assert job.raw_response == raw
     assert job.model == worker.GEMINI_MODEL
 
@@ -170,9 +170,9 @@ def test_raw_answer_and_model_are_kept(client, db):
 @pytest.mark.parametrize("second", [False, True])
 def test_photo_is_deleted_once_read(client, db, second):
     if second:  # a duplicate is also fully handled
-        run(db, lambda path: receipt().model_dump_json(), filename="first.jpg")
+        run(db, lambda path, known=(): receipt().model_dump_json(), filename="first.jpg")
     path = photo("p.jpg")
-    job = run(db, lambda path: receipt().model_dump_json(), filename="p.jpg")
+    job = run(db, lambda path, known=(): receipt().model_dump_json(), filename="p.jpg")
     assert job.status == ("duplicate" if second else "done")
     assert not path.exists()
 
@@ -189,7 +189,7 @@ def test_photo_is_kept_when_reading_fails(client, db, code):
 def test_invalid_answer_fails_but_keeps_the_raw_answer_and_photo(client, db):
     raw = '{"items": [{"raw_name": "LEGO", "canonical_name": "Lego", "category": "Leker"}]}'
     path = photo("p.jpg")
-    job = run(db, lambda _: raw, filename="p.jpg")
+    job = run(db, lambda _, known=(): raw, filename="p.jpg")
     assert job.status == "failed"
     assert "invalid receipt" in job.error
     assert job.raw_response == raw
@@ -264,3 +264,33 @@ def test_duplicates_saved_before_are_removed_once(client, db):
     assert worker.repair_duplicates(db) == 0
     assert sorted(r.image_filename for r in db.query(models.Receipt)) == ["another-shop.jpg", "photo.jpg"]
     assert db.query(models.ReceiptItem).count() == len(SHOP) + 3  # the copy's lines went with it
+
+
+def test_known_names_are_the_most_used_on_receipts_and_in_flyers(client, db):
+    for day in ("2026-10-01", "2026-10-02"):
+        saved_receipt(db, "Kiwi", day, [24.9, 15.0])  # "Vare 0" and "Vare 1" twice each
+    flyer = models.Flyer(chain="Meny", valid_from=date(2026, 10, 20), valid_to=date(2026, 10, 26), source="t")
+    flyer.offers.extend(models.FlyerOffer(canonical_name=n, pack_size=1, total_price=9) for n in ("Vare 1", "Vare 1", "Ost"))
+    db.add(flyer)
+    db.commit()
+    assert worker.known_product_names(db) == ["Vare 1", "Vare 0", "Ost"]
+    db.query(models.FlyerOffer).delete()
+    db.query(models.Flyer).delete()
+    db.commit()
+
+
+def test_a_receipt_gets_its_chains_name_and_keeps_the_store(client, db):
+    saved_receipt(db, "KIWI 305 Kjørbo", "2026-10-01", [24.9])
+    receipt = db.query(models.Receipt).one()
+    assert (receipt.store_chain, receipt.store_location) == ("Kiwi", "KIWI 305 Kjørbo")
+
+
+def test_receipts_saved_before_get_their_chains_name_once(client, db):
+    db.add_all([models.Receipt(image_filename="a.jpg", store_chain="MENY"),
+                models.Receipt(image_filename="b.json", store_chain="MENY Sandvika Storsenter"),
+                models.Receipt(image_filename="c.json", store_chain="Kiwi")])
+    db.commit()
+    assert worker.repair_chain_names(db) == 2
+    assert worker.repair_chain_names(db) == 0
+    rows = {r.image_filename: (r.store_chain, r.store_location) for r in db.query(models.Receipt)}
+    assert rows == {"a.jpg": ("Meny", "MENY"), "b.json": ("Meny", "MENY Sandvika Storsenter"), "c.json": ("Kiwi", None)}

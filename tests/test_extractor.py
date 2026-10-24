@@ -64,3 +64,27 @@ def test_a_receipt_file_asks_for_a_list_of_receipts(monkeypatch, tmp_path):
     prompt = calls[0]["contents"][1]
     assert extractor.PROMPT in prompt and "Return every receipt in it separately" in prompt
     assert "skip it" in prompt  # a receipt cut off at a part's edge is read from the neighbouring part
+
+
+def test_answers_have_room_and_skip_thinking(monkeypatch, tmp_path):
+    # On gemini-2.5-flash thinking shares the answer's budget; a long Trumf part got cut off
+    image = tmp_path / "r.jpg"
+    image.write_bytes(b"jpeg")
+    calls = fake_gemini(monkeypatch, {"items": []})
+    extractor.extract_receipt(image)
+    config = calls[0]["config"]
+    assert config.thinking_config.thinking_budget == 0 and config.max_output_tokens == 65536
+
+
+def test_known_names_are_offered_for_reuse(monkeypatch, tmp_path):
+    image = tmp_path / "r.jpg"
+    image.write_bytes(b"jpeg")
+    calls = fake_gemini(monkeypatch, {"items": []})
+    extractor.extract_receipt(image, known=["Lettmelk", "Energidrikk"])
+    extractor.extract_receipt(image)
+    assert "KNOWN PRODUCT NAMES" in calls[0]["contents"][1] and "Lettmelk, Energidrikk" in calls[0]["contents"][1]
+    assert "KNOWN PRODUCT NAMES" not in calls[1]["contents"][1]
+
+
+def test_names_leave_brands_out():
+    assert '"MONSTER ULTRA WHITE 0,5L" → "Energidrikk"' in extractor.DEFINITIONS

@@ -181,3 +181,9 @@ def test_basket_endpoint(client, db):
 ])
 def test_basket_rejects_bad_lists(client, body):
     assert client.post("/basket", json=body).status_code == 422
+
+
+def test_a_store_that_is_not_a_grocery_chain_is_not_compared():
+    # Trumf also lists florists that take the card
+    offers = basket.latest_offers([row("Tulipaner", "Mester Grønn Sandvika", 200), row("Melk", "Kiwi", 20)])
+    assert set(offers) == {("Melk", "Kiwi")}
