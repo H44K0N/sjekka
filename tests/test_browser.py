@@ -855,3 +855,31 @@ def test_list_suggests_products_that_are_only_on_offer(page):
     expect(page.get_by_role("option").first).to_have_text(re.compile("^Seigmenn.*Meny · tilbud"))
     page.keyboard.press("Enter")
     assert list_names(page) == ["Seigmenn"]
+
+
+def test_a_close_call_on_estimates_is_not_called_a_win(page):
+    def mostly_estimated(route):
+        result = route.fetch().json()
+        rema, kiwi = result["stores"]
+        rema.update(total=162.89, known=1, estimated=4)
+        kiwi.update(total=163.26, known=2, estimated=3)
+        route.fulfill(json=result)
+    page.route("**/basket", mostly_estimated)
+    page.goto("/handleliste.html?v=Lettmelk&v=Kj%C3%B8ttdeig")
+    expect(page.locator("#verdict-total")).to_have_text("≈ 163 kr")
+    expect(page.locator("#verdict .label").first).to_have_text("Trolig billigst for hele listen")
+    expect(page.locator("#verdict-note")).to_have_text("Omtrent likt med Kiwi. Flere kvitteringer gir et sikrere svar.")
+    expect(page.locator(".rank").nth(1).locator(".amount")).to_have_text("≈ 163 kromtrent likt")
+
+
+def test_a_clear_gap_on_estimates_is_rounded(page):
+    def apart(route):
+        result = route.fetch().json()
+        rema, kiwi = result["stores"]
+        rema.update(total=150.2, known=1, estimated=4)
+        kiwi.update(total=190.7, known=4, estimated=1)
+        route.fulfill(json=result)
+    page.route("**/basket", apart)
+    page.goto("/handleliste.html?v=Lettmelk&v=Kj%C3%B8ttdeig")
+    expect(page.locator("#verdict-note")).to_have_text("Rundt 41 kr billigere enn Kiwi, som er dyrest.")
+    expect(page.locator(".rank").nth(1).locator(".amount")).to_have_text("190,70 kr+41 kr")

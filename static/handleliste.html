@@ -262,6 +262,13 @@
         // ---- the result ----
 
         const money = v => `${kr.format(v)} kr`;
+        // A total that is mostly estimates is shown rounded ("≈ 163 kr"), and
+        // a near tie that rests on estimates isn't called a win: øre-precise
+        // sums of guesses would claim more than we know
+        const rough = s => s.estimated > s.known;
+        const total = s => rough(s) ? `≈ ${kr.format(Math.round(s.total))} kr` : money(s.total);
+        const gap = (a, b) => rough(a) || rough(b) ? `${kr.format(Math.round(b.total - a.total))} kr` : money(b.total - a.total);
+        const tooClose = (a, b) => (rough(a) || rough(b)) && b.total - a.total < Math.max(5, a.total * 0.03);
 
         function renderResult() {
             const items = ShoppingList.read();
@@ -283,12 +290,15 @@
 
             const best = stores[0], worst = stores[stores.length - 1];
             $("sticky-chain").replaceChildren(chainBadge(best.chain));
-            $("sticky-total").textContent = money(best.total);
+            $("sticky-total").textContent = total(best);
+            $("verdict").querySelector(".label").textContent = rough(best) ? "Trolig billigst for hele listen" : "Billigst for hele listen";
             $("verdict-chain").replaceChildren(chainBadge(best.chain));
-            $("verdict-total").textContent = money(best.total);
+            $("verdict-total").textContent = total(best);
             const notes = [];
-            if (stores.length > 1 && worst.total - best.total >= 0.5) {
-                notes.push(`${money(worst.total - best.total)} billigere enn ${worst.chain}, som er dyrest.`);
+            if (stores.length > 1 && tooClose(best, stores[1])) {
+                notes.push(`Omtrent likt med ${stores[1].chain}. Flere kvitteringer gir et sikrere svar.`);
+            } else if (stores.length > 1 && worst.total - best.total >= 0.5) {
+                notes.push(`${rough(best) || rough(worst) ? "Rundt " : ""}${gap(best, worst)} billigere enn ${worst.chain}, som er dyrest.`);
             } else if (stores.length === 1) {
                 notes.push("Bare denne butikken har priser på varene dine ennå.");
             }
@@ -333,7 +343,7 @@
                 bar.append(fill);
 
                 const amount = el("span", "amount");
-                amount.append(el("b", "", money(store.total)), el("span", "", i === 0 ? "billigst" : `+${money(diff)}`));
+                amount.append(el("b", "", total(store)), el("span", "", i === 0 ? "billigst" : tooClose(best, store) ? "omtrent likt" : `+${gap(best, store)}`));
                 row.append(who, bar, amount, el("span", "caret"));
                 row.addEventListener("click", () => {
                     const open = row.getAttribute("aria-expanded") !== "true";
