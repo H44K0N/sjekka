@@ -965,8 +965,9 @@ def test_a_receipt_can_be_uploaded_as_a_file(page, tmp_path):
     expect(page.locator("#prompt")).to_have_text("Fil valgt")
     expect(page.locator("#file-name")).to_have_text("kvittering.csv")
     page.locator("#btn").click()
-    page.wait_for_url("**/takk.html*")
-    expect(page.locator(".lede")).to_contain_text("Bildet eller filen slettes")
+    page.wait_for_url("**/takk.html?batch=*")
+    expect(page.locator("#lede")).to_contain_text("Vi tar vare på den i inntil 12 måneder")
+    expect(page.locator("#state")).to_have_text("Gemini leser filen …")  # no worker in these tests
 
 
 def test_the_upload_page_turns_away_other_files(page, tmp_path):
@@ -976,3 +977,22 @@ def test_the_upload_page_turns_away_other_files(page, tmp_path):
     page.set_input_files("#receipt", str(other))
     expect(page.locator("#status")).to_contain_text("PDF, CSV eller JSON")
     expect(page.locator("#btn")).to_be_disabled()
+
+
+def test_the_thank_you_page_follows_a_whole_history(page):
+    answers = iter([
+        {"parts": 12, "read": 3, "failed": 0, "waiting": 9, "receipts": 31, "duplicates": 0, "items": 402,
+         "chains": {"Kiwi": 20, "Meny": 11}, "from": "2025-11-02", "to": "2026-01-30"},
+        {"parts": 12, "read": 11, "failed": 1, "waiting": 0, "receipts": 140, "duplicates": 6, "items": 1890,
+         "chains": {"Kiwi": 90, "Meny": 50}, "from": "2025-11-02", "to": "2026-10-20"},
+    ])
+    state = {"answer": next(answers)}
+    page.route("**/jobs/batch/abc", lambda route: route.fulfill(json=state["answer"]))
+    page.goto("/takk.html?batch=abc")
+    expect(page.locator("#state")).to_have_text("Leser filen: del 4 av 12 …")
+    expect(page.locator("#found")).to_contain_text("31 kvitteringer · 402 varer · 2. november 2025 til 30. januar 2026")
+    state["answer"] = next(answers)
+    expect(page.locator("#state")).to_have_text(
+        "Lest. Prisene ligger nå i oversikten. 6 var allerede registrert og telles ikke to ganger. 1 av 12 deler kunne ikke leses.",
+        timeout=10000)
+    expect(page.locator("#found .chain img")).to_have_count(2)

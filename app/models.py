@@ -71,6 +71,9 @@ class Job(Base):
     # even when it fails validation (see app/migrations.py)
     raw_response = Column(String, nullable=True)
     model = Column(String, nullable=True)
+    # The parts of one uploaded receipt file share a batch (its original is
+    # kept as ORIGINALS_DIR/<batch>.<kind>); a photo has none
+    batch = Column(String, nullable=True, index=True)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 

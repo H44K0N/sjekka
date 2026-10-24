@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import time
 from collections import Counter
 from datetime import date, timedelta
 
@@ -11,9 +12,9 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app import models
-from app.extractor import extract_receipt
-from app.schema import ExtractedItem, ExtractedReceipt
-from app.config import GEMINI_MODEL, UPLOAD_DIR, LOG_DIR
+from app.extractor import extract_receipt, extract_receipts
+from app.schema import ExtractedItem, ExtractedReceipt, ExtractedReceipts
+from app.config import GEMINI_MODEL, KEEP_FILES_DAYS, LOG_DIR, ORIGINALS_DIR, UPLOAD_DIR
 
 logger = logging.getLogger("sjekka.worker")
 
@@ -194,22 +195,34 @@ async def process_job(job: models.Job, db: Session):
     job.updated_at = models.utcnow()
     db.commit()
 
+    # A receipt file (PDF, CSV, JSON) can hold many receipts; a photo is one
+    is_file = filepath.suffix.lower() in (".pdf", ".csv", ".json")
     raw = None
     try:
-        raw = await asyncio.to_thread(extract_receipt, filepath)
+        raw = await asyncio.to_thread(extract_receipts if is_file else extract_receipt, filepath)
         job.raw_response, job.model = raw, GEMINI_MODEL
         extraction_logger.info(f"FILE: {job.filename} ({GEMINI_MODEL})\n{raw}\n{'=' * 60}")
-        data = ExtractedReceipt.model_validate_json(raw)
+        found = (ExtractedReceipts.model_validate_json(raw).receipts if is_file
+                 else [ExtractedReceipt.model_validate_json(raw)])
 
-        duplicate = find_duplicate(db, data)
-        if duplicate:
-            job.status = "duplicate"
-            job.error = f"Same as receipt {duplicate.id} ({duplicate.image_filename})"
-            logger.info(f"Duplicate: {job.filename} is the same as receipt {duplicate.id}")
-        else:
+        saved = duplicates = 0
+        for data in found:
+            if is_file and not data.items:  # an empty entry in a history
+                continue
+            duplicate = find_duplicate(db, data)
+            if duplicate:
+                duplicates += 1
+                job.error = f"Same as receipt {duplicate.id} ({duplicate.image_filename})"
+                logger.info(f"Duplicate: in {job.filename}, the same as receipt {duplicate.id}")
+                continue
             receipt = save_receipt(db, job, data)
-            job.status = "done"
+            db.flush()  # so a repeat later in the same file is found as a duplicate
+            saved += 1
             logger.info(f"Done: {job.filename} — {receipt.store_chain}, {len(data.items)} items")
+        # Only duplicates (or, from a file part, nothing new): say so
+        job.status = "done" if saved or (is_file and not duplicates) else "duplicate"
+        if is_file:
+            job.error = f"{saved} saved, {duplicates} duplicates" if duplicates else None
 
         job.updated_at = models.utcnow()
         db.commit()
@@ -238,6 +251,20 @@ async def process_job(job: models.Job, db: Session):
 
         job.updated_at = models.utcnow()
         db.commit()
+
+
+def delete_old_originals() -> int:
+    """Deletes kept receipt files older than KEEP_FILES_DAYS (the privacy
+    page promises 12 months)."""
+    cutoff = time.time() - KEEP_FILES_DAYS * 86400
+    deleted = 0
+    for path in ORIGINALS_DIR.iterdir():
+        if path.is_file() and path.stat().st_mtime < cutoff:
+            path.unlink()
+            deleted += 1
+    if deleted:
+        logger.info(f"Deleted {deleted} receipt files kept over {KEEP_FILES_DAYS} days")
+    return deleted
 
 
 def delete_old_failed_photos(db: Session) -> int:
@@ -288,6 +315,7 @@ async def run_worker():
         try:
             if last_cleanup is None or models.utcnow() - last_cleanup > CLEANUP_INTERVAL:
                 delete_old_failed_photos(db)
+                delete_old_originals()
                 last_cleanup = models.utcnow()
             job = next_job(db)
             if job:

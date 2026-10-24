@@ -8,7 +8,7 @@ Crowdsourced Norwegian grocery prices: people upload receipt photos, Gemini read
 - `app/worker.py`: background loop in the same process. Takes pending jobs, calls Gemini, saves receipts. Retries 408/429/5xx with backoff, detects duplicate receipts, computes `price_per_unit`, normalises names.
 - `app/basket.py`: prices a shopping list per chain for `POST /basket` (pure functions, unit-tested). Groups chain names by pattern; keep `CHAINS` in step with `static/chains.js`.
 - `app/flyers.py`: flyer offers (kundeavis). Import from Gemini-read files (`util/import_flyer.py`), the verdict on whether an offer beats the chain's usual price, `GET /offers`. `app/tjek.py`: import from the eTilbudsavis API (`util/import_tjek.py`); prices and sizes from Tjek, names from Gemini or matched to known names (`--no-gemini`); `run_refresh` imports new flyers every `FLYER_REFRESH_HOURS` from the app's lifespan. Offers live in `flyers`/`flyer_offers`, apart from receipts, and never feed the chain price index.
-- `app/receipt_files.py`: receipts uploaded as PDF, CSV or JSON instead of photos: recognised by content, checked, text stored as UTF-8. The worker reads them like photos; `extractor.receipt_part` sends a PDF as a file and CSV/JSON as text.
+- `app/receipt_files.py`: receipts uploaded as PDF, CSV or JSON instead of photos: recognised by content, checked, text stored as UTF-8, and split into parts (a purchase history is too big for one reading). The parts are jobs sharing a `batch`; the original is kept in `ORIGINALS_DIR` for `KEEP_FILES_DAYS`. The worker reads a part with `extractor.extract_receipts` (a list of receipts) and saves each one, dropping duplicates; `/jobs/batch/{batch}` reports progress.
 - `app/extractor.py`: the prompts and the Gemini calls; `DEFINITIONS` is shared by the receipt and flyer prompts so names match. `app/schema.py`: Pydantic response schema (allowed categories and units).
 - `app/models.py`: SQLAlchemy models. `app/config.py`: all env settings.
 - `static/`: plain HTML/CSS/JS, one shared `style.css`. No build step. `list.js` holds the shopping list in `localStorage` (guarded; falls back to memory) and fills the header count on every page.
@@ -31,7 +31,7 @@ CI (`.github/workflows/pipeline.yml`) runs exactly this, requires the browser te
 - **Tests never call Gemini.** Fake `worker.extract_receipt` or `extractor.client.models.generate_content`. Browser tests run the app with `RUN_WORKER=0`.
 - **Every change gets tests.** Prefer checking that a new test fails when the code is broken on purpose.
 - **Schema changes need a migration.** `create_all` only creates missing tables; it never adds columns to the existing production database. New columns go in `app/migrations.py` (tested in `tests/test_migrations.py`); anything bigger needs a real migration tool.
-- **Photos are personal data.** They go to Gemini and are deleted once read; keep the raw answer (`jobs.raw_response`) instead. Never serve them.
+- **Photos and receipt files are personal data.** Photos are deleted once read; receipt files are kept for `KEEP_FILES_DAYS` (the privacy page says 12 months) to improve the reading. Keep the raw answer (`jobs.raw_response`). Never serve either.
 - **One app process only.** The worker runs inside it and the upload rate limit is in memory, so never add uvicorn workers or replicas.
 - **Timestamps are naive UTC** via `models.utcnow()`, matching the stored data.
 - **User-facing text is Norwegian (bokmål)**, including API error messages shown in the UI. Code, comments and commits are English.

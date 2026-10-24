@@ -9,9 +9,12 @@ load_dotenv()
 DATA_DIR = Path(os.getenv("DATA_DIR", "./data"))
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", DATA_DIR / "uploads"))
 LOG_DIR = Path(os.getenv("LOG_DIR", DATA_DIR / "logs"))
+# Receipt files (PDF, CSV, JSON) as uploaded, kept to improve the reading
+# (see KEEP_FILES_DAYS); photos are not kept
+ORIGINALS_DIR = Path(os.getenv("ORIGINALS_DIR", DATA_DIR / "originals"))
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR / 'sjekka.db'}")
 
-for directory in (DATA_DIR, UPLOAD_DIR, LOG_DIR):
+for directory in (DATA_DIR, UPLOAD_DIR, LOG_DIR, ORIGINALS_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -23,6 +26,8 @@ FLYER_REFRESH_HOURS = float(os.getenv("FLYER_REFRESH_HOURS", "6"))
 
 UPLOADS_PER_IP_PER_HOUR = int(os.getenv("UPLOADS_PER_IP_PER_HOUR", "10"))
 UPLOADS_PER_DAY = int(os.getenv("UPLOADS_PER_DAY", "200"))
+# How long uploaded receipt files are kept (the privacy page says 12 months)
+KEEP_FILES_DAYS = int(os.getenv("KEEP_FILES_DAYS", "365"))
 
 MAX_SIZE_MB = 10
 MAX_DIMENSION = 2000
