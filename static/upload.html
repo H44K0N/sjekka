@@ -39,17 +39,14 @@
 
         <section>
             <label class="drop" id="drop">
-                <input type="file" id="receipt" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif">
-                <span id="prompt">Velg bilde eller slipp det her</span>
-                <span class="label" id="hint">JPEG, PNG, WebP eller HEIC · maks 10 MB</span>
+                <input type="file" id="receipt" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,.pdf,.csv,.json,application/pdf,text/csv,application/json">
+                <span id="prompt">Velg bilde eller fil, eller slipp det her</span>
+                <span class="label" id="hint">Bilde (JPEG, PNG, WebP, HEIC), PDF, CSV eller JSON · maks 10 MB</span>
             </label>
             <label class="button camera" id="camera-button">
                 <input type="file" id="camera" accept="image/*" capture="environment">Ta bilde med kamera
             </label>
             <p class="note tips">Best resultat: hele kvitteringen i bildet, flatt underlag og godt lys.</p>
-            <p class="note other-file"><label class="file-link">
-                <input type="file" id="receipt-file" accept=".pdf,.csv,.json,application/pdf,text/csv,application/json">Har du kvitteringen som fil? Last opp PDF, CSV eller JSON i stedet
-            </label></p>
             <p class="file" id="file" hidden><span id="file-name"></span><span id="file-size"></span></p>
             <p class="note" id="privacy">Bildet eller filen sendes til Google Gemini, som leser kvitteringen. Den slettes når den er lest, mens butikk, varer og priser lagres. <a href="/personvern.html">Mer om personvern</a></p>
 
@@ -116,11 +113,11 @@
                 img.alt = "Forhåndsvisning av kvitteringen";
                 drop.append(img);
                 document.getElementById("prompt").hidden = true;
-                document.getElementById("hint").textContent = "Trykk for å velge et annet bilde";
+                document.getElementById("hint").textContent = "Trykk for å velge et annet bilde eller en annen fil";
             } else {
                 document.getElementById("prompt").hidden = false;
                 document.getElementById("prompt").textContent = asFile ? "Fil valgt" : "Bilde valgt";
-                document.getElementById("hint").textContent = asFile ? "Trykk for å velge et bilde i stedet" : "Trykk for å velge et annet bilde";
+                document.getElementById("hint").textContent = "Trykk for å velge et annet bilde eller en annen fil";
             }
         }
 
@@ -128,8 +125,6 @@
         // Phones open the camera straight away from this one
         const camera = document.getElementById("camera");
         camera.addEventListener("change", () => choose(camera.files[0]));
-        const receiptFile = document.getElementById("receipt-file");
-        receiptFile.addEventListener("change", () => choose(receiptFile.files[0]));
 
         drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("dragging"); });
         drop.addEventListener("dragleave", () => drop.classList.remove("dragging"));
