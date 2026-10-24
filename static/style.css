@@ -935,3 +935,7 @@ footer a[aria-current="page"] { color: var(--text); }
 .did-you-mean { padding: 1px 9px; font: inherit; font-size: 13px; color: var(--text); background: none;
   border: 1px solid var(--hover); border-radius: 999px; cursor: pointer; transition: background 150ms; }
 .did-you-mean:hover { background: rgba(236, 230, 220, 0.06); }
+
+/* Offers page: while most offers can't be checked, ask for a receipt */
+.ask { margin: 0 0 20px; padding: 12px 16px; font-size: 15px; color: var(--soft); border: 1px dashed var(--hover); border-radius: 10px; }
+.ask a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
