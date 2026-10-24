@@ -6,3 +6,4 @@ python-dotenv==1.2.4
 python-multipart==0.0.32
 SQLAlchemy==2.1.6
 uvicorn==0.54.0
+tzdata==2026.5

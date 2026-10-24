@@ -33,3 +33,24 @@ class ExtractedReceipt(BaseModel):
     purchase_date: str | None = None  # YYYY-MM-DD
     items: list[ExtractedItem]
     total: float | None = None
+
+
+class ExtractedOffer(BaseModel):
+    raw_name: str
+    canonical_name: str
+    brand: str | None = None
+    variant: str | None = None
+    category: Category
+    quantity: float | None = None
+    unit: Literal["g", "ml", "stk"] | None = None
+    pack_size: int = 1
+    total_price: float | None = None
+    is_member_price: bool = False
+    deal: str | None = None
+
+
+class ExtractedFlyer(BaseModel):
+    store_chain: str | None = None
+    valid_from: str | None = None  # YYYY-MM-DD
+    valid_to: str | None = None
+    offers: list[ExtractedOffer]

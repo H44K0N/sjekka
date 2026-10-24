@@ -303,7 +303,7 @@ h1 {
   text-overflow: ellipsis;
 }
 .chain.logo { padding: 3px 8px; background: #fff; border-radius: 6px; }
-.chain.logo img { display: block; height: 20px; width: auto; }
+.chain.logo img { display: block; height: 20px; width: auto; max-width: 88px; object-fit: contain; }
 
 .notice {
   padding: 48px 0;
@@ -686,7 +686,7 @@ main.planner-page { max-width: 1040px; }
 .card h3 a:focus-visible { outline: none; }
 .card:has(h3 a:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
 .card:has(h3 a:hover) { border-color: var(--hover); background: rgba(236, 230, 220, 0.04); transform: translateY(-2px); }
-.card .body h3 { padding-right: 34px; }
+.card .body h3 { padding-right: 34px; hyphens: auto; overflow-wrap: break-word; }
 .list-toggle {
   position: absolute;
   top: 16px; right: 16px;
@@ -716,6 +716,26 @@ main.planner-page { max-width: 1040px; }
 .text-link:hover .arrow { transform: translateX(2px); }
 .text-link .arrow { display: inline-block; }
 .button[aria-pressed="true"] { color: var(--accent); border-color: var(--hover); }
+
+/* offers: the verdict on each flyer offer */
+.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--soft); cursor: pointer; }
+.switch input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+.deal-verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 12px 0 0; font-size: 14px; line-height: 1.45; color: var(--soft); }
+.deal-verdict.real, .deal-verdict.cheapest_known { color: var(--accent); }
+.deal-verdict.cheaper_elsewhere, .deal-verdict.not { color: var(--error); }
+.deal-verdict .chain { height: 20px; }
+.card.offer.real { border-color: rgba(201, 180, 143, 0.28); }
+.card .raw { display: -webkit-box; margin: 4px 0 0; overflow: hidden; font-size: 13px; line-height: 1.45; color: var(--soft); -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
+.more { display: flex; justify-content: center; margin-top: 24px; }
+.card .deal-tag { margin: 10px 0 0; font-size: 13px; color: var(--accent); }
+.offers-now { margin-top: 40px; }
+.offers-now h2 { margin: 0; font-weight: 400; }
+.offers-now .brand, .offers-now .when { color: var(--soft); }
+.offers-now ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.offers-now li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.offers-now li b { font-weight: 500; font-variant-numeric: tabular-nums; }
+.offers-now li .deal-verdict { margin: 0; flex-basis: 100%; }
+.offer-tag { display: inline-block; padding: 0 7px; font-size: 12px; line-height: 18px; color: var(--ink); background: var(--accent); border-radius: 999px; }
 
 footer {
   display: flex;

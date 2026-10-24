@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -7,7 +8,7 @@ from pillow_heif import register_heif_opener
 from sqlalchemy.orm import Session
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import date, timedelta
 import io
 import time
 import uuid
@@ -17,12 +18,14 @@ import logging
 
 from app.config import (
     UPLOAD_DIR, MAX_SIZE_MB, MAX_DIMENSION, JPEG_QUALITY,
-    UPLOADS_PER_IP_PER_HOUR, UPLOADS_PER_DAY, RUN_WORKER,
+    UPLOADS_PER_IP_PER_HOUR, UPLOADS_PER_DAY, RUN_WORKER, FLYER_REFRESH_HOURS,
 )
 from app.database import engine, get_db
 from app import models
 from app import worker
 from app import basket
+from app import flyers
+from app import tjek
 from app.migrations import migrate
 
 # iPhones save photos as HEIC
@@ -39,13 +42,19 @@ for column in migrate(engine):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(worker.run_worker()) if RUN_WORKER else None
+    tasks = []
+    if RUN_WORKER:
+        tasks.append(asyncio.create_task(worker.run_worker()))
+        if FLYER_REFRESH_HOURS > 0:
+            tasks.append(asyncio.create_task(tjek.run_refresh()))
     yield
-    if task:
+    for task in tasks:
         task.cancel()
 
 
 app = FastAPI(lifespan=lifespan)
+# A week of flyers is a lot of JSON
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Fonts, logos and images rarely change, so browsers (and Cloudflare) may keep
 # them for a week. Pages, CSS and JS keep the default and revalidate, since
@@ -262,7 +271,20 @@ def price_basket(shopping_list: ShoppingList, db: Session = Depends(get_db)):
         .filter(models.ReceiptItem.total_price.isnot(None))
         .all()
     )
-    return basket.price_list(list(wanted.items()), basket.latest_offers(rows))
+    deals = basket.flyer_deals(flyers.active_offers(db, date.today()))
+    return basket.price_list(list(wanted.items()), basket.latest_offers(rows), deals)
+
+
+@app.get("/offers")
+def get_offers(navn: str | None = None, best: bool = False, db: Session = Depends(get_db)):
+    """This week's flyer offers, each judged against what receipts say the
+    product usually costs, best first. `navn` keeps one product's offers;
+    `best` keeps only the best offer per product (for the product cards)."""
+    offers = flyers.offer_list(db, date.today(), name=navn)
+    if best:
+        seen = set()
+        offers = [o for o in offers if o["canonical_name"] not in seen and not seen.add(o["canonical_name"])]
+    return offers
 
 
 @app.get("/stats")

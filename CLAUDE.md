@@ -7,7 +7,8 @@ Crowdsourced Norwegian grocery prices: people upload receipt photos, Gemini extr
 - `app/main.py`: FastAPI app. `/upload` (validation, rate limits, EXIF rotation, HEIC), `/products`, `/stats`, and the static site.
 - `app/worker.py`: background loop in the same process. Takes pending jobs, calls Gemini, saves receipts. Retries 408/429/5xx with backoff, detects duplicate receipts, computes `price_per_unit`, normalises names.
 - `app/basket.py`: prices a shopping list per chain for `POST /basket` (pure functions, unit-tested). Groups chain names by pattern; keep `CHAINS` in step with `static/chains.js`.
-- `app/extractor.py`: the prompt and the single Gemini call. `app/schema.py`: Pydantic response schema (allowed categories and units).
+- `app/flyers.py`: flyer offers (kundeavis). Import from Gemini-read files (`util/import_flyer.py`), the verdict on whether an offer beats the chain's usual price, `GET /offers`. `app/tjek.py`: import from the eTilbudsavis API (`util/import_tjek.py`); prices and sizes from Tjek, names from Gemini or matched to known names (`--no-gemini`); `run_refresh` imports new flyers every `FLYER_REFRESH_HOURS` from the app's lifespan. Offers live in `flyers`/`flyer_offers`, apart from receipts, and never feed the chain price index.
+- `app/extractor.py`: the prompts and the Gemini calls; `DEFINITIONS` is shared by the receipt and flyer prompts so names match. `app/schema.py`: Pydantic response schema (allowed categories and units).
 - `app/models.py`: SQLAlchemy models. `app/config.py`: all env settings.
 - `static/`: plain HTML/CSS/JS, one shared `style.css`. No build step. `list.js` holds the shopping list in `localStorage` (guarded; falls back to memory) and fills the header count on every page.
 - `deploy/`: `deploy.sh` (CI's forced SSH command), `backup.sh` + systemd timer, `setup-vps.sh`.

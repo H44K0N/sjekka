@@ -39,6 +39,7 @@ Visible on the explore page
 - Explore page with category filters and search; store chains shown as logos or in their colours
 - Product page: latest price per store, cheapest first, with each store's price history on shared axes
 - Shopping list (`/handleliste.html`): add products, see what the whole list costs at each chain, cheapest first. Where a chain has no price for a product, it's estimated from the product's typical price and how expensive that chain is on products both sell (marked as estimated). Suggests splitting the shop across two chains when that saves at least 25 kr and 5%. The list lives in the browser and can be shared as a link; cards and product pages have a button to add to it
+- Flyer offers (`/tilbud.html`): this week's offers from the chains' kundeaviser, each judged against receipts from before the offer started: a real offer (15 % or more below the chain's usual price), a small one, the usual price in disguise, or cheaper elsewhere without an offer. Where no receipt can tell, the flyer's own "førpris" is shown as a claim. Offers also count in the shopping list while they apply, and show on product pages and cards
 - After uploading, the thank-you page follows the receipt live (queue, reading, retrying) and lists what was found
 - Live counters showing total receipts and prices registered
 - Docker image with CI/CD to a VPS (see [Deployment](#deployment))
@@ -72,7 +73,6 @@ Visible on the explore page
 - Price history per product
 - Search with cascading filters (category → product → variant)
 - Regional price comparison
-- Deal alerts
 - Confidence scoring — surface low-confidence extractions for review
 - API access to the dataset
 
@@ -105,6 +105,7 @@ The tests never call Gemini; it's replaced with fakes.
 |---|---|
 | `test_upload.py`, `test_upload_edge_cases.py` | Upload validation, formats (incl. HEIC), EXIF rotation, resizing, rate limits |
 | `test_api.py` | `/products`, `/stats`, static pages |
+| `test_flyers.py`, `test_tjek.py` | Flyer offers: reading PDFs/images with Gemini, the eTilbudsavis import (sizes, before-prices, paging, naming), verdicts, `/offers`, offers in the shopping list, both command-line tools |
 | `test_basket.py` | Pricing a shopping list: chain grouping, latest prices, size-adjusted comparison, estimates from the chain index, the two-store split, and `POST /basket` |
 | `test_worker.py`, `test_worker_helpers.py` | Saving receipts, unit prices, name normalisation, duplicates, retries and backoff |
 | `test_extractor.py` | The Gemini request and response validation |
@@ -136,6 +137,21 @@ ssh -t vps 'sudo bash /tmp/sjekka-setup/deploy/setup-vps.sh /tmp/sjekka-setup/ci
 Production data lives in `/opt/sjekka/data` and secrets in `/opt/sjekka/.env`. The pipeline never touches either.
 
 Dependabot (`.github/dependabot.yml`) opens a PR every Monday when Python packages, the Python base image or GitHub Actions have new versions. Each runs the full pipeline; nothing is deployed until it's merged.
+
+### Flyer offers
+
+The app imports new flyers from eTilbudsavis (Tjek) by itself: every `FLYER_REFRESH_HOURS` (default 6, `0` turns it off) the worker lists the grocery flyers around Oslo and imports the ones it hasn't seen, with one Gemini text call per flyer to name the products. A flyer that fails is tried again on the next pass. To import by hand, from `/opt/sjekka`:
+
+```bash
+# Every flyer near a point again, replacing earlier imports
+sudo docker compose exec app python util/import_tjek.py
+sudo docker compose exec app python util/import_tjek.py --lat 60.39 --lng 5.32 --radius 30000   # Bergen
+# Or a flyer PDF / page images you have, read by Gemini
+sudo docker compose cp kiwi-uke-43.pdf app:/tmp/
+sudo docker compose exec app python util/import_flyer.py /tmp/kiwi-uke-43.pdf
+```
+
+The eTilbudsavis API is public but undocumented, and we haven't found terms for reuse; the offers page credits it as the source. Gemini's raw answers (and Tjek's original offer data) are kept on each flyer in `flyers.raw_response`.
 
 ### Backups
 

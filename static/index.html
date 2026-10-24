@@ -24,6 +24,7 @@
         <a href="/" class="mark">sjekka</a>
         <nav>
             <a href="/" aria-current="page">utforsk</a>
+            <a href="/tilbud.html">tilbud</a>
             <a href="/handleliste.html">handleliste <span class="list-count" data-list-count hidden></span></a>
             <a href="/upload.html">last opp</a>
         </nav>
@@ -75,6 +76,8 @@
     <script src="/list.js"></script>
     <script>
         let allProducts = [];
+        // The best flyer offer per product this week, for a line on its card
+        const offerFor = new Map();
         // Search, category and sort live in the URL, so a view can be shared
         const params = new URLSearchParams(location.search);
         let activeCategory = params.get("kategori");
@@ -147,30 +150,17 @@
                 if (p.brand) body.append(el("p", "brand", p.brand));
                 body.append(el("p", "price", each));
                 if (unit) body.append(el("p", "unit", unit));
+                const deal = offerFor.get(p.canonical_name);
+                if (deal) body.append(el("p", "deal-tag", `Tilbud hos ${deal.chain}: ${kr.format(deal.each)} kr`));
                 if (p.store_count > 1) body.append(el("p", "stores", `Sammenlign priser i ${p.store_count} butikker`));
                 const where = el("p", "where");
                 where.append(chainBadge(p.store_chain), el("span", "", daysAgo(p.purchase_date)));
                 const card = el("article", "card");
-                card.append(body, where, listToggle(p.canonical_name));
+                card.append(body, where, ShoppingList.toggle(p.canonical_name));
                 return card;
             }));
         }
 
-        function listToggle(name) {
-            const button = el("button", "list-toggle");
-            button.type = "button";
-            const show = () => {
-                const on = ShoppingList.has(name);
-                button.setAttribute("aria-pressed", String(on));
-            };
-            button.setAttribute("aria-label", `Legg ${name} på handlelisten`);
-            button.addEventListener("click", () => {
-                if (ShoppingList.has(name)) ShoppingList.remove(name); else ShoppingList.add(name);
-                show();
-            });
-            show();
-            return button;
-        }
 
         async function load() {
             try {
@@ -186,9 +176,22 @@
                 if (stats.total_items === 1) document.getElementById("stat-items-label").textContent = "registrert pris";
                 renderCategories();
                 renderGrid();
+                loadOffers();
             } catch {
                 document.getElementById("notice").textContent = "Kunne ikke hente priser. Prøv å laste siden på nytt.";
             }
+        }
+
+        async function loadOffers() {
+            try {
+                const res = await fetch("/offers?best=1");
+                if (!res.ok) return;
+                // Listed best first, so the first per product is the one to show
+                for (const o of await res.json()) {
+                    if (!offerFor.has(o.canonical_name) && !["not", "cheaper_elsewhere"].includes(o.verdict.kind)) offerFor.set(o.canonical_name, o);
+                }
+                if (offerFor.size) renderGrid();
+            } catch { /* the cards work without */ }
         }
 
         document.getElementById("search").addEventListener("input", renderGrid);

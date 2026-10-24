@@ -60,6 +60,17 @@ def seed(db_path):
                 receipt_id=receipt.id, canonical_name=name, brand=brand, category=cat, quantity=qty,
                 unit=unit, pack_size=pack, total_price=price, price_per_unit=ppu,
             ))
+        # This week's flyers: a real discount on Seigmenn (12,90 before), and
+        # an offer for a product no receipt has, with the flyer's own claim
+        models.Base.metadata.create_all(engine)
+        week = (today - timedelta(days=2), today + timedelta(days=4))
+        meny = models.Flyer(chain="Meny", valid_from=week[0], valid_to=week[1], source="test")
+        meny.offers.append(models.FlyerOffer(canonical_name="Seigmenn", brand="Laban", quantity=260, unit="g", pack_size=1,
+                                             total_price=9.9, price_per_unit=3.81))
+        rema = models.Flyer(chain="Rema 1000", valid_from=week[0], valid_to=week[1], source="test")
+        rema.offers.append(models.FlyerOffer(canonical_name="Safranboller", unit="stk", pack_size=1, total_price=25,
+                                             price_per_unit=25, pre_price=40, raw_name="SAFRANBOLLER 6 stk"))
+        db.add_all([meny, rema])
         db.commit()
     engine.dispose()
 
@@ -113,7 +124,8 @@ AXE = Path(__file__).parent / "vendor" / "axe.min.js"  # axe-core, pinned (MPL-2
 
 
 @pytest.mark.parametrize("path", ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/finnes-ikke.html", "/personvern.html",
-                                  "/handleliste.html", "/handleliste.html?v=Lettmelk~2&v=Kj%C3%B8ttdeig&v=Safran"])
+                                  "/handleliste.html", "/handleliste.html?v=Lettmelk~2&v=Kj%C3%B8ttdeig&v=Safran",
+                                  "/tilbud.html", "/produkt.html?navn=Seigmenn"])
 def test_pages_pass_automated_accessibility_checks(page, path):
     page.goto(path)
     page.wait_for_load_state("networkidle")
@@ -193,7 +205,7 @@ def test_product_names_are_not_rendered_as_html(page):
 def test_no_horizontal_scroll_on_a_phone(browser, site):
     context = browser.new_context(base_url=site[0], viewport={"width": 360, "height": 740})
     page = context.new_page()
-    for path in ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/handleliste.html?v=Lettmelk&v=Agurk"]:
+    for path in ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/handleliste.html?v=Lettmelk&v=Agurk", "/tilbud.html"]:
         page.goto(path)
         page.wait_for_load_state("networkidle")
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), path
@@ -336,7 +348,7 @@ def test_product_page_tooltip_and_table(page):
 
 def test_unknown_product_page(page):
     page.goto("/produkt.html?navn=Finnes%20ikke")
-    expect(page.locator("#notice")).to_have_text("Fant ingen priser for dette produktet.")
+    expect(page.locator("#notice")).to_have_text("Ingen kvitteringer har denne varen ennå.")
 
 
 SEEDED = {'<img src=x onerror="window.pwned=1">', "Seigmenn", "Agurk", "Lettmelk", "Kjøttdeig"}
@@ -575,3 +587,53 @@ def test_phone_shows_the_total_while_the_result_is_out_of_sight(browser, site):
     page.locator("#verdict").scroll_into_view_if_needed()
     expect(sticky).to_be_hidden()
     context.close()
+
+
+# Flyer offers
+
+def test_offers_page_judges_each_offer(page):
+    page.goto("/tilbud.html")
+    offers = page.locator(".card")
+    expect(offers).to_have_count(2)
+    candy = offers.first
+    expect(candy.locator("h3")).to_have_text("Seigmenn")
+    expect(candy.locator(".deal-verdict")).to_have_text("Ekte tilbud: 23 % under vanlig pris på 4,96 kr / 100 g")
+    expect(candy.locator(".chain img")).to_have_attribute("alt", "Meny")
+    buns = offers.nth(1)
+    expect(buns.locator(".deal-verdict")).to_contain_text("Butikken sier 38 % under førpris på 40,00 kr")
+    expect(buns.locator(".raw")).to_have_text("SAFRANBOLLER 6 stk")
+
+    page.get_by_role("button", name="Rema 1000", exact=True).click()
+    expect(offers).to_have_count(1)
+    expect(page).to_have_url(re.compile(r"kjede=Rema"))
+    page.get_by_role("button", name="Alle", exact=True).click()
+    page.get_by_label("Bare ekte tilbud").check()
+    expect(offers).to_have_count(1)
+    page.get_by_label("Bare ekte tilbud").uncheck()
+    page.fill("#search", "safran")
+    expect(offers).to_have_count(1)
+    page.fill("#search", "")
+
+    candy.get_by_role("button", name="Legg Seigmenn på handlelisten").click()
+    expect(page.locator(".top [data-list-count]")).to_have_text("1")
+
+
+def test_offer_shows_on_the_card_and_product_page(page):
+    page.goto("/")
+    expect(cards(page).filter(has_text="Seigmenn").locator(".deal-tag")).to_have_text("Tilbud hos Meny: 9,90 kr")
+    expect(cards(page).filter(has_text="Lettmelk").locator(".deal-tag")).to_have_count(0)
+
+    page.goto("/produkt.html?navn=Seigmenn")
+    expect(page.locator("#offers-now")).to_be_visible()
+    expect(page.locator("#offers-now .deal-verdict")).to_contain_text("Ekte tilbud")
+    expect(page.locator("#best .label")).to_have_text("Billigst nå, på tilbud")
+    expect(page.locator("#best-price")).to_have_text("9,90 kr")
+
+
+def test_shopping_list_uses_offers(page):
+    page.goto("/handleliste.html?v=Seigmenn&v=Safranboller")
+    candy = page.locator(".list-item", has_text="Seigmenn")
+    expect(candy.locator(".offer-tag")).to_have_text("tilbud")
+    expect(page.locator(".list-item", has_text="Safranboller").locator(".hint .chain img")).to_have_attribute("alt", "Rema 1000")
+    expect(page.locator("#unknown")).to_be_hidden()
+    expect(page.locator("#verdict-note")).to_contain_text("på tilbud her nå")
