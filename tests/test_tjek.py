@@ -1,4 +1,5 @@
 """Importing flyers from eTilbudsavis (Tjek), with the API and Gemini faked."""
+import asyncio
 import json
 from datetime import date
 from types import SimpleNamespace
@@ -182,3 +183,39 @@ def test_cli_empty_catalog(clean, db, capsys):
     finally:
         CATALOGS.pop()
         del OFFERS["empty"]
+
+
+def test_background_refresh_imports_only_new_flyers(clean, db, monkeypatch):
+    calls = []
+    monkeypatch.setattr(tjek, "gemini_names", lambda offers: (calls.append(len(offers)), namer(offers))[1])
+    assert tjek.refresh_new_flyers(fake_api()) == 2
+    assert calls == [2, 150]
+    # The next pass finds nothing new and asks Gemini nothing
+    assert tjek.refresh_new_flyers(fake_api()) == 0
+    assert calls == [2, 150]
+
+
+def test_background_refresh_logs_failures_and_goes_on(clean, db, monkeypatch, caplog):
+    def broken(offers):
+        raise RuntimeError("quota")
+    monkeypatch.setattr(tjek, "gemini_names", broken)
+    assert tjek.refresh_new_flyers(fake_api()) == 0
+    assert "Flyer Kiwi «KIWI uke 43»: quota" in caplog.text
+
+
+def test_refresh_loop_survives_errors(monkeypatch, caplog):
+    passes = []
+
+    def fail():
+        passes.append(1)
+        raise httpx.ConnectError("no network")
+
+    async def stop(seconds):
+        assert seconds == tjek.FLYER_REFRESH_HOURS * 3600
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(tjek, "refresh_new_flyers", fail)
+    monkeypatch.setattr(tjek.asyncio, "sleep", stop)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(tjek.run_refresh())
+    assert passes == [1] and "Flyer refresh failed: no network" in caplog.text

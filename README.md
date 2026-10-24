@@ -140,17 +140,18 @@ Dependabot (`.github/dependabot.yml`) opens a PR every Monday when Python packag
 
 ### Flyer offers
 
-Offers aren't collected automatically yet; run one of these on the server (from `/opt/sjekka`):
+The app imports new flyers from eTilbudsavis (Tjek) by itself: every `FLYER_REFRESH_HOURS` (default 6, `0` turns it off) the worker lists the grocery flyers around Oslo and imports the ones it hasn't seen, with one Gemini text call per flyer to name the products. A flyer that fails is tried again on the next pass. To import by hand, from `/opt/sjekka`:
 
 ```bash
-# This week's flyers from eTilbudsavis (Tjek), around Oslo: one Gemini text call per flyer
+# Every flyer near a point again, replacing earlier imports
 sudo docker compose exec app python util/import_tjek.py
+sudo docker compose exec app python util/import_tjek.py --lat 60.39 --lng 5.32 --radius 30000   # Bergen
 # Or a flyer PDF / page images you have, read by Gemini
 sudo docker compose cp kiwi-uke-43.pdf app:/tmp/
 sudo docker compose exec app python util/import_flyer.py /tmp/kiwi-uke-43.pdf
 ```
 
-The eTilbudsavis API is public but undocumented, and its terms for reuse are unclear; check them before running the import on a schedule. Re-running replaces a flyer's offers. Gemini's raw answers (and Tjek's original offer data) are kept on each flyer in `flyers.raw_response`.
+The eTilbudsavis API is public but undocumented, and we haven't found terms for reuse; the offers page credits it as the source. Gemini's raw answers (and Tjek's original offer data) are kept on each flyer in `flyers.raw_response`.
 
 ### Backups
 

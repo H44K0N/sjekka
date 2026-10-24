@@ -62,20 +62,30 @@ def test_app_starts_and_stops_the_worker(monkeypatch):
 
     events = []
 
-    async def fake_worker():
-        events.append("started")
-        try:
-            await asyncio.sleep(3600)
-        except asyncio.CancelledError:
-            events.append("stopped")
-            raise
+    def fake(name):
+        async def task():
+            events.append(f"{name} started")
+            try:
+                await asyncio.sleep(3600)
+            except asyncio.CancelledError:
+                events.append(f"{name} stopped")
+                raise
+        return task
 
     monkeypatch.setattr(main, "RUN_WORKER", True)
-    monkeypatch.setattr(main.worker, "run_worker", fake_worker)
+    monkeypatch.setattr(main.worker, "run_worker", fake("worker"))
+    monkeypatch.setattr(main.tjek, "run_refresh", fake("flyers"))
     with TestClient(main.app) as client:
         assert client.get("/health").status_code == 200
-        assert events == ["started"]
-    assert events == ["started", "stopped"]
+        assert events == ["worker started", "flyers started"]
+    assert events[2:] == ["worker stopped", "flyers stopped"]
+
+    # FLYER_REFRESH_HOURS=0 leaves the flyers alone
+    events.clear()
+    monkeypatch.setattr(main, "FLYER_REFRESH_HOURS", 0)
+    with TestClient(main.app):
+        pass
+    assert events == ["worker started", "worker stopped"]
 
 
 def test_app_can_run_without_the_worker(monkeypatch):

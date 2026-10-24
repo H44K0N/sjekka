@@ -7,7 +7,9 @@ work, since they must match the names receipts get ("KJØTTDEIG 10 % FETT"
 should become "Kjøttdeig"): Gemini does that in one text-only call per
 flyer, or, without Gemini, names already in the database are matched in the
 heading."""
+import asyncio
 import json
+import logging
 import re
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -19,12 +21,18 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.basket import CHAINS, chain_name
-from app.config import GEMINI_MODEL
+from app.config import FLYER_REFRESH_HOURS, GEMINI_MODEL
+from app.database import SessionLocal
 from app.extractor import DEFINITIONS, client
 from app.schema import Category
 from app.worker import normalize_name
 
+logger = logging.getLogger("sjekka.flyers")
+
 API = "https://squid-api.tjek.com/v2"
+OSLO_POINT = (59.9139, 10.7522)
+RADIUS_M = 20000
+USER_AGENT = "sjekka (+https://sjekka.tischbein.dev)"
 OSLO = ZoneInfo("Europe/Oslo")
 PAGE = 100
 UNITS = {"g": ("g", 1), "kg": ("g", 1000), "ml": ("ml", 1), "l": ("ml", 1000), "cl": ("ml", 10), "dl": ("ml", 100)}
@@ -182,3 +190,47 @@ def import_catalog(db: Session, catalog: dict, offers: list[dict], namer) -> mod
     db.add(flyer)
     db.commit()
     return flyer
+
+
+def refresh(db: Session, client: httpx.Client, namer, lat: float = OSLO_POINT[0], lng: float = OSLO_POINT[1],
+            radius_m: int = RADIUS_M, chains: set[str] | None = None, only_new: bool = False):
+    """Imports the flyers near a point, one at a time, yielding (label, flyer
+    or None, error or None). With `only_new`, flyers imported before are
+    skipped, so each one costs a single Gemini call."""
+    done = {s for (s,) in db.query(models.Flyer.source)} if only_new else set()
+    for catalog in grocery_catalogs(client, lat, lng, radius_m):
+        chain = chain_name(catalog["branding"]["name"])
+        if (chains and chain not in chains) or f"tjek:{catalog['id']}" in done:
+            continue
+        label = f"{chain} «{catalog.get('label') or catalog['id']}»"
+        try:
+            yield label, import_catalog(db, catalog, catalog_offers(client, catalog["id"]), namer), None
+        except Exception as e:  # report it and go on with the next flyer
+            db.rollback()
+            yield label, None, e
+
+
+def refresh_new_flyers(client: httpx.Client | None = None) -> int:
+    """One pass of the background refresh. Returns how many flyers it imported."""
+    client = client or httpx.Client(timeout=30, headers={"User-Agent": USER_AGENT})
+    imported = 0
+    with SessionLocal() as db:
+        for label, flyer, error in refresh(db, client, gemini_names, only_new=True):
+            if error:
+                logger.error(f"Flyer {label}: {error}")
+            elif flyer:
+                imported += 1
+                logger.info(f"Flyer {label}: {len(flyer.offers)} offers, {flyer.valid_from} to {flyer.valid_to}")
+    return imported
+
+
+async def run_refresh():
+    """Looks for new flyers every FLYER_REFRESH_HOURS. The chains start their
+    weeks on different days, so it checks more often than weekly; flyers it
+    has already imported cost nothing."""
+    while True:
+        try:
+            await asyncio.to_thread(refresh_new_flyers)
+        except Exception as e:  # Tjek unreachable and the like: try again next time
+            logger.error(f"Flyer refresh failed: {e}")
+        await asyncio.sleep(FLYER_REFRESH_HOURS * 3600)

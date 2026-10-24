@@ -18,6 +18,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 # Set to 0 to serve the site without processing receipts (browser tests)
 RUN_WORKER = os.getenv("RUN_WORKER", "1") != "0"
+# How often the worker looks for new flyers on eTilbudsavis; 0 turns it off
+FLYER_REFRESH_HOURS = float(os.getenv("FLYER_REFRESH_HOURS", "6"))
 
 UPLOADS_PER_IP_PER_HOUR = int(os.getenv("UPLOADS_PER_IP_PER_HOUR", "10"))
 UPLOADS_PER_DAY = int(os.getenv("UPLOADS_PER_DAY", "200"))

@@ -18,13 +18,14 @@ import logging
 
 from app.config import (
     UPLOAD_DIR, MAX_SIZE_MB, MAX_DIMENSION, JPEG_QUALITY,
-    UPLOADS_PER_IP_PER_HOUR, UPLOADS_PER_DAY, RUN_WORKER,
+    UPLOADS_PER_IP_PER_HOUR, UPLOADS_PER_DAY, RUN_WORKER, FLYER_REFRESH_HOURS,
 )
 from app.database import engine, get_db
 from app import models
 from app import worker
 from app import basket
 from app import flyers
+from app import tjek
 from app.migrations import migrate
 
 # iPhones save photos as HEIC
@@ -41,9 +42,13 @@ for column in migrate(engine):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(worker.run_worker()) if RUN_WORKER else None
+    tasks = []
+    if RUN_WORKER:
+        tasks.append(asyncio.create_task(worker.run_worker()))
+        if FLYER_REFRESH_HOURS > 0:
+            tasks.append(asyncio.create_task(tjek.run_refresh()))
     yield
-    if task:
+    for task in tasks:
         task.cancel()
 
 
