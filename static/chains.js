@@ -12,7 +12,7 @@ const CHAINS = [
     { match: /extra/i, logo: "/chains/extra.png" },
     { match: /\bobs\b/i, logo: "/chains/obs.png" },
     { match: /bunnpris/i, logo: "/chains/bunnpris.png" },
-    { match: /\boda\b/i, logo: "/chains/oda.svg" },
+    { match: /\boda\b/i, logo: "/chains/oda-orange.svg" },
     // Any other chain shows as plain text
 ];
 
