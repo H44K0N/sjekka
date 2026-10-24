@@ -1,43 +1,18 @@
 # How AI is used in Sjekka
 
-AI shows up in two places: **in the product**, where Google Gemini reads receipt photos, and **in development**, where Claude Code (Anthropic) has written and changed much of the code since October 2026. This document records both, so it's clear what the AI did, what a person decided, and how the AI's work is checked.
+AI plays two parts: **in the app**, Google's Gemini reads receipts and names flyer offers; **in building it**, Claude Code (Anthropic) has written most of the code since October 2026, directed by Haakon. This page says what the AI did, what a person decided, how the AI's work was checked, and what went wrong.
 
-Keep it up to date: add a line to the log below for each AI-assisted change.
+## In short
 
-## In the product: Gemini reads the receipts
+- **In the app,** Gemini does two narrow jobs: it reads each receipt photo into fixed fields, and it gives each flyer offer the product name a receipt would use. Everything else, including every calculation, is ordinary code.
+- **In building it,** Haakon described what he wanted in a sentence or two; Claude Code wrote the code, the tests and the docs, opened pull requests and watched them deploy. Haakon decided what to build, judged the results and said when to ship.
+- **How much:** on 24 October 2026 alone, 32 pull requests were merged: about 5,500 new lines in 58 files, and the test suite grew from 110 to 349 tests.
+- **How it was kept honest:** every change went through a pull request and automated checks, bugs got a test that fails without the fix, and the mistakes are recorded below.
+- **In the films,** the voice-over is AI-generated (Kokoro, running locally); the music is a royalty-free track by a human composer. The about page says so.
 
-Every uploaded photo is sent to Gemini (`GEMINI_MODEL`, default `gemini-2.5-flash`), which returns the store, date and each line item as structured data. This is the only AI in the running app.
+## Building Sjekka by describing it
 
-The model is treated as an unreliable component, so its output is constrained and checked:
-
-- **Fixed output shape.** Gemini must answer against a Pydantic response schema (`app/schema.py`), so categories and units can only be values from fixed lists. The answer is validated again before anything is saved; an invalid answer fails the job instead of storing bad data.
-- **No arithmetic by the model.** Gemini reads prices off the receipt, but the price per 100 g/ml or per item is computed in Python (`worker.unit_price`).
-- **Normalised names.** `KJØTTDEIG ` and `kjøttdeig` are stored as `Kjøttdeig` so the same product groups together.
-- **Duplicates.** A receipt with the same store, date and lines as one already saved is not stored twice.
-- **Failures.** Rate limits and outages are retried with backoff; anything else fails the job with the error saved, rather than retrying forever.
-- **Cost and abuse.** Every upload costs a Gemini call, so uploads are rate-limited per client and per day.
-- **Privacy.** Photos are sent to Google's Gemini API to be read, and the upload page says so. The server never serves them and deletes each photo once it has been read. Gemini's raw answer is kept, so the data can be reprocessed later without the photo.
-- **Tests never call Gemini.** It's replaced with fakes, so tests are free, fast and deterministic. Extraction quality itself still has to be checked with real receipts.
-
-Known limits: Gemini can misread blurry or cut-off receipts, and similar products with different names ("Kjøttdeig" vs "Kjøttdeig storfe") aren't merged yet.
-
-## In development: Claude Code
-
-### Phases
-
-| When | Work | AI involvement |
-|---|---|---|
-| 27–28 Apr 2026 | Original app: upload, database, Gemini extraction, job queue, explore page | Scaffolded by Haakon with help from AI. Not marked in the commits. |
-| 15 Oct 2026 | Stopped tracking `.env`, moved the sample database | Not recorded. **TODO (Haakon).** |
-| 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (PR #1) | Claude Code (Claude Opus 5.5) |
-| 23 Oct 2026 | Everything in PRs #2–#11 (log below) | Claude Code (Claude Opus 5.5) |
-| 24 Oct 2026 | PRs #22–#53: shopping list, flyer offers, UI rework, two rounds of customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts (see below) |
-
-Commits Claude worked on carry a `Co-Authored-By: Claude …` trailer, and the PR descriptions say they were generated with Claude Code, so `git log` shows which changes were AI-assisted.
-
-### What directing it looked like
-
-Most of Sjekka from PR #22 on was built by describing outcomes, not code. Haakon wrote a sentence or two; Claude Code read the code and the live site, did the work, wrote the tests, opened the PRs, and reported back. The prompts below are Haakon's own words (typos tidied), next to what came out of each.
+Most of Sjekka from PR #22 on was built by describing outcomes, not code. Haakon wrote a sentence or two; Claude Code read the code and the live site, did the work, wrote the tests, opened the PRs and reported back. These are Haakon's own prompts (typos tidied), next to what each became.
 
 | Haakon wrote | What it became |
 |---|---|
@@ -51,6 +26,8 @@ Most of Sjekka from PR #22 on was built by describing outcomes, not code. Haakon
 | "Do another pass as a customer, look for improvements and root causes for unwanted behavior" | Root causes rather than symptoms: Tjek's tile shop *Megaflis* matched the pattern for *Coop Mega*, and chains publish overlapping weekend flyers. Six fixes, merged in one go (#48–#53). |
 | "They don't tell a story. Frame it as a story: the large chains want you to spend as much as possible on groceries. We are here to declare war on the big chains" | The promo films on the about page: an English voice-over, promo signs piling up in a zigzag, and the reveal of Sjekka as the answer to one question (#46). |
 
+### The decisions that were Haakon's
+
 The judgement calls stayed with Haakon, and several changed the outcome:
 
 - **Asking for a checkpoint** before four PRs were merged at once (the `checkpoint-2026-10-24` tag), so any of it could be rolled back in one step.
@@ -59,21 +36,39 @@ The judgement calls stayed with Haakon, and several changed the outcome:
 - **Product taste.** Oda's logo in its orange ("it's their colour"), the logos without white badges, centred in the ranking, and the story and music for the films.
 - **Knowing when to stop.** When the list suggested "Kokosmelk, Sjokomelk, Litago melk" for "Melk", Claude offered to add a list of base products. Haakon: "Those are still melk, so I think that's OK." No extra code.
 
-### How the work was split
+### What made it work
 
-**Haakon decided:** what to work on and in which order, the visual direction (match tischbein.dev, no emoji, no gradients), keeping Cloudflare's bot protection even though it makes a CI check fail, and when each PR was merged and deployed.
+The prompts were short, but the way of working around them did the heavy lifting:
 
-**Haakon did by hand:** anything needing server root or dashboard access: running the VPS setup script with sudo, changing the SSH `AllowUsers` setting, adding Cloudflare tunnel routes, and the Cloudflare rate-limit rule.
+- **One idea, one pull request.** Each change was its own branch and PR with its own description, so every step could be reviewed, merged or rolled back on its own.
+- **Automated checks as the gate.** Nothing reached production without lint, the full test suite (including browser and accessibility tests), a coverage floor and a smoke test of the image. When CI was red, nothing merged.
+- **A test for every bug.** "Add a test so it cannot happen again" became the rule: the test is checked to fail without the fix, then pass with it.
+- **Checkpoints before big steps.** A git tag before merging several PRs at once meant one command could undo them.
+- **Reviewing by looking, not by reading code.** Haakon judged the work as a customer would: the live site, screenshots of each journey, the videos themselves, and the before-and-after numbers in each PR.
+- **Rules written down.** [`CLAUDE.md`](../CLAUDE.md) holds the project's rules (never call Gemini in tests, migrations for schema changes, Norwegian text, the design), so every AI session starts from the same ground.
 
-**Claude did:** read the code and the server state, proposed and ranked improvements, wrote the code, tests and docs, opened the PRs, watched CI and deploys, and diagnosed failures (for example the SSH `AllowUsers` block and the Cloudflare 403 in CI).
+### Where the AI was held back
+
+The AI didn't have free rein, and the limits held:
+
+- **Merging and deploying needed Haakon's go-ahead.** Claude Code's permission checks refused to merge or deploy without it, even when Claude had asked earlier in the conversation.
+- **The production server stayed off limits.** Claude's SSH user can't read the database or run Docker; a direct log-reading attempt was refused by the permission checks. When a question needed production data (was the 169 kr pizza misread?), Haakon ran the read-only query with his own password and pasted the result.
+- **Access stayed with Haakon.** Server root, the Cloudflare dashboard and the Google AI Studio account were his alone; when the work needed them, he did those steps himself.
+
+### Who did what
+
+**Haakon decided** what to build and in which order, the design (match tischbein.dev, no emoji, no gradients), the trade-offs (keeping Cloudflare's bot protection even though it trips a CI check, running the flyer import in production), the story and sound of the films, and when each change shipped.
+
+**Haakon did by hand** anything needing root or dashboard access: running the server setup with sudo, SSH settings, Cloudflare tunnel routes and rate limits, and queries on the production database.
+
+**Claude did** the reading and the writing: it read the code and the live site, proposed and ranked improvements, wrote the code, tests and docs, opened the PRs, watched CI and deploys, and traced failures to their cause.
 
 ### Guardrails on the AI's work
 
-- **Every change goes through a PR and CI**: lint, shellcheck, 349 tests including browser and accessibility tests, a 95% coverage floor, and a smoke test of the Docker image.
-- **Merging and deploying needed an explicit go-ahead.** Claude Code's permission checks blocked merges and production deploys until Haakon said yes, even when Claude had asked earlier.
-- **Tests were checked against deliberate bugs.** Claude broke the code on purpose (disabled the deploy rollback, loosened input checks, broke the unit-price maths, reintroduced an HTML-injection bug) to confirm the tests catch it.
-- **Deploys roll back automatically** if the new container isn't healthy.
-- **`CLAUDE.md`** holds the project rules for future AI sessions (no Gemini in tests, migrations for schema changes, Norwegian UI text, the design).
+- **Every change goes through a PR and CI:** lint, shellcheck, 349 tests including browser and accessibility tests, a 95 % coverage floor, and a smoke test of the Docker image.
+- **Tests are checked against deliberate bugs.** Claude broke the code on purpose (disabled the deploy rollback, loosened input checks, broke the unit-price maths, reintroduced an HTML-injection bug, restored the old chain pattern) to confirm the tests catch it.
+- **Deploys roll back by themselves** if the new container isn't healthy.
+- **Commits are marked.** Every commit Claude worked on carries a `Co-Authored-By: Claude …` line, and every PR says it was generated with Claude Code, so `git log` shows what was AI-assisted.
 
 ### Mistakes, and how they were caught
 
@@ -90,7 +85,39 @@ The AI's work wasn't right the first time every time. Recorded so the process ca
 - The first promo films had no voice and synthesised music, and Haakon found them flat ("they don't tell a story") and the music "too haunting". Claude can't hear audio, so it had judged the music only by measurements. They were remade with a voice-over and a real royalty-free track (#46, #47).
 - When several PRs were merged in parallel, two of them conflicted in the same test file and the merge stopped without saying so. It was caught by checking the PRs' state, and they were rebased and merged one at a time.
 
+- To work on several PRs at once, Claude made extra git worktrees with a link to the project's Python environment. Removing them afterwards deleted the environment through those links. Only the local setup was affected; it was rebuilt from `requirements-dev.txt` and the full suite passed again.
+
+## Technical details: Gemini in the app
+
+Gemini is treated as an unreliable component: its output is constrained, checked, and never trusted with arithmetic.
+
+**Reading receipts.** Every uploaded photo is sent to Gemini (`GEMINI_MODEL`, default `gemini-2.5-flash`), which returns the store, date and each line.
+
+- **Fixed output shape.** Gemini must answer against a Pydantic schema (`app/schema.py`), so categories and units can only be values from fixed lists. The answer is validated again before anything is saved; an invalid answer fails the job instead of storing bad data.
+- **No arithmetic by the model.** Gemini reads prices off the receipt; the price per 100 g, per 100 ml or per item is computed in Python (`worker.unit_price`). Known misreadings are corrected in code too: a multipack like "4x150g" stored as one cup is repaired to the whole pack.
+- **Normalised names.** `KJØTTDEIG ` and `kjøttdeig` are stored as `Kjøttdeig`, so the same product groups together.
+- **Duplicates.** A receipt with the same store, date and lines as one already saved isn't stored twice.
+- **Failures.** Rate limits and outages are retried with backoff; anything else fails the job with the error saved.
+- **Cost and abuse.** Every upload costs a call, so uploads are rate-limited per client and per day.
+- **Privacy.** The upload page says photos go to Google. The server never serves them and deletes each once read; Gemini's raw answer is kept so the data can be reprocessed without the photo.
+
+**Naming flyer offers.** Every six hours the app fetches new flyers from eTilbudsavis (`app/tjek.py`). Prices, sizes and pack counts come from the flyer data; Gemini gets one text-only call per flyer to give each offer a receipt-style name and brand, and to flag what isn't groceries (those are skipped). The same schema checks apply, and the raw answer is kept on the flyer.
+
+**Tests never call Gemini.** It's replaced with fakes, so tests are free, fast and deterministic. How well Gemini reads real receipts still has to be checked with real receipts.
+
+Known limits: Gemini can misread blurry or cut-off receipts, and slightly different names for the same product ("Kjøttdeig" and "Kjøttdeig storfe") aren't merged.
+
 ## Change log
+
+Add a line here for each AI-assisted change.
+
+| When | Work | AI involvement |
+|---|---|---|
+| 27–28 Apr 2026 | The original app: upload, database, Gemini reading, job queue, explore page | Built by Haakon with help from AI; not marked in the commits |
+| 15 Oct 2026 | Stopped tracking `.env`, moved the sample database | Not recorded. **TODO (Haakon).** |
+| 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
+| 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
+| 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -110,6 +137,11 @@ The AI's work wasn't right the first time every time. Recorded so the process ca
 | #14 | Privacy notice, photos deleted after reading, raw Gemini answers kept | Haakon caught that the video called the photos private while they're sent to Google |
 | #15 | Product page with per-store prices and history; chain logos on cards; CI uses the runner's Chrome | Logo idea from Haakon; chart colours validated, then a logo-per-row design instead of colour per store. CI: 7–10 min → ~1.5 min |
 | #16 | Thank-you page follows the upload live; export of raw Gemini answers | |
+| #17 | Explore page: sorting and shareable views | |
+| #18 | Link previews, a 404 page, caching for static files | |
+| #19 | Weekly dependency updates (Dependabot) | |
+| #20 | Automated accessibility checks (axe-core) on every page | |
+| #21 | Sort menu: tap to reveal instead of text links | |
 | #22 | Privacy page; failed-job photos deleted after 30 days | Haakon asked whether the project was legal; Claude flagged the gaps and wrote the page from what the code does. Not legal advice |
 | #23 | Libron for all text, on the site and the portfolio | Haakon's call; merged by Claude on his say-so |
 | #24 | Shopping list: what the whole list costs in each chain, gaps estimated from a per-chain price index, two-store split | Built unattended overnight from Haakon's brief ("grocery list that auto checks what store is the cheapest"); reviewed and merged by Haakon |
@@ -138,3 +170,4 @@ The AI's work wasn't right the first time every time. Recorded so the process ca
 | #51 | Offer-only products can go on the list from their page | |
 | #52 | Known names suggested for list items without prices | |
 | #53 | The offers page asks for receipts where offers can't be checked | |
+| #54 | This document: an overview in plain words, real prompts and decisions, how the work was done and limited; README and CLAUDE.md made easier to read | Haakon: "showcase how easy it is"; the mistakes section stays |
