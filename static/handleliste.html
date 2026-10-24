@@ -31,7 +31,7 @@
     </header>
 
     <main class="planner-page">
-        <section>
+        <section class="intro" id="intro">
             <p class="meta">Handleliste</p>
             <h1>Hvor er handlelisten billigst?</h1>
             <p class="lede">Skriv opp det du skal handle. Sjekka regner ut hva hele listen koster i hver butikk, ut fra priser på ekte kvitteringer.</p>
@@ -362,16 +362,22 @@
         new IntersectionObserver(([entry]) => { verdictVisible = entry.isIntersecting; showSticky(); })
             .observe($("verdict"));
         function showSticky() {
+            // Kept out of the way while typing, when the keyboard leaves little room
             $("sticky").hidden = verdictVisible || $("verdict").hidden || !matchMedia("(max-width: 860px)").matches ||
-                $("verdict").getBoundingClientRect().top < 0;
+                $("verdict").getBoundingClientRect().top < 0 || document.activeElement === $("add");
+            document.body.classList.toggle("has-sticky", !$("sticky").hidden);
         }
         addEventListener("resize", showSticky);
+        $("add").addEventListener("focus", showSticky);
+        $("add").addEventListener("blur", showSticky);
 
         // ---- keeping it all in step ----
 
         async function update() {
             renderList();
             const items = ShoppingList.read();
+            // Once there's a list, it matters more than the explanation
+            $("intro").classList.toggle("compact", items.length > 0);
             if (!items.length) { result = null; renderResult(); return; }
             request?.abort();
             request = new AbortController();

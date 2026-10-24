@@ -490,10 +490,13 @@ def test_plus_on_a_card_puts_the_product_on_the_list(page):
 
 def test_product_page_button(page):
     page.goto("/produkt.html?navn=Kj%C3%B8ttdeig")
-    button = page.get_by_role("button", name="Legg på handlelisten")
-    button.click()
-    expect(button).to_have_attribute("aria-pressed", "true")
+    page.get_by_role("button", name="Legg på handlelisten").click()
+    added = page.get_by_role("button", name="På handlelisten ✓")
+    expect(added).to_have_attribute("title", "Trykk for å ta den av listen")
     expect(page.locator("#list-link")).to_be_visible()
+    added.click()
+    expect(page.locator("#list-link")).to_be_hidden()
+    page.get_by_role("button", name="Legg på handlelisten").click()
     page.locator("#list-link").click()
     page.wait_for_url("**/handleliste.html")
     assert list_names(page) == ["Kjøttdeig"]
@@ -622,7 +625,9 @@ def test_offers_page_judges_each_offer(page):
     offers = page.locator(".card")
     expect(offers).to_have_count(2)
     candy = offers.first
-    expect(candy.locator("h3")).to_have_text("Seigmenn")
+    # The brand leads; the product name and size come second
+    expect(candy.locator("h3")).to_have_text("Laban seigmenn")
+    expect(candy.locator(".brand")).to_have_text("Seigmenn · 260 g")
     # A short verdict; the explanation and the flyer's own text are folded away
     expect(candy.locator(".verdict-tag")).to_have_text("Ekte tilbud −23 %")
     expect(candy.locator(".deal-verdict")).to_be_hidden()
@@ -751,3 +756,67 @@ def test_every_known_chain_has_a_logo_that_loads(page):
         return [name, img.naturalWidth > 0];
     }))""", names)
     assert dict(badges) == {name: None if name in NO_LOGO else True for name in names}
+
+
+def test_a_card_only_flags_an_offer_that_beats_its_price(page):
+    page.goto("/")
+    beats = page.evaluate("""() => [
+        beats({each: 9.9, per_unit: 3.81, unit: "g"}, {total_price: 38.7, pack_size: 3, price_per_unit: 4.96, unit: "g"}),
+        beats({each: 10, per_unit: 12.82, unit: "g"}, {total_price: 10, pack_size: 1, price_per_unit: 12.82, unit: "g"}),
+        beats({each: 25, per_unit: 25, unit: "stk"}, {total_price: 30, pack_size: 1, price_per_unit: 30, unit: "stk"}),
+        beats({each: 25, per_unit: 25, unit: "stk"}, {total_price: 20, pack_size: 1, price_per_unit: 20, unit: "stk"}),
+    ]""")
+    assert beats == [True, False, True, False]
+
+
+def test_receipt_counts_wait_until_there_are_enough(page):
+    page.goto("/")
+    expect(page.locator("#stat-receipts")).not_to_have_text("–")  # loaded, under 50
+    expect(page.locator("#stats")).to_be_hidden()
+
+
+def test_one_price_has_no_timeline(page):
+    page.goto("/produkt.html?navn=Kj%C3%B8ttdeig")
+    expect(page.locator(".store")).to_have_count(1)
+    expect(page.locator(".store svg")).to_have_count(0)
+    expect(page.locator("#axis")).to_be_hidden()
+    page.goto("/produkt.html?navn=Lettmelk")
+    expect(page.locator(".store svg")).to_have_count(2)
+
+
+def test_an_offer_seen_on_a_receipt_says_so(page):
+    page.goto("/produkt.html?navn=Lettmelk")
+    expect(page.locator(".store")).to_have_count(2)
+    found = page.evaluate("""() => {
+        const offer = {chain: "Kiwi", each: 24.9, valid_from: "2000-01-01", valid_to: "2999-12-31"};
+        return [!!receiptDuring(offer), !!receiptDuring({...offer, each: 19.9}), !!receiptDuring({...offer, chain: "Meny"}),
+                sameChain("KIWI 505 STORO", "Kiwi"), sameChain("Coop Mega", "Coop Prix")];
+    }""")
+    assert found == [True, False, False, True, False]
+
+
+def test_list_explanation_shrinks_once_there_is_a_list(page):
+    page.goto("/handleliste.html")
+    expect(page.locator("#intro .lede")).to_be_visible()
+    page.goto("/handleliste.html?v=Lettmelk")
+    expect(page.locator("#intro")).to_have_class(re.compile("compact"))
+    expect(page.locator("#intro .lede")).to_be_hidden()
+
+
+def test_real_offer_filter_is_hidden_while_no_offer_is_checked(page):
+    def without_real(route):
+        offers = route.fetch().json()
+        for o in offers:
+            o["verdict"]["kind"] = "unknown"
+        route.fulfill(json=offers)
+    page.route("**/offers", without_real)
+    page.goto("/tilbud.html?ekte=1")
+    expect(page.locator(".card")).to_have_count(2)
+    expect(page.get_by_label("Bare ekte tilbud")).to_be_hidden()
+    expect(page.locator("#count")).to_have_text("2 tilbud")
+
+
+def test_upload_offers_the_camera_and_photo_tips(page):
+    page.goto("/upload.html")
+    expect(page.locator("#camera")).to_have_attribute("capture", "environment")
+    expect(page.locator(".tips")).to_contain_text("hele kvitteringen")

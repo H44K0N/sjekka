@@ -16,6 +16,13 @@ const CHAINS = [
     // Any other chain shows as plain text
 ];
 
+// "MENY" on a receipt and "Meny" in a flyer are the same chain
+function sameChain(a, b) {
+    const find = name => name && CHAINS.find(c => c.match.test(name));
+    const ca = find(a), cb = find(b);
+    return ca ? ca === cb : (a || "").toLowerCase() === (b || "").toLowerCase();
+}
+
 function chainBadge(name) {
     const badge = document.createElement("span");
     badge.className = "chain";

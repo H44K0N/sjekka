@@ -106,18 +106,21 @@
             $("more").hidden = matching.length <= showing;
             $("more-button").textContent = `Vis flere (${matching.length - shown.length} til)`;
             const real = offers.filter(o => o.verdict.kind === "real").length;
-            $("count").textContent = offers.length ? `${matching.length} tilbud · ${real} sjekket som ekte` : "";
+            $("count").textContent = offers.length ? `${matching.length} tilbud${real ? ` · ${real} sjekket som ekte` : ""}` : "";
             $("notice").hidden = matching.length > 0;
             $("notice").textContent = offers.length ? "Ingen tilbud passer til valget." : "Ingen kundeaviser er lagt inn for denne uka ennå.";
 
             $("grid").replaceChildren(...shown.map(o => {
                 const body = el("div", "body");
-                const link = el("a", "", o.canonical_name);
+                // "Burn Apple Kiwi" says more than ten cards titled "Energidrikk":
+                // the brand and variant lead, the product name comes second
+                const heading = o.brand ? `${o.brand} ${o.variant || o.canonical_name.toLowerCase()}` : o.canonical_name;
+                const link = el("a", "", heading);
                 link.href = `/produkt.html?navn=${encodeURIComponent(o.canonical_name)}`;
                 const title = el("h3");
                 title.append(link);
                 body.append(title);
-                const about = describe(o);
+                const about = o.brand ? [o.canonical_name, packSize(o)].filter(Boolean).join(" · ") : describe(o);
                 if (about) body.append(el("p", "brand", about));
                 body.append(el("p", "price", offerPrice(o)));
                 const unit = o.unit === "g" || o.unit === "ml" ? `${kr.format(o.per_unit)} kr / 100 ${o.unit}` : o.pack_size > 1 ? `${kr.format(o.each)} kr / stk` : "";
@@ -146,6 +149,12 @@
 
         fetch("/offers").then(r => { if (!r.ok) throw new Error(); return r.json(); }).then(data => {
             offers = data;
+            // Until receipts from before an offer exist, the filter only ever
+            // empties the page
+            if (!offers.some(o => o.verdict.kind === "real")) {
+                $("real-only").checked = false;
+                $("real-only").closest("label").hidden = true;
+            }
             renderChains();
             render();
         }).catch(() => { $("notice").textContent = "Kunne ikke hente tilbudene. Prøv å laste siden på nytt."; });
