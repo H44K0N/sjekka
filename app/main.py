@@ -28,6 +28,7 @@ from app import worker
 from app import basket
 from app import flyers
 from app import tjek
+from app import receipt_files
 from app.migrations import migrate
 
 # iPhones save photos as HEIC
@@ -132,6 +133,18 @@ async def upload_receipt(request: Request, file: UploadFile = File(...), db: Ses
 
     data = await file.read()
 
+    # A PDF, CSV or JSON receipt is stored as it is (checked, text as UTF-8)
+    # and read by Gemini from the file; anything else must be a photo
+    kind = receipt_files.kind_of(file.filename, data)
+    if kind:
+        try:
+            stored = receipt_files.check(kind, data)
+        except receipt_files.ReceiptFileError as e:
+            raise HTTPException(400, str(e)) from None
+        filename = f"{uuid.uuid4()}.{kind}"
+        (UPLOAD_DIR / filename).write_bytes(stored)
+        return queue_job(db, ip, filename)
+
     if len(data) > MAX_SIZE_MB * 1024 * 1024:
         raise HTTPException(400, f"Bildet er for stort. Maks {MAX_SIZE_MB} MB.")
 
@@ -149,14 +162,16 @@ async def upload_receipt(request: Request, file: UploadFile = File(...), db: Ses
     filename = f"{uuid.uuid4()}.jpg"
     filepath = UPLOAD_DIR / filename
     img.save(filepath, format="JPEG", quality=JPEG_QUALITY, optimize=True)
+    return queue_job(db, ip, filename)
 
+
+def queue_job(db: Session, ip: str, filename: str) -> JSONResponse:
+    """Queues a stored upload for the worker and counts it towards the limits."""
     job = models.Job(filename=filename)
     db.add(job)
     db.commit()
     recent_uploads[ip].append(time.monotonic())
-
     logger.info(f"📥 Job created for {filename}")
-
     return JSONResponse({"id": filename})
 
 @app.get("/health")

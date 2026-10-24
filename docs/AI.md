@@ -85,7 +85,7 @@ The AI's work wasn't right the first time every time. Recorded so the process ca
 - The first promo films had no voice and synthesised music, and Haakon found them flat ("they don't tell a story") and the music "too haunting". Claude can't hear audio, so it had judged the music only by measurements. They were remade with a voice-over and a real royalty-free track (#46, #47).
 - When several PRs were merged in parallel, two of them conflicted in the same test file and the merge stopped without saying so. It was caught by checking the PRs' state, and they were rebased and merged one at a time.
 
-- To work on several PRs at once, Claude made extra git worktrees with a link to the project's Python environment. Removing them afterwards deleted the environment through those links. Only the local setup was affected; it was rebuilt from `requirements-dev.txt` and the full suite passed again.
+- To work on several PRs at once, Claude made extra git worktrees with a symlink to the project's Python environment. `.gitignore` listed `.venv/`, which ignores folders but not links, so a `git add -A` committed the link (#50); pulling it replaced the real environment, twice. Only the local setup was affected: `.gitignore` now says `.venv`, the link is gone from the repo, and the environment was rebuilt from `requirements-dev.txt`.
 
 ## Technical details: Gemini in the app
 
@@ -171,3 +171,4 @@ Add a line here for each AI-assisted change.
 | #52 | Known names suggested for list items without prices | |
 | #53 | The offers page asks for receipts where offers can't be checked | |
 | #54 | This document: an overview in plain words, real prompts and decisions, how the work was done and limited; README and CLAUDE.md made easier to read | Haakon: "showcase how easy it is"; the mistakes section stays |
+| #55 | Receipts as files: PDF, CSV or JSON, through the same queue and Gemini reading as photos | Haakon picked digital receipts from the data-source research; `.gitignore` fixed after a `.venv` link was committed |
