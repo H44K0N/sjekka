@@ -185,6 +185,8 @@ The chain logos in `static/chains/` come from Wikimedia Commons, apart from Oda'
 
 `docs/video/make.sh` records two narrated walkthroughs of the real app and worker on demo data, driven by Playwright, with the Gemini call replaced by a fixed answer: `sjekka-showcase.mp4` (desktop, 1920×1080, with a mouse pointer and slides on the architecture and the pipeline) and `sjekka-mobile.mp4` (phone, 1080×1920, with a touch dot, the features only). The phone video shows the site in a phone-width iframe scaled up, since Playwright records CSS pixels. The voice-over is generated locally with [Kokoro](https://github.com/thewh1teagle/kokoro-onnx), an open-source text-to-speech model; the narration in `docs/video/narration.py` sets the pace, since each scene holds until its line is spoken. Setup is in the comment at the top of `make.sh`; without the voice model it makes silent versions. The videos aren't committed. Rerun it after visible changes; facts in the script and slides (like the test count) are in `narration.py` and `slides.html`.
 
+The about page (`static/om.html`) shows two short promo films, `static/video/sjekka-desktop.mp4` and `sjekka-mobil.mp4`: what Sjekka does in under a minute, with big captions and no voice. `docs/video/promo.sh` records them the same way, on the demo data, and adds a quiet background track that `docs/video/music.py` synthesises (a slow lo-fi loop, so there's no licence to worry about). Unlike the walkthroughs, they are committed, since the site serves them. Give them new names when they change: browsers and Cloudflare keep them for a while.
+
 ---
 
 ## AI use

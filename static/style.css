@@ -909,3 +909,20 @@ body.has-sticky main { padding-bottom: 88px; }
   .intro.home .lede { font-size: 16px; }
   .intro.home .actions { margin-top: 20px; }
 }
+
+/* About page: the two promo films side by side at the same height (16:9 next
+   to 9:16 needs a 3.16 : 1 split), stacked with the phone one first on phones */
+.about .lede { max-width: 38em; }
+.promo { display: grid; grid-template-columns: 3.16fr 1fr; gap: 16px; align-items: start; margin: 48px 0 0; }
+.promo figure { margin: 0; }
+.promo video { display: block; width: 100%; height: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.promo .wide video { aspect-ratio: 16 / 9; }
+.promo .tall video { aspect-ratio: 9 / 16; }
+.promo figcaption { margin-top: 8px; font-size: 13px; color: var(--soft); }
+.about-facts { max-width: 720px; margin-top: 56px; }
+.about-facts a { color: var(--text); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; }
+footer a[aria-current="page"] { color: var(--text); }
+@media (max-width: 700px) {
+  .promo { grid-template-columns: 1fr; }
+  .promo .tall { order: -1; max-width: 320px; margin: 0 auto; width: 100%; }
+}
