@@ -958,11 +958,10 @@ def test_offers_ask_for_receipts_while_most_cannot_be_checked(page):
 
 def test_a_receipt_can_be_uploaded_as_a_file(page, tmp_path):
     page.goto("/upload.html")
-    link = page.get_by_text("Har du kvitteringen som fil? Last opp PDF, CSV eller JSON i stedet")
-    expect(link).to_be_visible()
+    expect(page.locator("#hint")).to_have_text("Bilde (JPEG, PNG, WebP, HEIC), PDF, CSV eller JSON · maks 10 MB")
     receipt = tmp_path / "kvittering.csv"
     receipt.write_text("Vare;Pris\nTine Lettmelk 1 l;24,90\n", encoding="utf-8")
-    page.set_input_files("#receipt-file", str(receipt))
+    page.set_input_files("#receipt", str(receipt))
     expect(page.locator("#prompt")).to_have_text("Fil valgt")
     expect(page.locator("#file-name")).to_have_text("kvittering.csv")
     page.locator("#btn").click()
@@ -974,6 +973,6 @@ def test_the_upload_page_turns_away_other_files(page, tmp_path):
     page.goto("/upload.html")
     other = tmp_path / "notes.txt"
     other.write_text("hei")
-    page.set_input_files("#receipt-file", str(other))
+    page.set_input_files("#receipt", str(other))
     expect(page.locator("#status")).to_contain_text("PDF, CSV eller JSON")
     expect(page.locator("#btn")).to_be_disabled()
