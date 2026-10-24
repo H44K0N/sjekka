@@ -668,3 +668,70 @@ def test_shopping_list_uses_offers(page):
     expect(page.locator(".list-item", has_text="Safranboller").locator(".hint .chain img")).to_have_attribute("alt", "Rema 1000")
     expect(page.locator("#unknown")).to_be_hidden()
     expect(page.locator("#verdict-facts")).to_contain_text("1 vare på tilbud")
+
+
+def test_whole_prices_drop_the_decimals(page):
+    page.goto("/")
+    formatted = page.evaluate("() => [15, 15.001, 24.9, 0.5, 99.99].map(kr.format)")
+    assert formatted == ["15", "15", "24,90", "0,50", "99,99"]
+
+
+def test_every_offer_verdict_has_a_tag_and_a_sentence(page):
+    page.goto("/tilbud.html")
+    verdicts = page.evaluate("""() => {
+        const base = {usual: 30, per: "stk", discount: null, cheaper_chain: null, cheaper_price: null};
+        return [
+            {kind: "real", discount: 0.3}, {kind: "small", discount: 0.05}, {kind: "not", discount: -0.1},
+            {kind: "not", discount: 0.01}, {kind: "cheaper_elsewhere", cheaper_chain: "Kiwi", cheaper_price: 20},
+            {kind: "cheapest_known"}, {kind: "claimed", discount: 0.25, pre_price: 40}, {kind: "unknown"},
+        ].map(v => {
+            const o = {verdict: {...base, ...v}};
+            return [verdictTag(o).textContent, offerVerdict(o).textContent];
+        });
+    }""")
+    assert verdicts == [
+        ["Ekte tilbud −30 %", "30 % under vanlig pris i butikken, som var 30 kr / stk."],
+        ["Bare −5 %", "Bare 5 % under vanlig pris i butikken, som var 30 kr / stk."],
+        ["Dyrere enn vanlig", "Dyrere enn vanlig pris i butikken, som var 30 kr / stk."],
+        ["Vanlig pris", "Omtrent vanlig pris i butikken (30 kr / stk)."],
+        ["Billigere hos Kiwi", "Uten tilbud er den billigere hos  20 kr / stk"],
+        ["Lavest kjente pris", "Lavere enn prisene vi kjenner fra andre butikker. Vi har ingen kvittering fra denne butikken å sammenligne med."],
+        ["Butikken sier −25 %", "Kundeavisen sier 25 % under førpris på 40 kr. Ikke sjekket mot kvitteringer ennå."],
+        ["Ikke sjekket ennå", "Ingen kvitteringer å sammenligne med ennå."],
+    ]
+
+
+def test_offers_page_shows_a_page_at_a_time_and_remembers_the_filter(page):
+    page.goto("/tilbud.html?ekte=1")
+    expect(page.get_by_label("Bare ekte tilbud")).to_be_checked()
+    expect(page.locator(".card")).to_have_count(1)
+    page.get_by_label("Bare ekte tilbud").uncheck()
+    # Fifty copies of the two offers: 48 at first, the rest on request
+    page.evaluate("() => { offers = Array.from({length: 50}, (_, i) => offers[i % 2]); render(); }")
+    expect(page.locator(".card")).to_have_count(48)
+    page.get_by_role("button", name="Vis flere (2 til)").click()
+    expect(page.locator(".card")).to_have_count(50)
+    expect(page.locator("#more")).to_be_hidden()
+
+
+def test_explanations_are_folded_away_until_asked_for(page):
+    page.goto("/tilbud.html")
+    method = page.locator("details.method")
+    expect(method.locator("summary")).to_have_text("Slik sjekker vi tilbudene")
+    expect(method).not_to_have_attribute("open", "")
+    method.locator("summary").click()
+    expect(method).to_have_attribute("open", "")
+
+
+@pytest.mark.parametrize("path", ["/", "/tilbud.html", "/handleliste.html", "/produkt.html?navn=Lettmelk", "/personvern.html"])
+def test_upload_link_stands_out_in_the_menu(page, path):
+    page.goto(path)
+    expect(page.locator(".top nav a.cta")).to_have_attribute("href", "/upload.html")
+
+
+def test_list_says_how_many_prices_are_estimated(page):
+    # Rema has milk but no cucumber, and is still cheapest with an estimate for it
+    page.goto("/handleliste.html?v=Lettmelk&v=Agurk")
+    expect(page.locator("#verdict .chain img")).to_have_attribute("alt", "Rema 1000")
+    expect(page.locator("#verdict-facts")).to_have_text("1 pris anslått")
+
