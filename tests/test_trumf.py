@@ -118,3 +118,48 @@ def test_the_worker_names_trumf_lines_with_the_known_names(client, db, monkeypat
     while job := worker.next_job(db):
         asyncio.run(worker.process_job(job, db))
     assert seen == [["Lettmelk", "Appelsiner"]]
+
+
+def old_way(db, batch, data, model="gemini-2.5-flash"):
+    """A history as it was read before the parser: its original kept, its
+    parts read by Gemini, and what Gemini found saved."""
+    from app.config import ORIGINALS_DIR
+    (ORIGINALS_DIR / f"{batch}.json").write_bytes(data)
+    job = models.Job(filename=f"{batch}-001.json", batch=batch, status="done", model=model)
+    db.add(job)
+    db.flush()
+    receipt = models.Receipt(image_filename=job.filename, store_chain="Meny")
+    db.add(receipt)
+    db.flush()
+    db.add(models.ReceiptItem(receipt_id=receipt.id, canonical_name="Lettmelk", total_price=24.9))
+    db.commit()
+
+
+def test_a_history_read_the_old_way_is_read_again_once(client, db, monkeypatch):
+    from app.config import ORIGINALS_DIR
+    data = json.dumps(HISTORY, ensure_ascii=False).encode()
+    old_way(db, "hist", data)
+    photo = models.Receipt(image_filename="photo.jpg", store_chain="Kiwi")
+    db.add(photo)
+    db.commit()
+
+    assert worker.reread_trumf_histories(db) == 1
+    assert [r.image_filename for r in db.query(models.Receipt)] == ["photo.jpg"]  # only the history's receipts went
+    job, = db.query(models.Job).filter_by(batch="hist").all()
+    assert (job.status, job.model) == ("pending", None)
+    assert worker.reread_trumf_histories(db) == 0  # queued again, not read again again
+
+    monkeypatch.setattr(trumf, "gemini_names", namer())
+    asyncio.run(worker.process_job(worker.next_job(db), db))
+    assert db.query(models.Job).filter_by(batch="hist").one().model.startswith(trumf.MODEL_PREFIX)
+    assert db.query(models.Receipt).count() == 3  # the photo, and both receipts in the history
+    assert worker.reread_trumf_histories(db) == 0
+    (ORIGINALS_DIR / "hist.json").unlink()
+
+
+def test_other_files_are_not_read_again(client, db):
+    from app.config import ORIGINALS_DIR
+    old_way(db, "export", b'{"varer": [{"navn": "AGURK", "pris": 15}]}')
+    assert worker.reread_trumf_histories(db) == 0
+    assert db.query(models.Receipt).count() == 1
+    (ORIGINALS_DIR / "export.json").unlink()

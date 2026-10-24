@@ -175,3 +175,4 @@ Add a line here for each AI-assisted change.
 | #56 | Trumf histories read from the file: exact prices, dates and weights; Gemini only names the lines | From the first real upload: Gemini read 93 % of 221 receipts exactly, but the file needs no reading at all |
 | #57 | A photo and a Trumf export of the same shop count once; the copy already saved is removed | Rule checked on production data first: it found exactly the one known duplicate, and nothing near it |
 | #58 | Names that match: Gemini reuses known product names everywhere, brands kept out of names, chains under one name, florists out of comparisons; answers no longer cut off | From the first real upload: 482 receipt names and 864 offer names shared only 105; one part failed with Gemini's answer cut short |
+| #59 | The first Trumf history read again with the parser | Dry-run on production first: it touches only that history's 258 receipts |

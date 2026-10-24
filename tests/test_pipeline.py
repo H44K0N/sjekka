@@ -124,10 +124,12 @@ def test_worker_loop_repairs_multipacks_when_it_starts(client, db, fake_gemini, 
     monkeypatch.setattr(worker, "POLL_INTERVAL", 0.01)
     repaired = []
     monkeypatch.setattr(worker, "repair_multipacks", lambda session: repaired.append("multipacks") or 0)
+    monkeypatch.setattr(worker, "repair_chain_names", lambda session: repaired.append("chains") or 0)
     monkeypatch.setattr(worker, "repair_duplicates", lambda session: repaired.append("duplicates") or 0)
+    monkeypatch.setattr(worker, "reread_trumf_histories", lambda session: repaired.append("histories") or 0)
     upload(client)
     run_worker_until(lambda: db.query(models.Job).one().status == "done", db)
-    assert repaired == ["multipacks", "duplicates"]
+    assert repaired == ["multipacks", "chains", "duplicates", "histories"]
 
 
 def test_worker_loop_survives_unexpected_errors(client, db, fake_gemini, monkeypatch):
