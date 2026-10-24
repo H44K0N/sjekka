@@ -208,7 +208,7 @@ def test_every_page_links_to_the_privacy_and_about_pages(client):
 
 def test_the_about_page_has_both_films(client):
     html = client.get("/om.html").text
-    for name in ["sjekka-story-desktop", "sjekka-story-mobil"]:
+    for name in ["sjekka-film-desktop", "sjekka-film-mobil"]:
         assert f'src="/video/{name}.mp4"' in html and f'poster="/video/{name}.jpg"' in html
         video = client.get(f"/video/{name}.mp4")
         assert video.status_code == 200 and video.headers["content-type"] == "video/mp4"

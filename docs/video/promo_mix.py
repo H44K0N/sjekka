@@ -32,7 +32,7 @@ filters += [
     f"{''.join(voices)}amix=inputs={len(voices)}:normalize=0,apad,asplit=2[voice][key]",
     f"{''.join(effects)}amix=inputs={len(effects)}:normalize=0,apad[fx]",
     # The music sits low, and dips further while the voice speaks
-    "[1:a]aformat=channel_layouts=stereo,volume=0.32[bed]",
+    "[1:a]aresample=48000,aformat=channel_layouts=stereo,volume=0.32[bed]",
     "[bed][key]sidechaincompress=threshold=0.02:ratio=6:attack=20:release=400[ducked]",
     "[voice][fx][ducked]amix=inputs=3:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[mix]",
 ]
