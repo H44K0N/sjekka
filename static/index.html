@@ -9,7 +9,7 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Sjekka">
     <meta property="og:title" content="Sjekka – Matpriser fra ekte kvitteringer">
-    <meta property="og:description" content="Del kvitteringen din, og se hva varene koster i hver butikk.">
+    <meta property="og:description" content="Del kvitteringen din og se hva varene koster i hver butikk.">
     <meta property="og:url" content="https://sjekka.tischbein.dev/">
     <meta property="og:image" content="https://sjekka.tischbein.dev/og.png">
     <meta property="og:image:width" content="1200">
@@ -31,11 +31,11 @@
     <main>
         <section class="intro">
             <p class="meta">Matpriser fra ekte kvitteringer</p>
-            <h1>Sammen gjør vi matprisene transparente.</h1>
-            <p class="lede">Hver kvittering du deler hjelper folk i hele landet å handle smartere og spare penger.</p>
+            <h1>Sammen gjør vi matprisene synlige.</h1>
+            <p class="lede">Hver kvittering du deler, hjelper folk i hele landet å handle billigere.</p>
             <p class="stats">
-                <span><b id="stat-receipts">–</b><span id="stat-receipts-label">kvitteringer delt</span></span>
-                <span><b id="stat-items">–</b><span id="stat-items-label">priser registrert</span></span>
+                <span><b id="stat-receipts">–</b><span id="stat-receipts-label">delte kvitteringer</span></span>
+                <span><b id="stat-items">–</b><span id="stat-items-label">registrerte priser</span></span>
             </p>
             <div class="actions">
                 <a class="button primary" href="/upload.html">Last opp kvittering <span class="arrow">→</span></a>
@@ -130,7 +130,7 @@
                 allProducts.length ? `${filtered.length} ${filtered.length === 1 ? "produkt" : "produkter"}` : "";
             const notice = document.getElementById("notice");
             notice.hidden = filtered.length > 0;
-            notice.textContent = allProducts.length ? "Ingen produkter passer søket." : "Ingen priser ennå. Last opp den første kvitteringen.";
+            notice.textContent = allProducts.length ? "Ingen produkter passer til søket." : "Ingen priser ennå. Last opp den første kvitteringen.";
 
             document.getElementById("grid").replaceChildren(...filtered.map(p => {
                 const { each, unit } = prices(p);
@@ -139,7 +139,7 @@
                 if (p.brand) body.append(el("p", "brand", p.brand));
                 body.append(el("p", "price", each));
                 if (unit) body.append(el("p", "unit", unit));
-                if (p.store_count > 1) body.append(el("p", "stores", `Sammenlign ${p.store_count} butikker`));
+                if (p.store_count > 1) body.append(el("p", "stores", `Sammenlign priser i ${p.store_count} butikker`));
                 const where = el("p", "where");
                 where.append(chainBadge(p.store_chain), el("span", "", daysAgo(p.purchase_date)));
                 const card = el("a", "card");
@@ -159,8 +159,8 @@
                 const stats = await statsRes.json();
                 document.getElementById("stat-receipts").textContent = whole.format(stats.total_receipts);
                 document.getElementById("stat-items").textContent = whole.format(stats.total_items);
-                if (stats.total_receipts === 1) document.getElementById("stat-receipts-label").textContent = "kvittering delt";
-                if (stats.total_items === 1) document.getElementById("stat-items-label").textContent = "pris registrert";
+                if (stats.total_receipts === 1) document.getElementById("stat-receipts-label").textContent = "delt kvittering";
+                if (stats.total_items === 1) document.getElementById("stat-items-label").textContent = "registrert pris";
                 renderCategories();
                 renderGrid();
             } catch {
