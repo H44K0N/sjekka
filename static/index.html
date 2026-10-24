@@ -61,6 +61,7 @@
                     </div>
                 </div>
             </div>
+            <a class="offer-hits" id="offer-hits" hidden></a>
             <div class="grid" id="grid"></div>
             <p class="notice" id="notice">Henter priser …</p>
         </section>
@@ -78,6 +79,7 @@
         let allProducts = [];
         // The best flyer offer per product this week, for a line on its card
         const offerFor = new Map();
+        let offerNames = [];  // this week's best offer per product, for search
         const STATS_FROM = 50;
 
         // An offer is only worth flagging on the card when it beats the price
@@ -146,7 +148,16 @@
                 allProducts.length ? `${filtered.length} ${filtered.length === 1 ? "produkt" : "produkter"}` : "";
             const notice = document.getElementById("notice");
             notice.hidden = filtered.length > 0;
-            notice.textContent = allProducts.length ? "Ingen produkter passer til søket." : "Ingen priser ennå. Last opp den første kvitteringen.";
+            notice.textContent = allProducts.length ? "Ingen kvitteringer har det du søker etter ennå." : "Ingen priser ennå. Last opp den første kvitteringen.";
+
+            // Receipts are few, flyers many: a search that finds offers says so,
+            // so "kaffe" doesn't end in "nothing" while coffee is on offer
+            const hits = query ? offerNames.filter(o => o.canonical_name.toLowerCase().includes(query) ||
+                (o.brand || "").toLowerCase().includes(query) || (o.raw_name || "").toLowerCase().includes(query)).length : 0;
+            const link = document.getElementById("offer-hits");
+            link.hidden = hits === 0;
+            link.textContent = `${hits} ${hits === 1 ? "vare" : "varer"} på tilbud denne uka passer «${query}» →`;
+            link.href = `/tilbud.html?q=${encodeURIComponent(query)}`;
 
             document.getElementById("grid").replaceChildren(...filtered.map(p => {
                 const { each, unit } = prices(p);
@@ -208,11 +219,12 @@
             try {
                 const res = await fetch("/offers?best=1");
                 if (!res.ok) return;
+                offerNames = await res.json();
                 // Listed best first, so the first per product is the one to show
-                for (const o of await res.json()) {
+                for (const o of offerNames) {
                     if (!offerFor.has(o.canonical_name) && !["not", "cheaper_elsewhere"].includes(o.verdict.kind)) offerFor.set(o.canonical_name, o);
                 }
-                if (offerFor.size) renderGrid();
+                if (offerNames.length) renderGrid();
             } catch { /* the cards work without */ }
         }
 
