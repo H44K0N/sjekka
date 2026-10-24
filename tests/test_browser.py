@@ -171,7 +171,7 @@ def test_search_matches_name_and_brand(page):
     expect(cards(page)).to_have_count(1)
     page.fill("#search", "finnes ikke")
     expect(cards(page)).to_have_count(0)
-    expect(page.locator("#notice")).to_have_text("Ingen produkter passer søket.")
+    expect(page.locator("#notice")).to_have_text("Ingen produkter passer til søket.")
 
 
 def test_category_filter(page):
@@ -304,7 +304,7 @@ def test_cards_show_chain_logos_or_colours(page):
 def test_card_opens_the_product_page(page):
     page.goto("/")
     milk = cards(page).filter(has_text="Lettmelk")
-    expect(milk.locator(".stores")).to_have_text("Sammenlign 2 butikker")
+    expect(milk.locator(".stores")).to_have_text("Sammenlign priser i 2 butikker")
     milk.click()
     page.wait_for_url("**/produkt.html?navn=Lettmelk")
     expect(page.locator("h1")).to_have_text("Lettmelk")

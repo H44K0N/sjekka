@@ -110,7 +110,7 @@
             let v0 = Math.min(...values), v1 = Math.max(...values);
             const pad = Math.max((v1 - v0) * 0.15, v1 * 0.05);
             v0 -= pad; v1 += pad;
-            $("scale-note").textContent = `Tidslinjene viser ${unitLabel(cheapest)}, samme skala for alle butikker`;
+            $("scale-note").textContent = `Tidslinjene viser ${unitLabel(cheapest)}, med lik skala for alle butikker`;
             const fmtDate = t => new Date(t).toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
             $("axis").children[0].textContent = fmtDate(t0);
             $("axis").children[1].textContent = fmtDate(t1);

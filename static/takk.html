@@ -39,7 +39,7 @@
                 <ul class="items" id="items" hidden></ul>
             </div>
             <div class="actions">
-                <a class="button primary" href="/upload.html">Last opp en til <span class="arrow">→</span></a>
+                <a class="button primary" href="/upload.html">Last opp flere <span class="arrow">→</span></a>
                 <a class="button" href="/">Se prisene</a>
             </div>
         </section>
@@ -114,7 +114,7 @@
             if (job.status === "failed") return setState("Kunne ikke lese kvitteringen. Prøv et skarpere bilde der hele kvitteringen er med.", "error");
 
             if (job.status === "processing") setState("Gemini leser kvitteringen …", "busy");
-            else if (job.retrying) setState("Gemini er opptatt. Prøver igjen om litt …", "busy");
+            else if (job.retrying) setState("Gemini er opptatt. Vi prøver igjen om litt …", "busy");
             else setState(job.queue_position > 1 ? `I kø, nummer ${job.queue_position} …` : "I kø …", "busy");
 
             if (Date.now() - started < GIVE_UP_MS) setTimeout(poll, POLL_MS);
