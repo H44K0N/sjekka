@@ -74,6 +74,7 @@ def test_flyer_prompt_names_products_like_receipts():
     # The same definitions, so offers and receipt lines get the same names
     assert extractor.DEFINITIONS in extractor.PROMPT
     assert extractor.DEFINITIONS in extractor.FLYER_PROMPT
+    assert "4x150g\" → quantity: 600" in extractor.DEFINITIONS
 
 
 def test_extract_flyer_rejects_other_files(tmp_path):
@@ -128,6 +129,12 @@ def test_import_stores_offers_with_dates_and_raw_answer(clean, db, tmp_path):
     assert (mince.canonical_name, mince.brand, mince.price_per_unit) == ("Kjøttdeig", "Gilde", 9.97)
     assert (soda.pack_size, soda.deal, soda.price_per_unit) == (2, "2 for 50", 1.67)
     assert oranges.total_price is None
+
+
+def test_import_prices_a_multipack_for_the_whole_pack(clean, db, tmp_path):
+    raw = answer([offer("Yoghurt 4x150g", 30, quantity=150, unit="g")], valid_from="2026-10-20", valid_to="2026-10-26")
+    yoghurt, = flyers.import_flyer(db, flyer_file(tmp_path), read=lambda p: raw).offers
+    assert (yoghurt.quantity, yoghurt.price_per_unit) == (600, 5.0)
 
 
 def test_import_arguments_win_over_what_gemini_read(clean, db, tmp_path):

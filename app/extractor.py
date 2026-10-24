@@ -32,6 +32,7 @@ DEFINITIONS = """## DEFINITIONS
   - 260g bag → quantity: 260, unit: "g"
   - 1 litre → quantity: 1000, unit: "ml"
   - Single item with no size → quantity: null, unit: "stk"
+  - Multipack sold as one item, "Yoghurt 4x150g" → quantity: 600, unit: "g" (the whole package)
 
 **pack_size**: How many units were purchased on this line item.
   - Bought 1 → pack_size: 1

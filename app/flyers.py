@@ -17,7 +17,7 @@ from app.basket import chain_name
 from app.config import GEMINI_MODEL
 from app.extractor import extract_flyer
 from app.schema import ExtractedFlyer
-from app.worker import is_retryable, normalize_name, parse_date, unit_price
+from app.worker import is_retryable, multipack_quantity, normalize_name, parse_date, unit_price
 
 ATTEMPTS = 4
 RETRY_SECONDS = 20
@@ -70,6 +70,7 @@ def import_flyer(db: Session, path: Path, chain: str | None = None, valid_from: 
     flyer = models.Flyer(chain=chain, valid_from=valid_from, valid_to=valid_to, source=path.name,
                          raw_response=raw, model=GEMINI_MODEL)
     for offer in data.offers:
+        offer.quantity = multipack_quantity(offer.raw_name, offer.quantity, offer.unit, offer.pack_size)
         flyer.offers.append(models.FlyerOffer(
             raw_name=offer.raw_name,
             canonical_name=normalize_name(offer.canonical_name),

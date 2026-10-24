@@ -41,6 +41,23 @@ def test_unit_price(fields, expected):
     assert worker.unit_price(item(**fields)) == expected
 
 
+@pytest.mark.parametrize("raw, quantity, unit, pack, expected", [
+    ("Yoghurt kokos 4x150g tine", 150, "g", 1, 600),        # the size of one cup: fixed
+    ("Yoghurt kokos 4x150g tine", 600, "g", 1, 600),        # already the whole pack
+    ("Farris 6 × 0,5 l", 500, "ml", 1, 3000),
+    ("Cola 6x33cl", 330, "ml", 1, 1980),
+    ("Pølser 2 X 1kg", 1000, "g", 1, 2000),
+    ("Yoghurt 4x150g", 150, "g", 4, 150),                   # bought as four: priced per item already
+    ("Yoghurt 4x150g", 150, "ml", 1, 150),                  # units disagree: leave it
+    ("Pizza grandiosa hj.laget m/ kjøttdeig 1kg", 1000, "g", 1, 1000),
+    ("Hamburgerbrød 1x6stk", 6, "stk", 1, 6),
+    ("Tørkerull 30x40cm", None, "stk", 1, None),
+    (None, 150, "g", 1, 150),
+])
+def test_multipack_quantity(raw, quantity, unit, pack, expected):
+    assert worker.multipack_quantity(raw, quantity, unit, pack) == expected
+
+
 @pytest.mark.parametrize("value, expected", [
     ("2026-10-20", date(2026, 10, 20)),
     ("20.10.2026", None),

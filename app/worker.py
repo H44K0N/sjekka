@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from collections import Counter
 from datetime import date, timedelta
 
@@ -61,6 +62,43 @@ def unit_price(item: ExtractedItem) -> float | None:
     return None
 
 
+# "Yoghurt kokos 4x150g": several of something sold as one package
+MULTIPACK = re.compile(r"(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|dl|l)\b", re.IGNORECASE)
+IN_BASE_UNIT = {"kg": ("g", 1000), "g": ("g", 1), "l": ("ml", 1000), "dl": ("ml", 100), "cl": ("ml", 10), "ml": ("ml", 1)}
+
+
+def multipack_quantity(raw_name: str | None, quantity: float | None, unit: str | None, pack_size: int | None) -> float | None:
+    """The contents of a whole multipack: "4x150g" holds 600 g. Gemini sometimes
+    gives the size of one cup instead, which makes the price per 100 g four
+    times too high. Only that exact mistake is corrected; a line bought as
+    several items (pack_size > 1) is priced per item already."""
+    match = MULTIPACK.search(raw_name or "")
+    if not match or not quantity or (pack_size or 1) != 1:
+        return quantity
+    count = int(match[1])
+    base, factor = IN_BASE_UNIT[match[3].lower()]
+    one = float(match[2].replace(",", ".")) * factor
+    if count < 2 or base != unit or abs(quantity - one) > 0.5:
+        return quantity
+    return one * count
+
+
+def repair_multipacks(db: Session) -> int:
+    """Corrects multipacks saved before multipack_quantity existed. Safe to
+    run again: a corrected row no longer matches."""
+    fixed = 0
+    for model in (models.ReceiptItem, models.FlyerOffer):
+        for row in db.query(model).filter(model.pack_size == 1, model.raw_name.ilike("%x%")):
+            quantity = multipack_quantity(row.raw_name, row.quantity, row.unit, row.pack_size)
+            if quantity != row.quantity:
+                logger.info(f"Multipack {row.raw_name!r}: {row.quantity:g} -> {quantity:g} {row.unit}")
+                row.quantity = quantity
+                row.price_per_unit = unit_price(row)
+                fixed += 1
+    db.commit()
+    return fixed
+
+
 def parse_date(value: str | None) -> date | None:
     try:
         return date.fromisoformat(value) if value else None
@@ -93,6 +131,7 @@ def save_receipt(db: Session, job: models.Job, data: ExtractedReceipt) -> models
     db.flush()
 
     for item in data.items:
+        item.quantity = multipack_quantity(item.raw_name, item.quantity, item.unit, item.pack_size)
         db.add(models.ReceiptItem(
             receipt_id=receipt.id,
             raw_name=item.raw_name,
@@ -205,6 +244,7 @@ async def run_worker():
         job.status = "pending"
         logger.info(f"Reset stuck job: {job.filename}")
     db.commit()
+    repair_multipacks(db)
     db.close()
 
     last_cleanup = None
