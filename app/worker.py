@@ -83,6 +83,16 @@ def multipack_quantity(raw_name: str | None, quantity: float | None, unit: str |
     return one * count
 
 
+def pieces_are_one_pack(text: str | None, pieces: int | None) -> bool:
+    """Whether a flyer's piece count is a multipack ("Yoghurt 4-pk 4x150 g",
+    "15 pk", "0,33 l x 15", "6 x 1,5 liter") rather than a multi-buy ("2 for
+    30"). Tjek gives both as pieces; only the text tells them apart."""
+    if not text or not pieces or pieces < 2:
+        return False
+    n = str(pieces)
+    return bool(re.search(rf"(?<![\d,.]){n}\s*(?:-?\s*pk\b|-?\s*pakk|[x×](?!\w{{2}}))|[x×]\s*{n}(?![\d,.])", text, re.IGNORECASE))
+
+
 def repair_multipacks(db: Session) -> int:
     """Corrects multipacks saved before multipack_quantity existed. Safe to
     run again: a corrected row no longer matches."""
@@ -95,6 +105,15 @@ def repair_multipacks(db: Session) -> int:
                 row.quantity = quantity
                 row.price_per_unit = unit_price(row)
                 fixed += 1
+    # Flyer multipacks once stored as "N for X kr"
+    for row in db.query(models.FlyerOffer).filter(models.FlyerOffer.pack_size > 1):
+        if pieces_are_one_pack(row.raw_name, row.pack_size):
+            logger.info(f"Multipack {row.raw_name!r}: {row.pack_size} for {row.total_price:g} -> one pack")
+            if row.quantity:
+                row.quantity *= row.pack_size
+            row.pack_size, row.deal = 1, None
+            row.price_per_unit = unit_price(row)
+            fixed += 1
     db.commit()
     return fixed
 

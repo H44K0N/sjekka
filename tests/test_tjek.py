@@ -124,12 +124,19 @@ def test_import_catalog(clean, db):
     assert json.loads(flyer.raw_response)["names"] == "raw"
     mince, cola = flyer.offers  # the offer without a price is left out
     assert (mince.canonical_name, mince.quantity, mince.unit, mince.price_per_unit) == ("Kjøttdeig", 400, "g", 17.48)
-    assert (cola.pack_size, cola.deal, cola.quantity, cola.price_per_unit) == (6, "6 for 89", 1500, 0.99)
+    # "6 x 1,5 liter" is one 9-litre pack, not "6 for 89"
+    assert (cola.pack_size, cola.deal, cola.quantity, cola.price_per_unit) == (1, None, 9000, 0.99)
     assert mince.raw_name == "KJØTTDEIG 10 % FETT 400 g, Folkets, pr. kg 174,75"
 
     # Importing again replaces it
     tjek.import_catalog(db, CATALOGS[0], OFFERS["kiwi1"][:1], namer)
     assert db.query(models.Flyer).count() == 1 and db.query(models.FlyerOffer).count() == 1
+
+
+def test_a_multi_buy_stays_n_for_x(clean, db):
+    battery = tjek_offer("Battery 0,5 l", 30, "med og uten sukker", unit="l", size=0.5, pieces=2)
+    offer, = tjek.import_catalog(db, CATALOGS[0], [battery], namer).offers
+    assert (offer.pack_size, offer.deal, offer.quantity, offer.price_per_unit) == (2, "2 for 30", 500, 3.0)
 
 
 def test_non_grocery_offers_are_left_out(clean, db):

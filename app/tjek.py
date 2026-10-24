@@ -25,7 +25,7 @@ from app.config import FLYER_REFRESH_HOURS, GEMINI_MODEL
 from app.database import SessionLocal
 from app.extractor import DEFINITIONS, client
 from app.schema import Category
-from app.worker import normalize_name
+from app.worker import normalize_name, pieces_are_one_pack
 
 logger = logging.getLogger("sjekka.flyers")
 
@@ -182,6 +182,9 @@ def import_catalog(db: Session, catalog: dict, offers: list[dict], namer) -> mod
         if not name or not name.grocery:
             continue
         quantity, unit, pack = size_of(o)
+        # A 4-pack is one thing bought, of four times the size, not "4 for 20"
+        if pieces_are_one_pack(text_of(o), pack):
+            quantity, pack = quantity * pack if quantity else None, 1
         price = o["pricing"]["price"]
         each = price / pack
         flyer.offers.append(models.FlyerOffer(
