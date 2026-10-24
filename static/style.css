@@ -21,7 +21,6 @@
   --soft:   #8e877c;                    /* taupe, secondary text */
   --text:   #ece6dc;                    /* ivory body text */
   --error:  #d98b7a;
-  --mono:   "Google Sans Code", ui-monospace, monospace;
   color-scheme: dark;
 }
 
@@ -46,6 +45,7 @@ body {
 ::selection { background: var(--accent); color: var(--ink); }
 
 a { color: inherit; text-decoration: none; }
+button, input, select, textarea { font-family: inherit; }
 
 .top, main, footer {
   max-width: 1040px;
@@ -55,9 +55,8 @@ a { color: inherit; text-decoration: none; }
 }
 main.narrow { max-width: 600px; }
 
-/* the small mono voice: header, footer, labels */
+/* the small voice: header, footer, labels */
 .top, footer, .meta, .label, .chips button, .count, .stats, .status {
-  font-family: var(--mono);
   font-size: 13px;
   color: var(--soft);
 }
@@ -132,7 +131,6 @@ h1 {
 .button.primary:disabled:hover { background: var(--text); border-color: var(--text); }
 
 .arrow {
-  font-family: var(--mono);
   transition: transform 200ms;
 }
 .button:hover .arrow { transform: translateX(2px); }
@@ -164,7 +162,7 @@ h1 {
 }
 .chips button {
   padding: 4px 12px;
-  font-size: 12px;
+  font-size: 13px;
   background: none;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -183,8 +181,7 @@ h1 {
   align-items: center;
   gap: 6px;
   padding: 6px 12px 6px 14px;
-  font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
   background: var(--card);
   border: 1px solid var(--line);
@@ -241,9 +238,9 @@ h1 {
   transform: rotate(45deg);
 }
 .sort-menu button:hover, .sort-menu button:focus-visible { background: rgba(236, 230, 220, 0.05); outline: none; }
-.sort-menu b { font-family: "Libron", Georgia, serif; font-size: 16px; font-weight: 400; }
+.sort-menu b { font-size: 16px; font-weight: 400; }
 .sort-menu button[aria-checked="true"] b { color: var(--accent); }
-.sort-menu span { font-family: var(--mono); font-size: 11px; color: var(--soft); }
+.sort-menu span { font-size: 12px; color: var(--soft); }
 
 /* product cards */
 .grid {
@@ -262,7 +259,7 @@ h1 {
 a.card { transition: border-color 200ms, background 200ms, transform 200ms; }
 a.card:hover { border-color: var(--hover); background: rgba(236, 230, 220, 0.04); transform: translateY(-2px); }
 .card .body { flex: 1; padding-bottom: 20px; }
-.card .stores { margin: 10px 0 0; font-family: var(--mono); font-size: 12px; color: var(--accent); }
+.card .stores { margin: 10px 0 0; font-size: 13px; color: var(--accent); }
 .card h3 {
   margin: 0;
   font-size: 20px;
@@ -271,14 +268,12 @@ a.card:hover { border-color: var(--hover); background: rgba(236, 230, 220, 0.04)
 .card .brand { margin: 2px 0 0; font-size: 16px; color: var(--soft); }
 .card .price {
   margin: 20px 0 0;
-  font-family: var(--mono);
   font-size: 22px;
   font-variant-numeric: tabular-nums;
 }
 .card .unit {
   margin: 2px 0 0;
-  font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--soft);
 }
 .card .where {
@@ -289,8 +284,7 @@ a.card:hover { border-color: var(--hover); background: rgba(236, 230, 220, 0.04)
   margin: 0;
   padding-top: 14px;
   border-top: 1px solid var(--line);
-  font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--soft);
   white-space: nowrap;
 }
@@ -303,8 +297,7 @@ a.card:hover { border-color: var(--hover); background: rgba(236, 230, 220, 0.04)
   height: 26px;
   flex-shrink: 0;
   max-width: 100%;
-  font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--soft);
   white-space: nowrap;
   overflow: hidden;
@@ -315,7 +308,6 @@ a.card:hover { border-color: var(--hover); background: rgba(236, 230, 220, 0.04)
 
 .notice {
   padding: 48px 0;
-  font-family: var(--mono);
   font-size: 13px;
   color: var(--soft);
   text-align: center;
@@ -341,7 +333,7 @@ a.card:hover { border-color: var(--hover); background: rgba(236, 230, 220, 0.04)
 .drop:hover, .drop.dragging { border-color: var(--accent); background: rgba(236, 230, 220, 0.04); }
 .drop:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
 .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.drop .label { font-size: 12px; }
+.drop .label { font-size: 13px; }
 .drop img {
   display: block;
   max-width: 100%;
@@ -354,20 +346,19 @@ a.card:hover { border-color: var(--hover); background: rgba(236, 230, 220, 0.04)
   justify-content: space-between;
   gap: 12px;
   margin: 12px 0 0;
-  font-family: var(--mono);
   font-size: 13px;
   color: var(--soft);
 }
 .file span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.note { margin: 14px 0 0; font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--soft); }
+.note { margin: 14px 0 0; font-size: 13px; line-height: 1.6; color: var(--soft); }
 
 .status { min-height: 1.6em; margin: 16px 0 0; }
 .status.error { color: var(--error); }
 
 /* thanks: the upload's progress */
 .progress { margin: 28px 0 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
-.progress .state { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--soft); }
+.progress .state { margin: 0; font-size: 13px; color: var(--soft); }
 .progress .state.busy::before {
   content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 10px; border-radius: 50%;
   background: var(--accent); vertical-align: 1px; animation: pulse 1.6s ease-in-out infinite;
@@ -375,10 +366,10 @@ a.card:hover { border-color: var(--hover); background: rgba(236, 230, 220, 0.04)
 .progress .state.ok { color: var(--text); }
 .progress .state.error { color: var(--error); }
 @keyframes pulse { 50% { opacity: 0.25; } }
-.found { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; font-family: var(--mono); font-size: 13px; color: var(--soft); }
+.found { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; font-size: 13px; color: var(--soft); }
 .items { margin: 12px 0 0; padding: 0; list-style: none; }
 .items li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 17px; }
-.items li span { font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+.items li span { font-size: 14px; font-variant-numeric: tabular-nums; }
 .items a { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; }
 .items a:hover { text-decoration-color: var(--accent); }
 
@@ -406,12 +397,12 @@ main.product { max-width: 820px; }
   border-radius: 12px;
   background: var(--card);
 }
-.best-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-family: var(--mono); font-size: 13px; color: var(--soft); }
+.best-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 13px; color: var(--soft); }
 .best-row b { font-size: 26px; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
 
 .stores-section { margin-top: 72px; }
 .stores-section h2 { margin: 0; font-weight: 400; }
-.scale-note { margin: 4px 0 16px; font-size: 12px; }
+.scale-note { margin: 4px 0 16px; font-size: 13px; }
 .stores { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
 .store, .axis {
   display: grid;
@@ -421,16 +412,16 @@ main.product { max-width: 820px; }
 .store { align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .store .who { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 .store .who .brand { font-size: 15px; color: var(--soft); }
-.store .amount { display: flex; flex-direction: column; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.store .amount { display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
 .store .amount b { font-size: 18px; font-weight: 500; }
-.store .amount span { font-size: 12px; color: var(--soft); }
+.store .amount span { font-size: 13px; color: var(--soft); }
 .store.cheapest .amount span { color: var(--accent); }
-.store .when { font-family: var(--mono); font-size: 12px; color: var(--soft); text-align: right; white-space: nowrap; }
+.store .when { font-size: 13px; color: var(--soft); text-align: right; white-space: nowrap; }
 .spark { display: block; width: 100%; height: 44px; overflow: visible; }
 .spark polyline { fill: none; stroke: rgba(201, 180, 143, 0.55); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .spark circle { fill: var(--accent); stroke: var(--ink); stroke-width: 2; }
 .spark circle.hit { fill: transparent; stroke: none; }
-.axis { margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--soft); }
+.axis { margin-top: 6px; font-size: 12px; color: var(--soft); }
 .axis span { grid-column: 3; grid-row: 1; }
 .axis span:last-child { justify-self: end; }
 .tip {
@@ -438,8 +429,7 @@ main.product { max-width: 820px; }
   z-index: 10;
   transform: translate(-50%, -100%);
   padding: 6px 10px;
-  font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
   color: var(--text);
   background: #1c1a18;
@@ -449,9 +439,9 @@ main.product { max-width: 820px; }
 }
 
 .history { margin-top: 28px; }
-.history summary { font-family: var(--mono); font-size: 13px; color: var(--soft); cursor: pointer; }
+.history summary { font-size: 13px; color: var(--soft); cursor: pointer; }
 .history summary:hover { color: var(--text); }
-.history table { width: 100%; margin-top: 14px; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+.history table { width: 100%; margin-top: 14px; border-collapse: collapse; font-size: 13px; }
 .history th { text-align: left; font-weight: 400; color: var(--soft); padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); }
 .history td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 

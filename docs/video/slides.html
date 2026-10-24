@@ -2,13 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 <style>
   body { margin: 0; height: 100vh; overflow: hidden; }
   .scene { display: none; position: absolute; inset: 0; padding: 64px 88px; }
   .scene.active { display: block; }
-  .mono { font-family: var(--mono); }
   .fade { opacity: 0; transform: translateY(10px); transition: opacity 700ms, transform 700ms cubic-bezier(.2,.8,.2,1); }
   .fade.on { opacity: 1; transform: none; }
 
@@ -16,9 +14,9 @@
   .center { display: flex; flex-direction: column; justify-content: center; height: 100%; }
   .big { font-size: 112px; line-height: 1; letter-spacing: -0.03em; margin: 0 0 28px; font-weight: 700; }
   .sub { font-size: 30px; color: var(--soft); margin: 0 0 40px; max-width: 26em; }
-  .tag { font-family: var(--mono); font-size: 17px; color: var(--soft); }
+  .tag { font-size: 17px; color: var(--soft); }
   .tag b { color: var(--accent); font-weight: 400; }
-  .heading { font-family: var(--mono); font-size: 16px; color: var(--soft); margin: 0 0 6px; }
+  .heading { font-size: 16px; color: var(--soft); margin: 0 0 6px; }
   .title { font-size: 44px; margin: 0; letter-spacing: -0.02em; font-weight: 700; }
 
   /* diagram */
@@ -28,10 +26,10 @@
     border: 1px solid var(--line); border-radius: 12px; transition: border-color 500ms, background 500ms, opacity 700ms, transform 700ms;
   }
   .box h4 { margin: 0 0 2px; font-size: 22px; }
-  .box p { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--soft); line-height: 1.5; }
+  .box p { margin: 0; font-size: 13px; color: var(--soft); line-height: 1.5; }
   .box.hot { border-color: var(--accent); background: rgba(201,180,143,0.06); }
   .group { position: absolute; border: 1px dashed rgba(236,230,220,0.18); border-radius: 16px; }
-  .group > span { position: absolute; top: -11px; left: 18px; padding: 0 8px; background: var(--ink); font-family: var(--mono); font-size: 13px; color: var(--soft); }
+  .group > span { position: absolute; top: -11px; left: 18px; padding: 0 8px; background: var(--ink); font-size: 13px; color: var(--soft); }
   svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
   .wire { fill: none; stroke: rgba(236,230,220,0.28); stroke-width: 1.5; stroke-dasharray: 2000; stroke-dashoffset: 2000; transition: stroke-dashoffset 1400ms ease, stroke 400ms; }
   .wire.on { stroke-dashoffset: 0; }
@@ -40,12 +38,12 @@
     position: absolute; left: 88px; right: 88px; bottom: 52px; min-height: 64px;
     font-size: 26px; line-height: 1.35; transition: opacity 400ms;
   }
-  .step .n { font-family: var(--mono); font-size: 15px; color: var(--accent); display: block; margin-bottom: 4px; }
+  .step .n { font-size: 15px; color: var(--accent); display: block; margin-bottom: 4px; }
 
   /* pipeline */
   .lane { display: flex; gap: 14px; margin-top: 64px; align-items: stretch; }
   .lane .box { position: relative; flex: 1; }
-  .lane .arrow { align-self: center; font-family: var(--mono); color: var(--soft); opacity: 0; transition: opacity 500ms; }
+  .lane .arrow { align-self: center; color: var(--soft); opacity: 0; transition: opacity 500ms; }
   .lane .arrow.on { opacity: 1; }
   .extras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 28px; }
   .extras .box { position: relative; }
