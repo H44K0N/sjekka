@@ -115,17 +115,32 @@
         const input = $("add"), box = $("suggestions");
         let options = [], active = -1;
 
+        // What can be suggested: products from receipts, and this week's offers,
+        // which the list prices too ("egg" is on offer before it's on a receipt)
+        let offerNames = [];
+        function known() {
+            const onOffer = new Map(offerNames.map(o => [o.canonical_name, o]));
+            const fromReceipts = products.map(p => {
+                const where = p.store_count > 1 ? `${p.store_count} butikker` : p.store_chain || "";
+                return { ...p, detail: onOffer.has(p.canonical_name) ? `${where} · tilbud` : where };
+            });
+            const seen = new Set(products.map(p => p.canonical_name));
+            const offersOnly = offerNames.filter(o => !seen.has(o.canonical_name))
+                .map(o => ({ canonical_name: o.canonical_name, brand: o.brand, detail: `tilbud hos ${o.chain}` }));
+            return [...fromReceipts, ...offersOnly];
+        }
+
         function suggest() {
             const q = input.value.trim().toLowerCase();
             options = [];
             if (q) {
                 const onList = new Set(ShoppingList.read().map(i => i.name.toLowerCase()));
-                const hits = products.filter(p => !onList.has(p.canonical_name.toLowerCase()) &&
+                const hits = known().filter(p => !onList.has(p.canonical_name.toLowerCase()) &&
                     (p.canonical_name.toLowerCase().includes(q) || (p.brand || "").toLowerCase().includes(q)));
                 // Names that start with the query first
                 hits.sort((a, b) => (b.canonical_name.toLowerCase().startsWith(q) - a.canonical_name.toLowerCase().startsWith(q)) ||
                     a.canonical_name.localeCompare(b.canonical_name, "nb"));
-                options = hits.slice(0, 7).map(p => ({ name: p.canonical_name, detail: p.store_count > 1 ? `${p.store_count} butikker` : p.store_chain || "" }));
+                options = hits.slice(0, 7).map(p => ({ name: p.canonical_name, detail: p.detail }));
                 if (!options.some(o => o.name.toLowerCase() === q)) {
                     options.push({ name: input.value.trim(), detail: "legg til uansett", free: true });
                 }
@@ -475,6 +490,7 @@
         handleShared();
         update();
         fetch("/products").then(r => r.ok ? r.json() : []).then(p => { products = p; if (input.value) suggest(); }).catch(() => {});
+        fetch("/offers?best=1").then(r => r.ok ? r.json() : []).then(o => { offerNames = o; if (input.value) suggest(); }).catch(() => {});
     </script>
 </body>
 </html>

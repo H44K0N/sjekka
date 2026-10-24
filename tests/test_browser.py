@@ -552,16 +552,16 @@ def test_list_finds_the_cheapest_store_for_the_whole_list(page):
 
 def test_products_without_prices_stay_on_the_list(page):
     page.goto("/handleliste.html")
-    page.get_by_role("combobox", name="Legg til vare").fill("safran")
-    expect(page.get_by_role("option")).to_have_text(re.compile("«safran»"))
+    page.get_by_role("combobox", name="Legg til vare").fill("kanel")
+    expect(page.get_by_role("option")).to_have_text(re.compile("«kanel»"))
     page.keyboard.press("Enter")
-    expect(page.locator(".list-item", has_text="Safran").locator(".hint")).to_have_text("ingen priser ennå")
+    expect(page.locator(".list-item", has_text="Kanel").locator(".hint")).to_have_text("ingen priser ennå")
     expect(page.locator("#notice")).to_contain_text("Ingen av varene har priser ennå")
     expect(page.locator("#verdict")).to_be_hidden()
 
     page.get_by_role("combobox", name="Legg til vare").fill("agurk")
     page.keyboard.press("Enter")
-    expect(page.locator("#unknown")).to_contain_text("Safran")
+    expect(page.locator("#unknown")).to_contain_text("Kanel")
     expect(page.locator("#verdict-total")).to_have_text("15 kr")
 
 
@@ -843,3 +843,15 @@ def test_product_page_prices_loose_produce_per_kilo(page):
     expect(page.locator("#best-price")).to_have_text("44,90 kr / kg")
     expect(page.locator("#best-unit")).to_have_text("1,57 kg for 70,49 kr")
     expect(page.locator("#scale-note")).to_contain_text("kr / kg")
+
+
+def test_list_suggests_products_that_are_only_on_offer(page):
+    page.goto("/handleliste.html")
+    add = page.get_by_role("combobox", name="Legg til vare")
+    add.fill("safran")
+    # No receipt has buns yet, but Rema's flyer does
+    expect(page.get_by_role("option").first).to_have_text(re.compile("^Safranboller.*tilbud hos Rema 1000"))
+    add.fill("seig")
+    expect(page.get_by_role("option").first).to_have_text(re.compile("^Seigmenn.*Meny · tilbud"))
+    page.keyboard.press("Enter")
+    assert list_names(page) == ["Seigmenn"]
