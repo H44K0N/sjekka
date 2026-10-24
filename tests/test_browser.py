@@ -820,3 +820,26 @@ def test_upload_offers_the_camera_and_photo_tips(page):
     page.goto("/upload.html")
     expect(page.locator("#camera")).to_have_attribute("capture", "environment")
     expect(page.locator(".tips")).to_contain_text("hele kvitteringen")
+
+
+def test_loose_produce_shows_its_kilo_price(page):
+    page.goto("/")
+    shown = page.evaluate("""() => {
+        const oranges = {by_weight: true, unit: "g", quantity: 1570, total_price: 70.49, price_per_unit: 4.49, pack_size: 1};
+        const offer = {by_weight: true, unit: "g", quantity: 1000, pack_size: 1, each: 29.9, per_unit: 2.99, total_price: 29.9};
+        return [prices(oranges), describe({...oranges, variant: "Løsvekt"}), offerPrice(offer), Math.round(unitPrice(oranges) * 100) / 100];
+    }""")
+    assert shown == [{"each": "44,90 kr / kg", "unit": "1,57 kg for 70,49 kr"}, "Løsvekt", "29,90 kr / kg", 44.9]
+
+
+def test_product_page_prices_loose_produce_per_kilo(page):
+    def weighed(route):
+        product = route.fetch().json()
+        for p in product["prices"]:
+            p.update(by_weight=True, unit="g", quantity=1570, total_price=70.49, price_per_unit=4.49, pack_size=1)
+        route.fulfill(json=product)
+    page.route("**/products/Lettmelk", weighed)
+    page.goto("/produkt.html?navn=Lettmelk")
+    expect(page.locator("#best-price")).to_have_text("44,90 kr / kg")
+    expect(page.locator("#best-unit")).to_have_text("1,57 kg for 70,49 kr")
+    expect(page.locator("#scale-note")).to_contain_text("kr / kg")

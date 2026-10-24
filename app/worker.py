@@ -93,6 +93,22 @@ def pieces_are_one_pack(text: str | None, pieces: int | None) -> bool:
     return bool(re.search(rf"(?<![\d,.]){n}\s*(?:-?\s*pk\b|-?\s*pakk|[x×](?!\w{{2}}))|[x×]\s*{n}(?![\d,.])", text, re.IGNORECASE))
 
 
+# "Banane kg", "APPELSINER Pr kg. Løsvekt": weighed at the till. A size in
+# the name ("Pizza 1kg", "Kjøttdeig 400 g, pr. kg 174,75") means a package.
+PACKAGE_SIZE = re.compile(r"\d\s*(?:kg|g|gr)\b", re.IGNORECASE)
+
+
+def sold_by_weight(raw_name: str | None, unit: str | None) -> bool:
+    """Whether a line is loose produce, priced by the kilo rather than per
+    package. Its weight is whatever one shopper took, so the kilo price is
+    the price to show."""
+    if unit != "g" or not raw_name:
+        return False
+    if "løsvekt" in raw_name.lower():
+        return True
+    return bool(re.search(r"\bkg\b", raw_name, re.IGNORECASE)) and not PACKAGE_SIZE.search(raw_name)
+
+
 def repair_multipacks(db: Session) -> int:
     """Corrects multipacks saved before multipack_quantity existed. Safe to
     run again: a corrected row no longer matches."""

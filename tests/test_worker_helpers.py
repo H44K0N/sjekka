@@ -58,6 +58,22 @@ def test_multipack_quantity(raw, quantity, unit, pack, expected):
     assert worker.multipack_quantity(raw, quantity, unit, pack) == expected
 
 
+@pytest.mark.parametrize("raw, unit, weighed", [
+    ("Banane kg", "g", True),
+    ("Appelsiner kg", "g", True),
+    ("APPELSINER Pr kg. Løsvekt", "g", True),
+    ("Tomater pr. kg", "g", True),
+    ("Pizza grandiosa hj.laget m/ kjøttdeig 1kg", "g", False),
+    ("KJØTTDEIG 10 % FETT 400 g, Folkets, pr. kg 174,75", "g", False),
+    ("Poteter 2 kg", "g", False),
+    ("Banane kg", "stk", False),
+    ("Bananer", "g", False),
+    (None, "g", False),
+])
+def test_sold_by_weight(raw, unit, weighed):
+    assert worker.sold_by_weight(raw, unit) is weighed
+
+
 # Real Tjek texts: multipacks, and multi-buys that only look alike
 @pytest.mark.parametrize("text, pieces, one_pack", [
     ("Yoghurt 4-pk TINE, et utvalg, 4x150 g 33,33/kg", 4, True),

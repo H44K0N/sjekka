@@ -81,10 +81,15 @@
         const $ = id => document.getElementById(id);
 
         const each = p => p.pack_size > 1 ? p.total_price / p.pack_size : p.total_price;
-        // What prices are compared on: per 100 g/ml or per item, else the price of one
-        const comparable = p => p.price_per_unit ?? each(p);
-        const unitLabel = p => p.price_per_unit != null && (p.unit === "g" || p.unit === "ml")
+        // Loose produce (bananas by weight) is priced and compared per kilo:
+        // one receipt's 1,57 kg says nothing about what the next shopper pays
+        let weighed = false;
+        // What prices are compared on: per 100 g/ml (or per kg) or per item, else the price of one
+        const comparable = p => weighed ? p.price_per_unit * 10 : p.price_per_unit ?? each(p);
+        const unitLabel = p => weighed ? "kr / kg" : p.price_per_unit != null && (p.unit === "g" || p.unit === "ml")
             ? `kr / 100 ${p.unit}` : p.unit === "stk" ? "kr / stk" : "kr";
+        // The price as paid, or the kilo price for what was weighed
+        const amount = p => weighed && p.by_weight ? `${kr.format(comparable(p))} kr / kg` : `${kr.format(each(p))} kr`;
         let cheapest = null;  // the cheapest store's latest price, once loaded
         const day = p => p.purchase_date ? new Date(p.purchase_date).getTime() : null;
 
@@ -111,6 +116,7 @@
 
             const prices = product.prices.filter(p => p.total_price != null);
             receipts = prices;
+            weighed = prices.some(p => p.by_weight) && prices.every(p => p.unit === "g" && p.price_per_unit != null);
             const byStore = new Map();
             for (const p of prices) {
                 const key = p.store_chain || "Ukjent butikk";
@@ -129,8 +135,9 @@
             cheapest = stores[0].latest;
             $("best").hidden = false;
             $("best-chain").replaceChildren(chainBadge(stores[0].chain));
-            $("best-price").textContent = `${kr.format(each(cheapest))} kr`;
-            $("best-unit").textContent = cheapest.price_per_unit != null ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : "";
+            $("best-price").textContent = amount(cheapest);
+            $("best-unit").textContent = weighed && cheapest.by_weight ? `${packSize(cheapest)} for ${kr.format(cheapest.total_price)} kr`
+                : cheapest.price_per_unit != null ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : "";
 
             // Shared axes for every store's timeline, so the rows compare directly
             const days = prices.map(day).filter(Boolean);
@@ -156,7 +163,7 @@
                 const about = describe(p);
                 if (about) who.append(el("span", "brand", about));
                 const price = el("div", "amount");
-                price.append(el("b", "", `${kr.format(each(p))} kr`));
+                price.append(el("b", "", amount(p)));
                 const diff = comparable(p) - comparable(cheapest);
                 price.append(el("span", "", i === 0 ? "billigst" : diff < 0.005 ? "samme pris" : `+${kr.format(diff)} ${unitLabel(p)}`));
                 row.append(who, price, trend ? timeline(store.list, [t0, t1], [v0, v1]) : el("span"), el("span", "when", daysAgo(p.purchase_date)));
@@ -168,7 +175,7 @@
                 const store = el("td");
                 store.append(chainBadge(p.store_chain));
                 tr.append(el("td", "", p.purchase_date ? new Date(p.purchase_date).toLocaleDateString("nb-NO") : "–"), store,
-                    el("td", "", describe(p) || "–"), el("td", "", `${kr.format(each(p))} kr`),
+                    el("td", "", describe(p) || "–"), el("td", "", amount(p)),
                     el("td", "", `${kr.format(comparable(p))} ${unitLabel(p)}`));
                 return tr;
             }));
@@ -209,12 +216,12 @@
         let receipts = [];
         function receiptDuring(o) {
             return receipts.find(p => sameChain(p.store_chain, o.chain) && p.purchase_date >= o.valid_from &&
-                p.purchase_date <= o.valid_to && Math.abs(each(p) - o.each) < 0.005);
+                p.purchase_date <= o.valid_to && (weighed ? Math.abs(p.price_per_unit - o.per_unit) < 0.005 : Math.abs(each(p) - o.each) < 0.005));
         }
 
         function showTip(e, p) {
             const tip = $("tip");
-            tip.textContent = `${p.purchase_date ? new Date(p.purchase_date).toLocaleDateString("nb-NO") : ""} · ${kr.format(each(p))} kr · ${kr.format(comparable(p))} ${unitLabel(p)}`;
+            tip.textContent = `${p.purchase_date ? new Date(p.purchase_date).toLocaleDateString("nb-NO") : ""} · ${amount(p)} · ${kr.format(comparable(p))} ${unitLabel(p)}`;
             tip.hidden = false;
             const r = e.target.getBoundingClientRect();
             tip.style.left = `${r.left + r.width / 2 + scrollX}px`;
@@ -255,12 +262,13 @@
 
             // Offers are compared per 100 g/ml or per item, like the receipt prices
             const best = mine[0].verdict.per === "stk" ? null : mine.reduce((a, b) => a.per_unit <= b.per_unit ? a : b);
-            const offerPer = best && `kr / ${best.verdict.per}`;
-            if (best && cheapest && unitLabel(cheapest) === offerPer && best.per_unit < comparable(cheapest)) {
+            const offerPer = best && (weighed && best.unit === "g" ? "kr / kg" : `kr / ${best.verdict.per}`);
+            const offerValue = best && (offerPer === "kr / kg" ? best.per_unit * 10 : best.per_unit);
+            if (best && cheapest && unitLabel(cheapest) === offerPer && offerValue < comparable(cheapest)) {
                 $("best").querySelector(".label").textContent = "Billigst nå, på tilbud";
                 $("best-chain").replaceChildren(chainBadge(best.chain));
-                $("best-price").textContent = `${kr.format(best.each)} kr`;
-                $("best-unit").textContent = `${kr.format(best.per_unit)} ${offerPer} · ${until(best.valid_to)}`;
+                $("best-price").textContent = offerPrice(best);
+                $("best-unit").textContent = `${kr.format(offerValue)} ${offerPer} · ${until(best.valid_to)}`;
                 $("best").hidden = false;
             }
         });

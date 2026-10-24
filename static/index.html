@@ -101,6 +101,7 @@
             nyest: (a, b) => (b.purchase_date || "").localeCompare(a.purchase_date || ""),
         };
         function unitPrice(p) {
+            if (p.by_weight && p.price_per_unit) return p.price_per_unit * 10;  // the kilo price shown on the card
             return p.total_price == null ? null : p.pack_size > 1 ? p.total_price / p.pack_size : p.total_price;
         }
 

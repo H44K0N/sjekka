@@ -18,7 +18,7 @@ from app.basket import chain_name
 from app.config import GEMINI_MODEL
 from app.extractor import extract_flyer
 from app.schema import ExtractedFlyer
-from app.worker import is_retryable, multipack_quantity, normalize_name, parse_date, unit_price
+from app.worker import is_retryable, multipack_quantity, normalize_name, parse_date, sold_by_weight, unit_price
 
 ATTEMPTS = 4
 RETRY_SECONDS = 20
@@ -196,6 +196,7 @@ def offer_list(db: Session, today: date, name: str | None = None) -> list[dict]:
             "total_price": offer.total_price,
             "each": round(offer.total_price / max(offer.pack_size or 1, 1), 2),
             "per_unit": round(price.value, 2),
+            "by_weight": sold_by_weight(offer.raw_name, offer.unit),
             "is_member_price": bool(offer.is_member_price),
             "deal": offer.deal,
             "pre_price": offer.pre_price,

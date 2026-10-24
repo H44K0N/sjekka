@@ -41,6 +41,10 @@ function until(dateStr) {
 // Price of one unit, plus the comparable unit price where there is one.
 function prices(p) {
     const each = p.pack_size > 1 ? p.total_price / p.pack_size : p.total_price;
+    // Loose produce: the kilo price, and what this one receipt's weight cost
+    if (p.by_weight && p.price_per_unit) {
+        return { each: `${kr.format(p.price_per_unit * 10)} kr / kg`, unit: `${packSize(p)} for ${kr.format(p.total_price)} kr` };
+    }
     let unit = "";
     if (p.price_per_unit && (p.unit === "g" || p.unit === "ml")) {
         unit = `${kr.format(p.price_per_unit)} kr / 100 ${p.unit}`;
@@ -63,14 +67,16 @@ function packSize(p) {
 // Brand, variant and size on one line, leaving out the size when the variant
 // already says it
 function describe(p) {
-    const size = /\d\s*(kg|g|ml|cl|dl|l)\b/i.test(p.variant || "") ? "" : packSize(p);
+    // Nor for loose produce, whose weight is just what one shopper took
+    const size = p.by_weight || /\d\s*(kg|g|ml|cl|dl|l)\b/i.test(p.variant || "") ? "" : packSize(p);
     return [p.brand, p.variant, size].filter(Boolean).join(" · ");
 }
 
 const perLabel = per => per === "stk" ? "kr / stk" : `kr / ${per}`;
 
-// What a flyer offer costs: "44,90 kr", or "3 for 50" for a multi-buy
-const offerPrice = o => o.pack_size > 1 ? `${o.pack_size} for ${kr.format(o.total_price)}` : `${kr.format(o.each)} kr`;
+// What a flyer offer costs: "44,90 kr", "3 for 50" for a multi-buy, or "29,90 kr / kg"
+const offerPrice = o => o.pack_size > 1 ? `${o.pack_size} for ${kr.format(o.total_price)}`
+    : o.by_weight ? `${kr.format(o.per_unit * 10)} kr / kg` : `${kr.format(o.each)} kr`;
 
 // A flyer offer's verdict (see app/flyers.py) in a few words, for a tag
 function verdictTag(o) {
