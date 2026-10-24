@@ -88,6 +88,7 @@ About 350 tests, and none of them call Gemini: it's replaced with fakes, so they
 | File | Covers |
 |---|---|
 | `test_upload.py`, `test_upload_edge_cases.py` | Upload checks, formats (HEIC too), rotation, resizing, rate limits |
+| `test_trumf.py` | Trumf histories: recognised by their fields, prices and weights from the file, deposits and bags left out, names from one Gemini call, a re-upload adding nothing |
 | `test_receipt_files.py` | Receipt files (PDF, CSV, JSON): recognised by content, checked, split into parts, every receipt in a part saved once, the batch progress, files kept and then deleted |
 | `test_api.py` | `/products`, `/stats`, pages, caching and content-hashed scripts, the about page and its films |
 | `test_jobs.py` | `/jobs/{id}`, which the thank-you page follows |
