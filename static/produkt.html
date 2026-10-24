@@ -24,6 +24,7 @@
         <a href="/" class="mark">sjekka</a>
         <nav>
             <a href="/">utforsk</a>
+            <a href="/tilbud.html">tilbud</a>
             <a href="/handleliste.html">handleliste <span class="list-count" data-list-count hidden></span></a>
             <a href="/upload.html">last opp</a>
         </nav>
@@ -42,6 +43,11 @@
                 <span class="label">Billigst nå</span>
                 <span class="best-row"><span id="best-chain"></span><b id="best-price"></b><span id="best-unit"></span></span>
             </div>
+        </section>
+
+        <section class="offers-now" id="offers-now" hidden>
+            <h2 class="label">På tilbud nå</h2>
+            <ul id="offers-list"></ul>
         </section>
 
         <section class="stores-section" id="stores-section" hidden>
@@ -79,6 +85,7 @@
         const comparable = p => p.price_per_unit ?? each(p);
         const unitLabel = p => p.price_per_unit != null && (p.unit === "g" || p.unit === "ml")
             ? `kr / 100 ${p.unit}` : p.unit === "stk" ? "kr / stk" : "kr";
+        let cheapest = null;  // the cheapest store's latest price, once loaded
         const day = p => p.purchase_date ? new Date(p.purchase_date).getTime() : null;
 
         function render(product) {
@@ -115,7 +122,7 @@
             $("notice").hidden = true;
             if (!stores.length) return;
 
-            const cheapest = stores[0].latest;
+            cheapest = stores[0].latest;
             $("best").hidden = false;
             $("best-chain").replaceChildren(chainBadge(stores[0].chain));
             $("best-price").textContent = `${kr.format(each(cheapest))} kr`;
@@ -203,14 +210,41 @@
             if (!name) { $("notice").textContent = "Ingen produkt valgt."; return; }
             try {
                 const res = await fetch(`/products/${encodeURIComponent(name)}`);
-                if (res.status === 404) { $("name").textContent = name; $("notice").textContent = "Fant ingen priser for dette produktet."; return; }
+                if (res.status === 404) { $("name").textContent = name; $("notice").textContent = "Ingen kvitteringer har denne varen ennå."; return; }
                 if (!res.ok) throw new Error();
                 render(await res.json());
             } catch {
                 $("notice").textContent = "Kunne ikke hente prisene. Prøv å laste siden på nytt.";
             }
         }
-        load();
+        // This week's flyer offers for the product, if any. Waits for the
+        // prices, so a cheaper offer can take over "Billigst nå".
+        const offersLoaded = fetch("/offers").then(r => r.ok ? r.json() : []).catch(() => []);
+        load().then(() => offersLoaded).then(all => {
+            const mine = all.filter(o => o.canonical_name === name);
+            if (!mine.length) return;
+            $("offers-list").replaceChildren(...mine.map(o => {
+                const li = el("li");
+                li.append(chainBadge(o.chain), el("b", "", o.pack_size > 1 && o.deal ? o.deal : `${kr.format(o.each)} kr`));
+                if (o.brand) li.append(el("span", "brand", o.brand));
+                li.append(el("span", "when", until(o.valid_to)));
+                if (o.is_member_price) li.append(el("span", "when", "medlemspris"));
+                li.append(offerVerdict(o));
+                return li;
+            }));
+            $("offers-now").hidden = false;
+
+            // Offers are compared per 100 g/ml or per item, like the receipt prices
+            const best = mine[0].verdict.per === "stk" ? null : mine.reduce((a, b) => a.per_unit <= b.per_unit ? a : b);
+            const offerPer = best && `kr / ${best.verdict.per}`;
+            if (best && cheapest && unitLabel(cheapest) === offerPer && best.per_unit < comparable(cheapest)) {
+                $("best").querySelector(".label").textContent = "Billigst nå, på tilbud";
+                $("best-chain").replaceChildren(chainBadge(best.chain));
+                $("best-price").textContent = `${kr.format(best.each)} kr`;
+                $("best-unit").textContent = `${kr.format(best.per_unit)} ${offerPer} · ${until(best.valid_to)}`;
+                $("best").hidden = false;
+            }
+        });
     </script>
 </body>
 </html>

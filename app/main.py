@@ -7,7 +7,7 @@ from pillow_heif import register_heif_opener
 from sqlalchemy.orm import Session
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import date, timedelta
 import io
 import time
 import uuid
@@ -23,6 +23,7 @@ from app.database import engine, get_db
 from app import models
 from app import worker
 from app import basket
+from app import flyers
 from app.migrations import migrate
 
 # iPhones save photos as HEIC
@@ -262,7 +263,15 @@ def price_basket(shopping_list: ShoppingList, db: Session = Depends(get_db)):
         .filter(models.ReceiptItem.total_price.isnot(None))
         .all()
     )
-    return basket.price_list(list(wanted.items()), basket.latest_offers(rows))
+    deals = basket.flyer_deals(flyers.active_offers(db, date.today()))
+    return basket.price_list(list(wanted.items()), basket.latest_offers(rows), deals)
+
+
+@app.get("/offers")
+def get_offers(db: Session = Depends(get_db)):
+    """This week's flyer offers, each judged against what receipts say the
+    product usually costs."""
+    return flyers.offer_list(db, date.today())
 
 
 @app.get("/stats")

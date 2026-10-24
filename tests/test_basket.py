@@ -64,7 +64,7 @@ def test_missing_prices_are_estimated_from_how_expensive_the_chain_is():
     rows += [row(p, "Meny", price * 1.2) for p, price in [("A", 10), ("B", 20), ("C", 30)]]
     result = priced([("A", 1), ("Egg", 1)], rows)
     egg = result["items"][1]["prices"]
-    assert egg["Kiwi"] == {"price": 40, "estimated": False, "date": str(TODAY), "brand": None}
+    assert egg["Kiwi"] == {"price": 40, "estimated": False, "date": str(TODAY), "brand": None, "offer_until": None, "deal": None}
     assert egg["Meny"]["estimated"] is True
     # Dearer than the known price, but pulled towards average by the prior
     assert 40 < egg["Meny"]["price"] < 40 * 1.2

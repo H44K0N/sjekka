@@ -24,6 +24,7 @@
         <a href="/" class="mark">sjekka</a>
         <nav>
             <a href="/">utforsk</a>
+            <a href="/tilbud.html">tilbud</a>
             <a href="/handleliste.html" aria-current="page">handleliste <span class="list-count" data-list-count hidden></span></a>
             <a href="/upload.html">last opp</a>
         </nav>
@@ -85,7 +86,7 @@
                 <a class="sticky-total" id="sticky" href="#verdict" hidden aria-hidden="true" tabindex="-1">
                     <span class="label">Billigst</span><span id="sticky-chain"></span><b id="sticky-total"></b><span class="arrow">↓</span>
                 </a>
-                <p class="note" id="method" hidden>Mangler en butikk pris på en vare, anslår vi den ut fra varens vanlige pris og hvor dyr butikken er på varer vi kan sammenligne. Anslåtte priser er merket. Jo flere kvitteringer, jo færre anslag: <a href="/upload.html">last opp din</a>.</p>
+                <p class="note" id="method" hidden>Tilbud fra kundeavisene regnes med mens de gjelder. Mangler en butikk pris på en vare, anslår vi den ut fra varens vanlige pris og hvor dyr butikken er på varer vi kan sammenligne. Anslåtte priser er merket. Jo flere kvitteringer, jo færre anslag: <a href="/upload.html">last opp din</a>.</p>
                 <p class="notice" id="notice" hidden></p>
             </div>
         </section>
@@ -193,6 +194,11 @@
                     const best = line.prices[line.cheapest];
                     hint.append("billigst hos ", chainBadge(line.cheapest),
                         el("span", "each", line.size ? `${money(best.price / line.count)} · ${line.size}` : money(best.price / line.count)));
+                    if (best.offer_until) {
+                        const tag = el("span", "offer-tag", "tilbud");
+                        tag.title = [best.deal, until(best.offer_until)].filter(Boolean).join(", ");
+                        hint.append(tag, el("span", "", until(best.offer_until)));
+                    }
                 } else if (unknown.has(item.name)) {
                     hint.textContent = "ingen priser ennå";
                     hint.classList.add("none");
@@ -269,6 +275,7 @@
                 notes.push("Bare denne butikken har priser på varene dine ennå.");
             }
             const priced = best.known + best.estimated;
+            if (best.offers) notes.push(`${best.offers === 1 ? "Én vare" : `${best.offers} varer`} er på tilbud her nå.`);
             if (best.estimated) notes.push(`${best.known} av ${priced} priser fra kvitteringer, resten anslått.`);
             $("verdict-note").textContent = notes.join(" ");
 
@@ -336,7 +343,7 @@
                     tr.append(
                         what,
                         el("td", "", money(p.price)),
-                        el("td", "", p.estimated ? "anslått" : p.date ? daysAgo(p.date) : ""),
+                        el("td", "", p.estimated ? "anslått" : p.offer_until ? `tilbud ${until(p.offer_until)}` : p.date ? daysAgo(p.date) : ""),
                     );
                     table.tBodies[0].append(tr);
                 }

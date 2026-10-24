@@ -40,6 +40,21 @@ const ShoppingList = (() => {
     }
     const has = name => Boolean(find(read(), name));
 
+    // The round + on product cards: puts the product on the list, or takes it off
+    function toggle(name) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "list-toggle";
+        button.setAttribute("aria-label", `Legg ${name} på handlelisten`);
+        const show = () => button.setAttribute("aria-pressed", String(has(name)));
+        button.addEventListener("click", () => {
+            if (has(name)) remove(name); else add(name);
+            show();
+        });
+        show();
+        return button;
+    }
+
     // The header link shows how many products are on the list
     function showCount() {
         const n = read().length;
@@ -53,5 +68,5 @@ const ShoppingList = (() => {
     // Another tab changed the list
     addEventListener("storage", e => { if (e.key === KEY) showCount(); });
 
-    return { read, write, add, setCount, remove, has, showCount };
+    return { read, write, add, setCount, remove, has, toggle, showCount };
 })();

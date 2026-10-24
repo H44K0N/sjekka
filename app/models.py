@@ -73,3 +73,40 @@ class Job(Base):
     model = Column(String, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class Flyer(Base):
+    """One imported kundeavis (a chain's weekly offers), with Gemini's raw
+    answer kept like jobs.raw_response, so offers can be re-read later."""
+    __tablename__ = "flyers"
+
+    id = Column(Integer, primary_key=True)
+    chain = Column(String, nullable=False)  # grouped name, see basket.chain_name
+    valid_from = Column(Date, nullable=False)
+    valid_to = Column(Date, nullable=False)
+    source = Column(String)                 # file name or URL it came from
+    raw_response = Column(String)
+    model = Column(String)
+    created_at = Column(DateTime, default=utcnow)
+    offers = relationship("FlyerOffer", back_populates="flyer", cascade="all, delete-orphan")
+
+
+class FlyerOffer(Base):
+    __tablename__ = "flyer_offers"
+
+    id = Column(Integer, primary_key=True)
+    flyer_id = Column(Integer, ForeignKey("flyers.id"), nullable=False)
+    raw_name = Column(String)
+    canonical_name = Column(String, nullable=False)
+    brand = Column(String)
+    variant = Column(String)
+    category = Column(String)
+    quantity = Column(Float)
+    unit = Column(String)
+    pack_size = Column(Integer, default=1)
+    total_price = Column(Float)             # for pack_size items, as advertised
+    price_per_unit = Column(Float)
+    is_member_price = Column(Integer, default=0)
+    deal = Column(String)                   # "3 for 2", "2 for 50,-"
+    pre_price = Column(Float)               # the "før" price the flyer claims
+    flyer = relationship("Flyer", back_populates="offers")

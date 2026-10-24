@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sjekka – Ukens tilbud</title>
+    <meta name="theme-color" content="#0d0c0b">
+    <meta name="description" content="Tilbudene i kundeavisene, sjekket mot hva varene faktisk pleier å koste.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Sjekka">
+    <meta property="og:title" content="Sjekka – Er tilbudet egentlig et tilbud?">
+    <meta property="og:description" content="Tilbudene i kundeavisene, sjekket mot hva varene faktisk pleier å koste.">
+    <meta property="og:url" content="https://sjekka.tischbein.dev/tilbud.html">
+    <meta property="og:image" content="https://sjekka.tischbein.dev/og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="preload" href="/fonts/Libron-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header class="top">
+        <a href="/" class="mark">sjekka</a>
+        <nav>
+            <a href="/">utforsk</a>
+            <a href="/tilbud.html" aria-current="page">tilbud</a>
+            <a href="/handleliste.html">handleliste <span class="list-count" data-list-count hidden></span></a>
+            <a href="/upload.html">last opp</a>
+        </nav>
+    </header>
+
+    <main>
+        <section>
+            <p class="meta">Ukens tilbud</p>
+            <h1>Er tilbudet egentlig et tilbud?</h1>
+            <p class="lede">Tilbudene fra kundeavisene, sjekket mot hva varene kostet på kvitteringer før tilbudet startet. Noen er ekte kupp. Andre er vanlig pris med rød plakat.</p>
+        </section>
+
+        <section class="explore" aria-labelledby="offers-heading">
+            <h2 class="visually-hidden" id="offers-heading">Tilbud</h2>
+            <input class="search" type="search" id="search" placeholder="Søk i tilbudene" aria-label="Søk i tilbudene" autocomplete="off">
+            <ul class="chips" id="chains"></ul>
+            <div class="listbar">
+                <p class="count" id="count" aria-live="polite"></p>
+                <label class="switch"><input type="checkbox" id="real-only"> Bare ekte tilbud</label>
+            </div>
+            <div class="grid" id="grid"></div>
+            <div class="more" id="more" hidden><button type="button" class="button" id="more-button">Vis flere</button></div>
+            <p class="notice" id="notice">Henter tilbud …</p>
+            <p class="note">Ekte tilbud: minst 15 % under butikkens egen pris fra før tilbudet. Prisene sammenlignes per 100 g, per 100 ml eller per stykk. Jo flere kvitteringer, jo flere tilbud kan vi sjekke: <a href="/upload.html">last opp din</a>.</p>
+        </section>
+    </main>
+
+    <footer>
+        <span>sjekka · <a href="/personvern.html">personvern</a></span>
+        <span>Har du sjekka i dag?</span>
+    </footer>
+
+    <script src="/common.js"></script>
+    <script src="/chains.js"></script>
+    <script src="/list.js"></script>
+    <script>
+        const $ = id => document.getElementById(id);
+        let offers = [];
+        const params = new URLSearchParams(location.search);
+        let chain = params.get("kjede");
+        $("search").value = params.get("q") || "";
+        // Thousands of offers a week: show them a page at a time
+        const PAGE = 48;
+        let showing = PAGE;
+        $("real-only").checked = params.get("ekte") === "1";
+
+        function saveView() {
+            const next = new URLSearchParams();
+            const q = $("search").value.trim();
+            if (q) next.set("q", q);
+            if (chain) next.set("kjede", chain);
+            if ($("real-only").checked) next.set("ekte", "1");
+            history.replaceState(null, "", next.size ? `?${next}` : location.pathname);
+        }
+
+        function renderChains() {
+            const chains = [...new Set(offers.map(o => o.chain))].sort((a, b) => a.localeCompare(b, "nb"));
+            if (chain && !chains.includes(chain)) chain = null;
+            $("chains").replaceChildren(...[null, ...chains].map(c => {
+                const btn = el("button", "", c ?? "Alle");
+                btn.type = "button";
+                btn.setAttribute("aria-pressed", String(chain === c));
+                btn.addEventListener("click", () => { chain = c; showing = PAGE; renderChains(); render(); });
+                const li = el("li");
+                li.append(btn);
+                return li;
+            }));
+        }
+
+        function render() {
+            saveView();
+            const q = $("search").value.trim().toLowerCase();
+            const matching = offers.filter(o => (!chain || o.chain === chain) && (!$("real-only").checked || o.verdict.kind === "real") &&
+                (!q || o.canonical_name.toLowerCase().includes(q) || (o.brand || "").toLowerCase().includes(q) || (o.raw_name || "").toLowerCase().includes(q)));
+            const shown = matching.slice(0, showing);
+            $("more").hidden = matching.length <= showing;
+            $("more-button").textContent = `Vis flere (${matching.length - shown.length} til)`;
+            const real = offers.filter(o => o.verdict.kind === "real").length;
+            $("count").textContent = offers.length ? `${matching.length} tilbud · ${real} sjekket som ekte` : "";
+            $("notice").hidden = matching.length > 0;
+            $("notice").textContent = offers.length ? "Ingen tilbud passer til valget." : "Ingen kundeaviser er lagt inn for denne uka ennå.";
+
+            $("grid").replaceChildren(...shown.map(o => {
+                const body = el("div", "body");
+                const link = el("a", "", o.canonical_name);
+                link.href = `/produkt.html?navn=${encodeURIComponent(o.canonical_name)}`;
+                const title = el("h3");
+                title.append(link);
+                body.append(title);
+                const brand = [o.brand, o.variant].filter(Boolean).join(" · ");
+                if (brand) body.append(el("p", "brand", brand));
+                // What the flyer itself says, since names are matched loosely
+                if (o.raw_name) body.append(el("p", "raw", o.raw_name));
+                const price = el("p", "price", o.pack_size > 1 && o.deal ? o.deal : `${kr.format(o.each)} kr`);
+                body.append(price);
+                const unit = o.unit === "g" || o.unit === "ml" ? `${kr.format(o.per_unit)} kr / 100 ${o.unit}` : o.pack_size > 1 ? `${kr.format(o.each)} kr / stk` : "";
+                const facts = [unit, o.is_member_price ? "medlemspris" : "", o.pack_size === 1 && o.deal ? o.deal : ""].filter(Boolean);
+                if (facts.length) body.append(el("p", "unit", facts.join(" · ")));
+                body.append(offerVerdict(o));
+
+                const where = el("p", "where");
+                where.append(chainBadge(o.chain), el("span", "", until(o.valid_to)));
+                const card = el("article", o.verdict.kind === "real" ? "card offer real" : "card offer");
+                card.append(body, where, ShoppingList.toggle(o.canonical_name));
+                return card;
+            }));
+        }
+
+
+        const fresh = () => { showing = PAGE; render(); };
+        $("real-only").addEventListener("change", fresh);
+        $("search").addEventListener("input", fresh);
+        $("more-button").addEventListener("click", () => { showing += PAGE; render(); });
+
+        fetch("/offers").then(r => { if (!r.ok) throw new Error(); return r.json(); }).then(data => {
+            offers = data;
+            renderChains();
+            render();
+        }).catch(() => { $("notice").textContent = "Kunne ikke hente tilbudene. Prøv å laste siden på nytt."; });
+    </script>
+</body>
+</html>
