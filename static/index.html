@@ -31,11 +31,11 @@
     </header>
 
     <main>
-        <section class="intro">
+        <section class="intro home">
             <p class="meta">Matpriser fra ekte kvitteringer</p>
             <h1>Sammen gjør vi handlekurven billigere.</h1>
             <p class="lede">Hver kvittering du deler, viser alle hva maten faktisk koster, og hvor den er billigst.</p>
-            <p class="stats">
+            <p class="stats" id="stats" hidden>
                 <span><b id="stat-receipts">–</b><span id="stat-receipts-label">delte kvitteringer</span></span>
                 <span><b id="stat-items">–</b><span id="stat-items-label">registrerte priser</span></span>
             </p>
@@ -78,6 +78,16 @@
         let allProducts = [];
         // The best flyer offer per product this week, for a line on its card
         const offerFor = new Map();
+        const STATS_FROM = 50;
+
+        // An offer is only worth flagging on the card when it beats the price
+        // shown there, per 100 g/ml where both have one, else per item
+        function beats(o, p) {
+            const sized = (p.unit === "g" || p.unit === "ml") && o.unit === p.unit && o.per_unit != null && p.price_per_unit != null;
+            if (sized) return o.per_unit < p.price_per_unit - 0.005;
+            const each = p.pack_size > 1 ? p.total_price / p.pack_size : p.total_price;
+            return each != null && o.each < each - 0.005;
+        }
         // Search, category and sort live in the URL, so a view can be shared
         const params = new URLSearchParams(location.search);
         let activeCategory = params.get("kategori");
@@ -152,7 +162,7 @@
                 body.append(el("p", "price", each));
                 if (unit) body.append(el("p", "unit", unit));
                 const deal = offerFor.get(p.canonical_name);
-                if (deal) body.append(el("p", "deal-tag", `Tilbud ${offerPrice(deal)} hos ${deal.chain}`));
+                if (deal && beats(deal, p)) body.append(el("p", "deal-tag", `Tilbud ${offerPrice(deal)} hos ${deal.chain}`));
                 const where = el("p", "where");
                 const shop = el("span", "shop");
                 shop.append(chainBadge(p.store_chain));
@@ -183,6 +193,8 @@
                 document.getElementById("stat-items").textContent = whole.format(stats.total_items);
                 if (stats.total_receipts === 1) document.getElementById("stat-receipts-label").textContent = "delt kvittering";
                 if (stats.total_items === 1) document.getElementById("stat-items-label").textContent = "registrert pris";
+                // A handful of receipts makes the site look empty rather than busy
+                document.getElementById("stats").hidden = stats.total_receipts < STATS_FROM;
                 renderCategories();
                 renderGrid();
                 loadOffers();

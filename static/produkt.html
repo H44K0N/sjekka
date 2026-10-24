@@ -40,7 +40,7 @@
                 <span class="best-row"><span id="best-chain"></span><b id="best-price"></b><span id="best-unit"></span></span>
             </div>
             <div class="product-actions" id="product-actions" hidden>
-                <button type="button" class="button" id="list-button" aria-pressed="false">Legg på handlelisten</button>
+                <button type="button" class="button" id="list-button">Legg på handlelisten</button>
                 <a class="text-link" id="list-link" href="/handleliste.html" hidden>Se hvor listen er billigst <span class="arrow">→</span></a>
             </div>
         </section>
@@ -96,7 +96,10 @@
             $("product-actions").hidden = false;
             const showListed = () => {
                 const on = ShoppingList.has(product.canonical_name);
-                $("list-button").setAttribute("aria-pressed", String(on));
+                // The label says the state, so it isn't also a pressed toggle
+                $("list-button").classList.toggle("on", on);
+                $("list-button").textContent = on ? "På handlelisten ✓" : "Legg på handlelisten";
+                $("list-button").title = on ? "Trykk for å ta den av listen" : "";
                 $("list-link").hidden = !on;
             };
             $("list-button").addEventListener("click", () => {
@@ -107,6 +110,7 @@
             showListed();
 
             const prices = product.prices.filter(p => p.total_price != null);
+            receipts = prices;
             const byStore = new Map();
             for (const p of prices) {
                 const key = p.store_chain || "Ukjent butikk";
@@ -140,6 +144,9 @@
             const fmtDate = t => new Date(t).toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
             $("axis").children[0].textContent = fmtDate(t0);
             $("axis").children[1].textContent = fmtDate(t1);
+            // One price makes a lone dot, not a trend: leave the timelines out
+            const trend = prices.length > 1;
+            $("axis").hidden = $("scale-note").hidden = !trend;
 
             $("stores").replaceChildren(...stores.map((store, i) => {
                 const p = store.latest;
@@ -152,7 +159,7 @@
                 price.append(el("b", "", `${kr.format(each(p))} kr`));
                 const diff = comparable(p) - comparable(cheapest);
                 price.append(el("span", "", i === 0 ? "billigst" : diff < 0.005 ? "samme pris" : `+${kr.format(diff)} ${unitLabel(p)}`));
-                row.append(who, price, timeline(store.list, [t0, t1], [v0, v1]), el("span", "when", daysAgo(p.purchase_date)));
+                row.append(who, price, trend ? timeline(store.list, [t0, t1], [v0, v1]) : el("span"), el("span", "when", daysAgo(p.purchase_date)));
                 return row;
             }));
 
@@ -198,6 +205,13 @@
             return svg;
         }
 
+        // A receipt from the offer's chain, bought while it ran, at the offer's price
+        let receipts = [];
+        function receiptDuring(o) {
+            return receipts.find(p => sameChain(p.store_chain, o.chain) && p.purchase_date >= o.valid_from &&
+                p.purchase_date <= o.valid_to && Math.abs(each(p) - o.each) < 0.005);
+        }
+
         function showTip(e, p) {
             const tip = $("tip");
             tip.textContent = `${p.purchase_date ? new Date(p.purchase_date).toLocaleDateString("nb-NO") : ""} · ${kr.format(each(p))} kr · ${kr.format(comparable(p))} ${unitLabel(p)}`;
@@ -226,8 +240,12 @@
             $("offers-list").replaceChildren(...mine.map(o => {
                 const li = el("li");
                 const line = el("div", "offer-line");
-                line.append(chainBadge(o.chain), el("b", "", offerPrice(o)), verdictTag(o), el("span", "when", until(o.valid_to)));
-                const details = [offerVerdict(o)];
+                // A receipt from this chain while the offer ran shows what the
+                // offer cost, so "not checked yet" would look like we ignored it
+                const seen = o.verdict.kind === "unknown" && receiptDuring(o);
+                const tag = seen ? el("span", "verdict-tag seen", "Samme pris som på kvittering") : verdictTag(o);
+                line.append(chainBadge(o.chain), el("b", "", offerPrice(o)), tag, el("span", "when", until(o.valid_to)));
+                const details = [seen ? el("p", "deal-verdict", `En kvittering fra ${new Date(seen.purchase_date).toLocaleDateString("nb-NO", { day: "numeric", month: "long" })} viser samme pris. Om det er et godt tilbud, kan vi først si når vi har priser fra før tilbudet startet.`) : offerVerdict(o)];
                 if (o.brand || o.is_member_price) details.push(el("p", "raw", [o.brand, o.is_member_price ? "medlemspris" : ""].filter(Boolean).join(" · ")));
                 if (o.raw_name) details.push(el("p", "raw", `I kundeavisen: «${o.raw_name}»`));
                 li.append(line, fold("Detaljer", ...details));

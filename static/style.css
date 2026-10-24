@@ -730,7 +730,7 @@ main.planner-page { max-width: 1040px; }
 .text-link { font-size: 15px; color: var(--accent); }
 .text-link:hover .arrow { transform: translateX(2px); }
 .text-link .arrow { display: inline-block; }
-.button[aria-pressed="true"] { color: var(--accent); border-color: var(--hover); }
+.button[aria-pressed="true"], #list-button.on { color: var(--accent); border-color: var(--hover); }
 
 /* offers: the verdict on each flyer offer */
 .switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--soft); cursor: pointer; }
@@ -748,6 +748,7 @@ main.planner-page { max-width: 1040px; }
 }
 .verdict-tag.real { color: var(--ink); background: var(--accent); border-color: var(--accent); }
 .verdict-tag.small, .verdict-tag.cheapest_known { color: var(--accent); border-color: var(--hover); }
+.verdict-tag.seen { color: var(--text); }
 .verdict-tag.not, .verdict-tag.cheaper_elsewhere { color: var(--error); border-color: rgba(217, 139, 122, 0.35); }
 .deal-verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; font-size: 14px; line-height: 1.5; color: var(--soft); }
 .deal-verdict .chain { height: 20px; }
@@ -884,4 +885,27 @@ main > section:nth-child(3) { animation-delay: 160ms; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* A list in progress: the page's explanation shrinks to its heading */
+.intro.compact .meta, .intro.compact .lede { display: none; }
+.intro.compact h1 { margin-bottom: 0; font-size: clamp(28px, 5vw, 40px); }
+
+/* Room below the list for the floating total, so it never hides the last line */
+body.has-sticky main { padding-bottom: 88px; }
+
+/* Upload: a camera button on phones, where it opens the camera directly */
+.camera { display: none; margin-top: 12px; cursor: pointer; }
+.camera input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.camera:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (pointer: coarse) { .camera { display: inline-flex; } }
+.tips { margin-top: 12px; }
+
+/* Phones: the front page gets to the search sooner */
+@media (max-width: 600px) {
+  main { padding-top: 40px; }
+  .intro.home .meta { display: none; }
+  .intro.home h1 { margin-bottom: 16px; }
+  .intro.home .lede { font-size: 16px; }
+  .intro.home .actions { margin-top: 20px; }
 }
