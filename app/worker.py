@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import re
 import time
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app import models
 from app.extractor import extract_receipt, extract_receipts
+from app import trumf
 from app.schema import ExtractedItem, ExtractedReceipt, ExtractedReceipts
 from app.config import GEMINI_MODEL, KEEP_FILES_DAYS, LOG_DIR, ORIGINALS_DIR, UPLOAD_DIR
 
@@ -199,11 +201,17 @@ async def process_job(job: models.Job, db: Session):
     is_file = filepath.suffix.lower() in (".pdf", ".csv", ".json")
     raw = None
     try:
-        raw = await asyncio.to_thread(extract_receipts if is_file else extract_receipt, filepath)
-        job.raw_response, job.model = raw, GEMINI_MODEL
-        extraction_logger.info(f"FILE: {job.filename} ({GEMINI_MODEL})\n{raw}\n{'=' * 60}")
-        found = (ExtractedReceipts.model_validate_json(raw).receipts if is_file
-                 else [ExtractedReceipt.model_validate_json(raw)])
+        history = trumf.receipts_in(json.loads(filepath.read_text(encoding="utf-8"))) if filepath.suffix == ".json" else None
+        if history:
+            # A Trumf history: prices from the file, only the names from Gemini
+            found, raw = await asyncio.to_thread(trumf.read, history)
+            job.raw_response, job.model = raw, trumf.MODEL_PREFIX + GEMINI_MODEL
+        else:
+            raw = await asyncio.to_thread(extract_receipts if is_file else extract_receipt, filepath)
+            job.raw_response, job.model = raw, GEMINI_MODEL
+            found = (ExtractedReceipts.model_validate_json(raw).receipts if is_file
+                     else [ExtractedReceipt.model_validate_json(raw)])
+        extraction_logger.info(f"FILE: {job.filename} ({job.model})\n{raw}\n{'=' * 60}")
 
         saved = duplicates = 0
         for data in found:
