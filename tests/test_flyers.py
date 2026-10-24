@@ -286,6 +286,19 @@ def test_offers_say_what_is_sold_by_weight(clean, db):
     assert data["Kjøttdeig"]["by_weight"] is False
 
 
+def test_an_offer_in_two_overlapping_flyers_is_listed_once(clean, db):
+    # Coop Mega's weekly and weekend flyers carry the same offers; Gemini
+    # named the copies differently
+    bun = {"raw_name": "COOP SKOLEBRØD Løse. 100-120 g", "total_price": 10}
+    add_flyer(db, "Coop Mega", [{**bun, "canonical_name": "Skolebrød"}, {"canonical_name": "Melk", "total_price": 20}])
+    add_flyer(db, "Coop Mega", [{**bun, "canonical_name": "Bakervarer"}])
+    add_flyer(db, "Kiwi", [{**bun, "canonical_name": "Skolebrød"}])  # another chain: its own offer
+    add_flyer(db, "Coop Mega", [{**bun, "canonical_name": "Skolebrød", "total_price": 12}])  # another price
+    offers = clean.get("/offers").json()
+    assert sorted((o["chain"], o["total_price"]) for o in offers if o["raw_name"] == bun["raw_name"]) == [
+        ("Coop Mega", 10), ("Coop Mega", 12), ("Kiwi", 10)]
+
+
 def test_offers_endpoint_filters(clean, db):
     add_receipt_price(db, "Kaffe", "Kiwi", 100, days_ago=10)
     add_flyer(db, "Kiwi", [{"canonical_name": "Kaffe", "total_price": 99}, {"canonical_name": "Melk", "total_price": 20}])
