@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
+import hashlib
 import io
+import re
 import time
 import uuid
 import asyncio
@@ -57,16 +59,46 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Fonts, logos and images rarely change, so browsers (and Cloudflare) may keep
-# them for a week. Pages, CSS and JS keep the default and revalidate, since
-# their names don't change between deploys.
+# them for a week.
 LONG_CACHE = ("/fonts/", "/chains/", "/favicon.svg", "/og.png")
+
+# Cloudflare keeps CSS and JS for hours but always fetches pages fresh, so a
+# deploy could pair new pages with old scripts. Pages therefore link each
+# stylesheet and script as /name?v=<hash of its contents>: a changed file gets a
+# new address, and an addressed version never changes, so it may be kept long.
+ASSET_LINK = re.compile(r'((?:src|href)="/)([\w.-]+\.(?:js|css))"')
+
+
+def asset_version(name: str) -> str:
+    with open(f"static/{name}", "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()[:10]
+
+
+def link_versioned_assets(html: str) -> str:
+    return ASSET_LINK.sub(lambda m: f'{m[1]}{m[2]}?v={asset_version(m[2])}"', html)
+
+
+class Pages(StaticFiles):
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if isinstance(response, FileResponse) and str(response.path).endswith(".html"):
+            with open(response.path, encoding="utf-8") as f:
+                html = link_versioned_assets(f.read())
+            return HTMLResponse(html, status_code=response.status_code, headers={"Cache-Control": "no-cache"})
+        return response
 
 
 @app.middleware("http")
 async def cache_static_assets(request: Request, call_next):
     response = await call_next(request)
-    if response.status_code == 200 and request.url.path.startswith(LONG_CACHE):
+    if response.status_code != 200:
+        return response
+    path = request.url.path
+    if path.startswith(LONG_CACHE):
         response.headers["Cache-Control"] = "public, max-age=604800"
+    elif path.endswith((".js", ".css")):
+        versioned = request.query_params.get("v") == asset_version(path.lstrip("/"))
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable" if versioned else "no-cache"
     return response
 
 # Every upload costs a Gemini call, so uploads are limited per client and per
@@ -299,4 +331,4 @@ def get_stats(db: Session = Depends(get_db)):
     }
 
 # Receipt photos are deliberately not served: they can show card digits.
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+app.mount("/", Pages(directory="static", html=True), name="static")
