@@ -154,3 +154,18 @@ def test_invalid_answer_fails_but_keeps_the_raw_answer_and_photo(client, db):
     assert job.raw_response == raw
     assert path.exists()
     assert db.query(models.Receipt).count() == 0
+
+
+def test_photos_of_long_failed_jobs_are_deleted(client, db):
+    now = models.utcnow()
+    old, recent, done_old = photo("old.jpg"), photo("recent.jpg"), photo("done.jpg")
+    db.add_all([
+        models.Job(filename="old.jpg", status="failed", updated_at=now - timedelta(days=31)),
+        models.Job(filename="recent.jpg", status="failed", updated_at=now - timedelta(days=29)),
+        models.Job(filename="done.jpg", status="pending", updated_at=now - timedelta(days=40)),
+        models.Job(filename="gone.jpg", status="failed", updated_at=now - timedelta(days=60)),  # photo already gone
+    ])
+    db.commit()
+    assert worker.delete_old_failed_photos(db) == 1
+    assert not old.exists()
+    assert recent.exists() and done_old.exists()

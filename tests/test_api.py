@@ -143,3 +143,23 @@ def test_pages_have_link_previews(client):
         html = client.get(path).text
         assert 'property="og:image" content="https://sjekka.tischbein.dev/og.png"' in html, path
         assert 'name="twitter:card" content="summary_large_image"' in html, path
+
+
+PAGES = ["/", "/upload.html", "/takk.html", "/produkt.html", "/personvern.html", "/finnes-ikke.html"]
+
+
+def test_every_page_links_to_the_privacy_page(client):
+    for path in PAGES:
+        assert 'href="/personvern.html"' in client.get(path).text, path
+
+
+def test_pages_load_nothing_from_google(client):
+    # The privacy page says visiting sends nothing to Google; only uploads do
+    for path in PAGES + ["/style.css"]:
+        text = client.get(path).text
+        assert "googleapis" not in text and "gstatic" not in text, path
+
+
+def test_self_hosted_fonts_are_served(client):
+    for name in ["Libron-Regular.woff2", "Libron-Bold.woff2"]:
+        assert client.get(f"/fonts/{name}").status_code == 200, name
