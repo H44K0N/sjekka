@@ -17,8 +17,8 @@ def test_adds_missing_columns_and_keeps_data(tmp_path):
     con.close()
 
     engine = create_engine(f"sqlite:///{path}")
-    assert migrate(engine) == ["jobs.raw_response", "jobs.model"]
-    assert {"raw_response", "model"} <= {c["name"] for c in inspect(engine).get_columns("jobs")}
+    assert migrate(engine) == ["jobs.raw_response", "jobs.model", "jobs.batch"]
+    assert {"raw_response", "model", "batch"} <= {c["name"] for c in inspect(engine).get_columns("jobs")}
     with engine.connect() as conn:
         assert conn.exec_driver_sql("SELECT filename, status, raw_response FROM jobs").all() == [("a.jpg", "done", None)]
 

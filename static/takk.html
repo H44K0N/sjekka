@@ -34,7 +34,7 @@
         <section>
             <p class="meta">Mottatt</p>
             <h1>Takk.</h1>
-            <p class="lede">Kvitteringen er lastet opp og blir lest nå. Bildet eller filen slettes når den er lest.</p>
+            <p class="lede" id="lede">Kvitteringen er lastet opp og blir lest nå. Bildet slettes når det er lest.</p>
             <div class="progress" id="progress" aria-live="polite" hidden>
                 <p class="state" id="state"></p>
                 <p class="found" id="found" hidden></p>
@@ -122,7 +122,47 @@
             if (Date.now() - started < GIVE_UP_MS) setTimeout(poll, POLL_MS);
             else setState("Det tar litt tid. Prisene dukker opp i oversikten når kvitteringen er lest.");
         }
-        if (id) poll();
+        // A receipt file, maybe a whole purchase history, read part by part
+        const batch = new URLSearchParams(location.search).get("batch");
+        const BATCH_GIVE_UP_MS = 30 * 60 * 1000;
+        const day = d => new Date(d).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
+
+        function showBatch(b) {
+            if (!b.receipts) { $("found").hidden = true; return; }
+            const span = b.from && b.to && b.from !== b.to ? `${day(b.from)} til ${day(b.to)}` : b.from ? day(b.from) : null;
+            $("found").replaceChildren(...Object.keys(b.chains).map(chainBadge),
+                el("span", "", [`${b.receipts} ${b.receipts === 1 ? "kvittering" : "kvitteringer"}`, `${b.items} varer`, span].filter(Boolean).join(" · ")));
+            $("found").hidden = false;
+        }
+
+        async function pollBatch() {
+            let b;
+            try {
+                const res = await fetch(`/jobs/batch/${encodeURIComponent(batch)}`);
+                if (!res.ok) throw new Error(res.status);
+                b = await res.json();
+            } catch {
+                setState("Fikk ikke kontakt med Sjekka. Prisene dukker opp i oversikten når filen er lest.");
+                return;
+            }
+            showBatch(b);
+            if (b.waiting) {
+                setState(b.parts > 1 ? `Leser filen: del ${b.read + b.failed + 1} av ${b.parts} …` : "Gemini leser filen …", "busy");
+                if (Date.now() - started < BATCH_GIVE_UP_MS) setTimeout(pollBatch, POLL_MS * 2);
+                else setState("Det tar litt tid. Prisene dukker opp i oversikten etter hvert som filen blir lest.");
+                return;
+            }
+            const notes = [];
+            if (b.duplicates) notes.push(`${b.duplicates} var allerede registrert og telles ikke to ganger.`);
+            if (b.failed) notes.push(`${b.failed} av ${b.parts} deler kunne ikke leses.`);
+            if (!b.receipts && !b.duplicates) return setState(["Fant ingen kvitteringer i filen.", ...notes].join(" "), "error");
+            setState([b.receipts ? "Lest. Prisene ligger nå i oversikten." : "Lest.", ...notes].join(" "), "ok");
+        }
+
+        if (batch) {
+            $("lede").textContent = "Filen er lastet opp og blir lest nå. Vi tar vare på den i inntil 12 måneder for å bli bedre til å lese slike filer.";
+            pollBatch();
+        } else if (id) poll();
     </script>
     <script src="/list.js"></script>
 </body>

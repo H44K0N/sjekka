@@ -11,7 +11,7 @@
 - **Look up a price.** Search for a product and see what it cost in each store, from real receipts, with its price history.
 - **Price your whole shopping list.** Write down what you need and see what the list costs in every chain, cheapest first. Missing prices are estimated, and marked as estimates.
 - **See if an offer is really an offer.** This week's flyer offers from ten chains, each checked against what the product cost before the sale.
-- **Share a receipt.** Take a photo, or upload a receipt you have as a file (a PDF, or a CSV or JSON export from a store app, bank or online shop). Sjekka reads the store, the items and the prices, and every receipt makes the prices better for everyone.
+- **Share a receipt, or a whole year of them.** Take a photo, or upload a receipt file: a PDF, or a CSV or JSON export from a store app, bank or online shop. A file can be a full purchase history, such as a year of Trumf receipts. Sjekka reads the store, the items and the prices, and every receipt makes the prices better for everyone.
 
 It's free, needs no account, and sets no cookies of its own.
 
@@ -66,7 +66,8 @@ All are environment variables (see `app/config.py`); only the API key is require
 | `RUN_WORKER` | `1` | `0` turns off the background worker: no receipts read, no flyers fetched |
 | `FLYER_REFRESH_HOURS` | `6` | How often new flyers are fetched; `0` turns it off |
 | `UPLOADS_PER_IP_PER_HOUR` | `10` | Upload limit per client, since every upload costs a Gemini call |
-| `UPLOADS_PER_DAY` | `200` | Upload limit for everyone together |
+| `UPLOADS_PER_DAY` | `200` | Gemini readings for everyone together per 24 hours: a photo is one, a receipt file one per part |
+| `KEEP_FILES_DAYS` | `365` | How long uploaded receipt files are kept (in `DATA_DIR/originals`, never served); photos aren't kept |
 
 ### Tests
 
@@ -87,7 +88,7 @@ About 350 tests, and none of them call Gemini: it's replaced with fakes, so they
 | File | Covers |
 |---|---|
 | `test_upload.py`, `test_upload_edge_cases.py` | Upload checks, formats (HEIC too), rotation, resizing, rate limits |
-| `test_receipt_files.py` | Receipts as PDF, CSV or JSON: recognised by content, checked, stored as UTF-8 |
+| `test_receipt_files.py` | Receipt files (PDF, CSV, JSON): recognised by content, checked, split into parts, every receipt in a part saved once, the batch progress, files kept and then deleted |
 | `test_api.py` | `/products`, `/stats`, pages, caching and content-hashed scripts, the about page and its films |
 | `test_jobs.py` | `/jobs/{id}`, which the thank-you page follows |
 | `test_worker.py`, `test_worker_helpers.py` | Saving receipts, unit prices, multipacks, loose produce, names, duplicates, retries |
@@ -163,6 +164,7 @@ docker compose start app
 <details>
 <summary>Security and data handling</summary>
 
+- **Receipt files** (PDF, CSV, JSON) are kept for `KEEP_FILES_DAYS` (12 months) in `DATA_DIR/originals`, so the reading of real exports can be improved; they may hold names or member numbers, and are never served. A file holding a purchase history is split into parts of about 30 KB or 4 pages (`app/receipt_files.py`), each one Gemini reading.
 - **Photos** go to Google's Gemini API, so Google's API terms apply (on the free tier Google may use them to improve its products; on the paid tier it says it doesn't). The server never serves them, deletes each one once read, and deletes photos of failed jobs after 30 days. The thank-you page shows a small copy kept only in the uploader's browser tab.
 - **Gemini's raw answers** are kept (`jobs.raw_response`, `jobs.model`), so readings can be reworked later without the photos. `util/export_extractions.py` exports them.
 - **Uploads** need no login, so they're rate-limited (see Settings). A Cloudflare rate-limit rule in front would stop floods earlier.

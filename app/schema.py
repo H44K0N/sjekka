@@ -35,6 +35,11 @@ class ExtractedReceipt(BaseModel):
     total: float | None = None
 
 
+class ExtractedReceipts(BaseModel):
+    """A receipt file's answer: it can hold a whole purchase history."""
+    receipts: list[ExtractedReceipt]
+
+
 class ExtractedOffer(BaseModel):
     raw_name: str
     canonical_name: str

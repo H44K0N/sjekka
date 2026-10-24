@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pillow_heif import register_heif_opener
 from sqlalchemy.orm import Session
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 import hashlib
@@ -19,7 +19,7 @@ import sys
 import logging
 
 from app.config import (
-    UPLOAD_DIR, MAX_SIZE_MB, MAX_DIMENSION, JPEG_QUALITY,
+    UPLOAD_DIR, ORIGINALS_DIR, MAX_SIZE_MB, MAX_DIMENSION, JPEG_QUALITY,
     UPLOADS_PER_IP_PER_HOUR, UPLOADS_PER_DAY, RUN_WORKER, FLYER_REFRESH_HOURS,
 )
 from app.database import engine, get_db
@@ -113,6 +113,13 @@ def client_ip(request: Request) -> str:
     return request.headers.get("cf-connecting-ip") or request.client.host
 
 
+def jobs_today(db: Session) -> int:
+    """Gemini calls queued in the last 24 hours: a photo is one, a receipt
+    file one per part."""
+    since = models.utcnow() - timedelta(days=1)
+    return db.query(models.Job).filter(models.Job.created_at >= since).count()
+
+
 def check_upload_limits(ip: str, db: Session):
     window = recent_uploads[ip]
     now = time.monotonic()
@@ -121,8 +128,7 @@ def check_upload_limits(ip: str, db: Session):
     if len(window) >= UPLOADS_PER_IP_PER_HOUR:
         raise HTTPException(429, "Du har lastet opp mange kvitteringer på kort tid. Prøv igjen om en time.")
 
-    since = models.utcnow() - timedelta(days=1)
-    if db.query(models.Job).filter(models.Job.created_at >= since).count() >= UPLOADS_PER_DAY:
+    if jobs_today(db) >= UPLOADS_PER_DAY:
         raise HTTPException(429, "Sjekka har nådd dagens grense for opplastinger. Prøv igjen i morgen.")
 
 
@@ -139,11 +145,24 @@ async def upload_receipt(request: Request, file: UploadFile = File(...), db: Ses
     if kind:
         try:
             stored = receipt_files.check(kind, data)
+            parts = receipt_files.split(kind, stored)
         except receipt_files.ReceiptFileError as e:
             raise HTTPException(400, str(e)) from None
-        filename = f"{uuid.uuid4()}.{kind}"
-        (UPLOAD_DIR / filename).write_bytes(stored)
-        return queue_job(db, ip, filename)
+        # Every part is a Gemini call, so all of them must fit in today's limit
+        if jobs_today(db) + len(parts) > UPLOADS_PER_DAY:
+            raise HTTPException(429, "Filen er for stor for det Sjekka har igjen av dagens grense. Prøv igjen i morgen.")
+        batch = str(uuid.uuid4())
+        (ORIGINALS_DIR / f"{batch}.{kind}").write_bytes(stored)
+        filenames = []
+        for i, part in enumerate(parts, start=1):
+            filename = f"{batch}-{i:03d}.{kind}"
+            (UPLOAD_DIR / filename).write_bytes(part)
+            db.add(models.Job(filename=filename, batch=batch))
+            filenames.append(filename)
+        db.commit()
+        recent_uploads[ip].append(time.monotonic())
+        logger.info(f"📥 Receipt file queued as {len(parts)} part(s), batch {batch}")
+        return JSONResponse({"id": filenames[0], "batch": batch, "parts": len(parts)})
 
     if len(data) > MAX_SIZE_MB * 1024 * 1024:
         raise HTTPException(400, f"Bildet er for stort. Maks {MAX_SIZE_MB} MB.")
@@ -297,6 +316,35 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
                 ],
             }
     return result
+
+
+@app.get("/jobs/batch/{batch}")
+def get_batch(batch: str, db: Session = Depends(get_db)):
+    """How an uploaded receipt file is doing, over all its parts: for the
+    thank-you page. The batch id is random, so it can't be guessed."""
+    jobs = db.query(models.Job).filter_by(batch=batch).all()
+    if not jobs:
+        raise HTTPException(404, "Fant ikke opplastingen.")
+    status = Counter(job.status for job in jobs)
+    receipts = (
+        db.query(models.Receipt)
+        .filter(models.Receipt.image_filename.in_([job.filename for job in jobs]))
+        .all()
+    )
+    dates = sorted(r.purchase_date for r in receipts if r.purchase_date)
+    duplicates = sum(int(m[1]) for job in jobs if job.error and (m := re.match(r"\d+ saved, (\d+) duplicates", job.error)))
+    return {
+        "parts": len(jobs),
+        "read": status["done"] + status["duplicate"],
+        "failed": status["failed"],
+        "waiting": status["pending"] + status["processing"],
+        "receipts": len(receipts),
+        "duplicates": duplicates + status["duplicate"],
+        "items": sum(len(r.items) for r in receipts),
+        "chains": dict(Counter(r.store_chain for r in receipts if r.store_chain).most_common()),
+        "from": str(dates[0]) if dates else None,
+        "to": str(dates[-1]) if dates else None,
+    }
 
 
 class ListItem(BaseModel):

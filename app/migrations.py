@@ -10,6 +10,7 @@ COLUMNS = [
     # (table, column, SQL type) in the order they were introduced
     ("jobs", "raw_response", "TEXT"),
     ("jobs", "model", "VARCHAR"),
+    ("jobs", "batch", "VARCHAR"),
 ]
 
 

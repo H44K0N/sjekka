@@ -6,7 +6,7 @@ import pytest
 
 from app import models, worker
 from app.config import UPLOAD_DIR
-from app.schema import ExtractedItem, ExtractedReceipt
+from app.schema import ExtractedItem, ExtractedReceipt, ExtractedReceipts
 from tests import helpers
 
 
@@ -150,9 +150,9 @@ def test_a_receipt_uploaded_as_csv_goes_all_the_way_through(client, db, monkeypa
 
     def extract(path):
         sent.append(path.read_text(encoding="utf-8"))
-        return kiwi_receipt(path).model_dump_json()
+        return ExtractedReceipts(receipts=[kiwi_receipt(path)]).model_dump_json()
 
-    monkeypatch.setattr(worker, "extract_receipt", extract)
+    monkeypatch.setattr(worker, "extract_receipts", extract)
     csv = "Vare;Pris\nTINE LETTMELK 1L;24,90\nGILDE KJØTTDEIG 400G;89,00\n".encode("cp1252")
     res = helpers.upload(client, csv, name="kvittering.csv")
     filename = res.json()["id"]

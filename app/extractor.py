@@ -2,7 +2,7 @@ from google import genai
 from google.genai import types
 from pathlib import Path
 from app.config import GEMINI_API_KEY, GEMINI_MODEL
-from app.schema import ExtractedFlyer, ExtractedReceipt
+from app.schema import ExtractedFlyer, ExtractedReceipt, ExtractedReceipts
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -145,6 +145,29 @@ def receipt_part(path: Path):
         return f"The receipt, as a {kind} file exported from a store app, a bank or an online shop:\n\n{path.read_text(encoding='utf-8')}"
     mime = "application/pdf" if suffix == ".pdf" else "image/jpeg"
     return types.Part.from_bytes(data=path.read_bytes(), mime_type=mime)
+
+
+FILE_PROMPT = """
+This file may hold many receipts, for example a purchase history exported from
+Trumf, a store app or a bank. Return every receipt in it separately, each with
+its own store, date and lines, in the order they appear. A receipt cut off at
+the very start or end of the file is part of a larger file that was split;
+skip it, as it's read whole from the neighbouring part.
+"""
+
+
+def extract_receipts(path: Path) -> str:
+    """For a receipt file (PDF, CSV, JSON): one Gemini call returning a list
+    of receipts, as raw JSON text."""
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=[receipt_part(path), PROMPT + FILE_PROMPT],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=ExtractedReceipts,
+        ),
+    )
+    return response.text
 
 
 def extract_receipt(path: Path) -> str:
