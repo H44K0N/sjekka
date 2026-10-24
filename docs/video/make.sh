@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Records docs/video/sjekka-showcase.mp4: the real app and worker on demo data
-# (Gemini replaced by a fixed answer), driven by Playwright, plus the slides,
-# with an optional voice-over.
+# Records two videos of the real app and worker on demo data (Gemini replaced
+# by a fixed answer), driven by Playwright, with an optional voice-over:
+#   docs/video/sjekka-showcase.mp4   desktop, 1920x1080, with the slides
+#   docs/video/sjekka-mobile.mp4     phone, 1080x1920, the features only
 #
 #   pip install -r requirements-dev.txt && playwright install chromium ffmpeg
 #   docs/video/make.sh                      # silent, captions only
@@ -29,13 +30,20 @@ if [ -n "${VOICE_MODELS:-}" ]; then
 fi
 
 python "$here/make_receipt.py" "$here/receipt.jpg"
-mkdir -p "$work/data"
-python "$here/demo_server.py" "$work/data" "$port" > "$work/server.log" 2>&1 &
-server=$!
-for _ in $(seq 50); do curl -sf "http://127.0.0.1:$port/health" > /dev/null && break; sleep 0.2; done
-
 if [ "$voice" != "-" ]; then export VOICE_DIR="$voice"; fi
-raw="$(python "$here/record.py" "http://127.0.0.1:$port" | tail -n 1)"
-python "$here/mix.py" "$raw" "$here/raw/cues.json" "$voice" "$here/sjekka-showcase.mp4"
+
+# Each video gets a fresh server, so both start from the same demo data
+record() {
+    local mode="$1" out="$2"
+    rm -rf "$work/data" && mkdir -p "$work/data"
+    python "$here/demo_server.py" "$work/data" "$port" > "$work/server.log" 2>&1 &
+    server=$!
+    for _ in $(seq 50); do curl -sf "http://127.0.0.1:$port/health" > /dev/null && break; sleep 0.2; done
+    raw="$(python "$here/record.py" "http://127.0.0.1:$port" "$mode" | tail -n 1)"
+    kill "$server"; wait "$server" 2>/dev/null || true; server=""
+    python "$here/mix.py" "$raw" "$here/raw/cues-$mode.json" "$voice" "$here/$out"
+    echo "Wrote $here/$out"
+}
+record desktop sjekka-showcase.mp4
+record mobile sjekka-mobile.mp4
 rm -rf "$here/raw" "$here/receipt.jpg"
-echo "Wrote $here/sjekka-showcase.mp4"
