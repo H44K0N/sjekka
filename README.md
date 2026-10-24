@@ -38,6 +38,7 @@ Visible on the explore page
 - Multi-pack and deal detection
 - Explore page with category filters and search; store chains shown as logos or in their colours
 - Product page: latest price per store, cheapest first, with each store's price history on shared axes
+- Shopping list (`/handleliste.html`): add products, see what the whole list costs at each chain, cheapest first. Where a chain has no price for a product, it's estimated from the product's typical price and how expensive that chain is on products both sell (marked as estimated). Suggests splitting the shop across two chains when that saves at least 25 kr and 5%. The list lives in the browser and can be shared as a link; cards and product pages have a button to add to it
 - After uploading, the thank-you page follows the receipt live (queue, reading, retrying) and lists what was found
 - Live counters showing total receipts and prices registered
 - Docker image with CI/CD to a VPS (see [Deployment](#deployment))
@@ -69,7 +70,6 @@ Visible on the explore page
 ## Planned
 
 - Price history per product
-- Basket builder — add items, get cheapest store recommendation
 - Search with cascading filters (category → product → variant)
 - Regional price comparison
 - Deal alerts
@@ -105,11 +105,12 @@ The tests never call Gemini; it's replaced with fakes.
 |---|---|
 | `test_upload.py`, `test_upload_edge_cases.py` | Upload validation, formats (incl. HEIC), EXIF rotation, resizing, rate limits |
 | `test_api.py` | `/products`, `/stats`, static pages |
+| `test_basket.py` | Pricing a shopping list: chain grouping, latest prices, size-adjusted comparison, estimates from the chain index, the two-store split, and `POST /basket` |
 | `test_worker.py`, `test_worker_helpers.py` | Saving receipts, unit prices, name normalisation, duplicates, retries and backoff |
 | `test_extractor.py` | The Gemini request and response validation |
 | `test_pipeline.py` | Upload → queue → worker → API, the worker loop and crash recovery |
 | `test_deploy_scripts.py` | `deploy.sh` (SHA check, health check, rollback) with a fake `docker`, and `backup.sh` |
-| `test_browser.py` | The pages in Chromium: rendering, formatting, search, filters, upload flow, phone layout, and automated accessibility checks (axe-core, WCAG 2.1 AA) on every page |
+| `test_browser.py` | The pages in Chromium: rendering, formatting, search, filters, upload flow, shopping list (adding, totals, estimates, sharing, undo), phone layout, and automated accessibility checks (axe-core, WCAG 2.1 AA) on every page |
 
 Browser tests are skipped if Playwright isn't installed. CI requires them and fails below 95% coverage.
 

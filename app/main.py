@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pillow_heif import register_heif_opener
 from sqlalchemy.orm import Session
@@ -21,6 +22,7 @@ from app.config import (
 from app.database import engine, get_db
 from app import models
 from app import worker
+from app import basket
 from app.migrations import migrate
 
 # iPhones save photos as HEIC
@@ -236,6 +238,31 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
                 ],
             }
     return result
+
+
+class ListItem(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    count: int = Field(default=1, ge=1, le=99)
+
+
+class ShoppingList(BaseModel):
+    items: list[ListItem] = Field(max_length=100)
+
+
+@app.post("/basket")
+def price_basket(shopping_list: ShoppingList, db: Session = Depends(get_db)):
+    """What a shopping list costs at each chain, for the shopping-list page.
+    Every price is read, since a chain's estimates depend on all its prices."""
+    wanted: dict[str, int] = {}
+    for item in shopping_list.items:
+        wanted[item.name] = wanted.get(item.name, 0) + item.count
+    rows = (
+        db.query(models.ReceiptItem, models.Receipt)
+        .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
+        .filter(models.ReceiptItem.total_price.isnot(None))
+        .all()
+    )
+    return basket.price_list(list(wanted.items()), basket.latest_offers(rows))
 
 
 @app.get("/stats")

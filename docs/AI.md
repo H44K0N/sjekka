@@ -82,3 +82,5 @@ The AI's work wasn't right the first time every time. Recorded so the process ca
 | #15 | Product page with per-store prices and history; chain logos on cards; CI uses the runner's Chrome | Logo idea from Haakon; chart colours validated, then a logo-per-row design instead of colour per store. CI: 7–10 min → ~1.5 min |
 | #16 | Thank-you page follows the upload live; export of raw Gemini answers | |
 | #22 | Privacy page; failed-job photos deleted after 30 days | Haakon asked whether the project was legal; Claude flagged the gaps and wrote the page from what the code does. Not legal advice |
+| #23 | Libron for all text, on the site and the portfolio | Haakon's call; merged by Claude on his say-so |
+| #24 | Shopping list: what the whole list costs in each chain, gaps estimated from a per-chain price index, two-store split | Built unattended overnight from Haakon's brief ("grocery list that auto checks what store is the cheapest"); left unmerged for his review |
