@@ -58,7 +58,7 @@
             <details class="fold history">
                 <summary>Alle registrerte priser</summary>
                 <table>
-                    <thead><tr><th>Dato</th><th>Butikk</th><th>Merke</th><th>Pris</th><th>Enhetspris</th></tr></thead>
+                    <thead><tr><th>Dato</th><th>Butikk</th><th>Vare</th><th>Pris</th><th>Enhetspris</th></tr></thead>
                     <tbody id="history"></tbody>
                 </table>
             </details>
@@ -146,7 +146,8 @@
                 const row = el("li", i === 0 ? "store cheapest" : "store");
                 const who = el("div", "who");
                 who.append(chainBadge(store.chain));
-                if (p.brand) who.append(el("span", "brand", p.brand));
+                const about = describe(p);
+                if (about) who.append(el("span", "brand", about));
                 const price = el("div", "amount");
                 price.append(el("b", "", `${kr.format(each(p))} kr`));
                 const diff = comparable(p) - comparable(cheapest);
@@ -160,7 +161,7 @@
                 const store = el("td");
                 store.append(chainBadge(p.store_chain));
                 tr.append(el("td", "", p.purchase_date ? new Date(p.purchase_date).toLocaleDateString("nb-NO") : "–"), store,
-                    el("td", "", p.brand || "–"), el("td", "", `${kr.format(each(p))} kr`),
+                    el("td", "", describe(p) || "–"), el("td", "", `${kr.format(each(p))} kr`),
                     el("td", "", `${kr.format(comparable(p))} ${unitLabel(p)}`));
                 return tr;
             }));

@@ -153,9 +153,31 @@ def test_prices_use_norwegian_formatting(page):
     milk = cards(page).filter(has_text="Lettmelk")
     expect(milk.locator(".price")).to_have_text("24,90 kr")
     expect(milk.locator(".unit")).to_have_text("2,49 kr / 100 ml")
-    expect(milk.locator(".brand")).to_have_text("Tine")
+    expect(milk.locator(".brand")).to_have_text("Tine · 1 l")
     expect(milk.locator(".where .chain img")).to_have_attribute("alt", "Kiwi")
     expect(milk.locator(".where")).to_contain_text("i dag")
+
+
+def test_cards_say_how_big_the_package_is(page):
+    page.goto("/")
+    expect(cards(page).filter(has_text="Kjøttdeig").locator(".brand")).to_have_text("Gilde · 400 g")
+    # No size to show: just the brand, or nothing
+    expect(cards(page).filter(has_text="Agurk").locator(".brand")).to_have_count(0)
+    described = page.evaluate("""() => [
+        describe({brand: "Grandiosa", variant: "Hjemmelaget", quantity: 1000, unit: "g"}),
+        describe({brand: "Tine", quantity: 1500, unit: "ml"}),
+        describe({brand: null, variant: "Løsvekt", quantity: 1570, unit: "g"}),
+        describe({brand: "Farris", variant: "Lime 0,5 l", quantity: 500, unit: "ml"}),
+        describe({brand: "Gilde", quantity: 6, unit: "stk"}),
+    ]""")
+    assert described == ["Grandiosa · Hjemmelaget · 1 kg", "Tine · 1,5 l", "Løsvekt · 1,57 kg", "Farris · Lime 0,5 l", "Gilde"]
+
+
+def test_product_page_says_the_size_of_each_price(page):
+    page.goto("/produkt.html?navn=Lettmelk")
+    expect(page.locator(".store").nth(0).locator(".brand")).to_have_text("Q · 1 l")
+    page.locator(".history summary").click()
+    expect(page.locator("#history tr").first).to_contain_text("Tine · 1 l")
 
 
 def test_multipacks_show_the_price_of_one(page):

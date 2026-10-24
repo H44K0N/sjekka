@@ -52,6 +52,21 @@ function prices(p) {
     return { each: each != null ? `${kr.format(each)} kr` : "–", unit };
 }
 
+// A package's size, "600 g", "1 kg" or "1,5 l", so a family pizza isn't
+// mistaken for a small one at a big price
+function packSize(p) {
+    if (!p.quantity || (p.unit !== "g" && p.unit !== "ml")) return "";
+    if (p.quantity < 1000) return `${whole.format(p.quantity)} ${p.unit}`;
+    return `${whole.format(p.quantity / 1000)} ${p.unit === "g" ? "kg" : "l"}`;
+}
+
+// Brand, variant and size on one line, leaving out the size when the variant
+// already says it
+function describe(p) {
+    const size = /\d\s*(kg|g|ml|cl|dl|l)\b/i.test(p.variant || "") ? "" : packSize(p);
+    return [p.brand, p.variant, size].filter(Boolean).join(" · ");
+}
+
 const perLabel = per => per === "stk" ? "kr / stk" : `kr / ${per}`;
 
 // What a flyer offer costs: "44,90 kr", or "3 for 50" for a multi-buy

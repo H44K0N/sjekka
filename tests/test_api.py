@@ -37,6 +37,14 @@ def test_products_returns_latest_price(client, db):
     assert products[0]["store_chain"] == "Kiwi"
 
 
+def test_products_include_the_variant_and_size(client, db):
+    add_item(db, "Pizza", 169.0, date(2026, 10, 23), store="Meny")
+    db.query(models.ReceiptItem).one().variant = "Hjemmelaget"
+    db.commit()
+    product = client.get("/products").json()[0]
+    assert (product["variant"], product["quantity"], product["unit"]) == ("Hjemmelaget", 1000, "ml")
+
+
 def test_pages_are_served(client):
     for path in ["/", "/upload.html", "/takk.html", "/style.css"]:
         assert client.get(path).status_code == 200
