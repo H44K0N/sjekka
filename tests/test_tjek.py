@@ -137,6 +137,16 @@ def namer(offers, known=()):
             for i, o in enumerate(offers)}, "raw"
 
 
+def test_a_pack_counted_in_pieces_is_one_pack_of_that_many(clean, db):
+    eggs = tjek_offer("EGG FRITTGÅENDE", 49.9, "15 pk, S/M, Norgården", unit="pcs", size=1, pieces=15)
+    offer, = tjek.import_catalog(db, CATALOGS[0], [eggs], namer).offers
+    assert (offer.quantity, offer.unit, offer.pack_size, offer.deal, offer.price_per_unit) == (15, "stk", 1, None, 3.33)
+    # Pieces said only in the text
+    eggs = tjek_offer("EGG 18 stk", 64.9, "First Price", unit=None, pieces=1)
+    offer, = tjek.import_catalog(db, CATALOGS[0], [eggs], namer).offers
+    assert (offer.quantity, offer.unit, offer.price_per_unit) == (18, "stk", 3.61)
+
+
 def test_import_catalog(clean, db):
     flyer = tjek.import_catalog(db, CATALOGS[0], OFFERS["kiwi1"], namer)
     assert (flyer.chain, flyer.valid_from, flyer.valid_to, flyer.source) == ("Kiwi", date(2026, 10, 19), date(2026, 10, 25), "tjek:kiwi1")

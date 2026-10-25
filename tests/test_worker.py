@@ -58,6 +58,39 @@ def test_a_multipack_is_priced_for_the_whole_pack(client, db):
     assert (saved.quantity, saved.pack_size, saved.price_per_unit) == (600, 1, 3.33)
 
 
+def test_a_pack_counted_in_pieces_is_priced_per_piece(client, db):
+    eggs = ExtractedItem(raw_name="FROKOSTEGG FRITTGÅENDE L 12STK PRIOR", canonical_name="Egg", category="Annet",
+                         unit="stk", total_price=56.4)
+    run(db, lambda path, known=(): receipt(items=[eggs], total=56.4).model_dump_json())
+    saved = db.query(models.ReceiptItem).one()
+    assert (saved.quantity, saved.unit, saved.price_per_unit) == (12, "stk", 4.7)
+
+
+def test_repair_gives_pieces_to_lines_and_offers_saved_before_and_only_once(client, db):
+    receipt_row = models.Receipt(image_filename="r.jpg", store_chain="Kiwi")
+    flyer = models.Flyer(chain="Kiwi", source="t", valid_from=date(2026, 10, 20), valid_to=date(2026, 10, 26))
+    db.add_all([receipt_row, flyer])
+    db.flush()
+    db.add_all([
+        models.ReceiptItem(receipt_id=receipt_row.id, raw_name="EGG 6PK PRIOR", canonical_name="Egg",
+                           unit="stk", pack_size=1, total_price=29.9, price_per_unit=29.9),
+        # Gemini had the pieces, but the price was per pack
+        models.ReceiptItem(receipt_id=receipt_row.id, raw_name="EGG 18STK", canonical_name="Egg",
+                           quantity=18, unit="stk", pack_size=1, total_price=61.2, price_per_unit=61.2),
+        models.ReceiptItem(receipt_id=receipt_row.id, raw_name="AGURK", canonical_name="Agurk",
+                           unit="stk", pack_size=1, total_price=15.0, price_per_unit=15.0),
+        models.FlyerOffer(flyer_id=flyer.id, raw_name="EGG 15stk, S/M, Norgården", canonical_name="Egg",
+                          unit="stk", pack_size=1, total_price=49.9, price_per_unit=49.9),
+    ])
+    db.commit()
+    assert worker.repair_piece_counts(db) == 3
+    assert worker.repair_piece_counts(db) == 0
+    lines = {i.raw_name: (i.quantity, i.price_per_unit) for i in db.query(models.ReceiptItem)}
+    assert lines == {"EGG 6PK PRIOR": (6, 4.98), "EGG 18STK": (18, 3.4), "AGURK": (None, 15.0)}
+    offer = db.query(models.FlyerOffer).one()
+    assert (offer.quantity, offer.price_per_unit) == (15, 3.33)
+
+
 def test_repair_fixes_multipacks_saved_before_and_only_once(client, db):
     receipt_row = models.Receipt(image_filename="r.jpg", store_chain="Meny")
     flyer = models.Flyer(chain="Kiwi", source="t.pdf", valid_from=date(2026, 10, 20), valid_to=date(2026, 10, 26))

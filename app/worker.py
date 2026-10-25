@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 import httpx
 from google.genai import errors
 from pydantic import ValidationError
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -49,16 +49,39 @@ def retry_delay(attempts: int) -> timedelta:
     return timedelta(seconds=min(30 * 2 ** (attempts - 1), 1800))
 
 
+def price_per(each: float, quantity: float | None, unit: str | None) -> float | None:
+    """The comparable price of one item: per 100 g/ml, or per piece for stk
+    (quantity is the pieces in a pack: 12 eggs; none is one piece)."""
+    if unit in ("g", "ml") and quantity:
+        return round(each / quantity * 100, 2)
+    if unit == "stk":
+        return round(each / (quantity or 1), 2)
+    return None
+
+
 def unit_price(item: ExtractedItem) -> float | None:
-    """Price per 100 g/ml, or per item for stk."""
+    """Price per 100 g/ml, or per piece for stk."""
     if item.total_price is None:
         return None
-    each = item.total_price / max(item.pack_size, 1)
-    if item.unit in ("g", "ml") and item.quantity:
-        return round(each / item.quantity * 100, 2)
-    if item.unit == "stk":
-        return round(each, 2)
-    return None
+    return price_per(item.total_price / max(item.pack_size, 1), item.quantity, item.unit)
+
+
+# "EGG FRITTGÅENDE 18STK", "6PK", "12 store egg": the pieces in one pack
+PIECES = re.compile(r"(?<![\d,.x×])(\d{1,3})\s*-?\s*(?:stk|pk|pakk\w*|pack)\b|(?<![\d,.])(\d{1,3})\s+(?:\w+\s+)?egg\b",
+                    re.IGNORECASE)
+
+
+def piece_count(raw_name: str | None, quantity: float | None, unit: str | None,
+                pack_size: int | None) -> tuple[float | None, str | None]:
+    """(quantity, unit) with the pieces in a pack, for a line counted in
+    pieces. Gemini gives "EGG 12STK" as 12 stk about half the time and as
+    one item the other, which made a 12-pack look like one dear egg. A line
+    bought as several (pack_size > 1) is left alone: "2 STK" may be that."""
+    if unit not in ("stk", None) or quantity or (pack_size or 1) != 1:
+        return quantity, unit
+    match = PIECES.search(raw_name or "")
+    count = int(match[1] or match[2]) if match else 0
+    return (float(count), "stk") if count >= 2 else (quantity, unit)
 
 
 # "Yoghurt kokos 4x150g": several of something sold as one package
@@ -106,6 +129,23 @@ def sold_by_weight(raw_name: str | None, unit: str | None) -> bool:
     if "løsvekt" in raw_name.lower():
         return True
     return bool(re.search(r"\bkg\b", raw_name, re.IGNORECASE)) and not PACKAGE_SIZE.search(raw_name)
+
+
+def repair_piece_counts(db: Session) -> int:
+    """Gives lines and offers counted in pieces, saved before piece_count,
+    their pieces, and prices them per piece. Safe to run again."""
+    fixed = 0
+    for model in (models.ReceiptItem, models.FlyerOffer):
+        for row in db.query(model).filter(or_(model.unit == "stk", model.unit.is_(None)), model.total_price.isnot(None)):
+            quantity, unit = piece_count(row.raw_name, row.quantity, row.unit, row.pack_size)
+            per = price_per(row.total_price / max(row.pack_size or 1, 1), quantity, unit)
+            if (quantity, unit, per) != (row.quantity, row.unit, row.price_per_unit):
+                row.quantity, row.unit, row.price_per_unit = quantity, unit, per
+                fixed += 1
+    db.commit()
+    if fixed:
+        logger.info(f"Gave {fixed} lines and offers their pieces")
+    return fixed
 
 
 def repair_multipacks(db: Session) -> int:
@@ -330,6 +370,7 @@ def save_receipt(db: Session, job: models.Job, data: ExtractedReceipt) -> models
     in_use = names.Names(db)
     for item in data.items:
         item.quantity = multipack_quantity(item.raw_name, item.quantity, item.unit, item.pack_size)
+        item.quantity, item.unit = piece_count(item.raw_name, item.quantity, item.unit, item.pack_size)
         name, brand, variant = in_use.tidy(item.canonical_name, item.brand, item.variant)
         db.add(models.ReceiptItem(
             receipt_id=receipt.id,
@@ -477,6 +518,7 @@ async def run_worker():
         logger.info(f"Reset stuck job: {job.filename}")
     db.commit()
     repair_multipacks(db)
+    repair_piece_counts(db)
     repair_chain_names(db)
     names.repair_product_names(db)
     fill_receipt_totals(db)

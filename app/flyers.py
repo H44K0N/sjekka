@@ -20,7 +20,7 @@ from app.config import GEMINI_MODEL
 from app.extractor import extract_flyer
 from app.names import Names
 from app.schema import ExtractedFlyer
-from app.worker import is_retryable, multipack_quantity, parse_date, sold_by_weight, unit_price
+from app.worker import is_retryable, multipack_quantity, parse_date, piece_count, sold_by_weight, unit_price
 
 ATTEMPTS = 4
 RETRY_SECONDS = 20
@@ -81,6 +81,7 @@ def import_flyer(db: Session, path: Path, chain: str | None = None, valid_from: 
     in_use = Names(db)
     for offer in data.offers:
         offer.quantity = multipack_quantity(offer.raw_name, offer.quantity, offer.unit, offer.pack_size)
+        offer.quantity, offer.unit = piece_count(offer.raw_name, offer.quantity, offer.unit, offer.pack_size)
         name, brand, variant = in_use.tidy(offer.canonical_name, offer.brand, offer.variant)
         flyer.offers.append(models.FlyerOffer(
             raw_name=offer.raw_name,
@@ -116,7 +117,7 @@ def active_offers(db: Session, today: date, name: str | None = None) -> list[tup
 @dataclass
 class Price:
     """A price reduced to something comparable: per 100 g/ml when the size
-    is known, else per item."""
+    is known, per piece when the pieces are, else per item."""
     value: float
     per: str  # "100 g", "100 ml" or "stk"
 
@@ -127,7 +128,7 @@ def comparable(total_price, pack_size, unit, quantity) -> Price | None:
     each = total_price / max(pack_size or 1, 1)
     if unit in ("g", "ml") and quantity:
         return Price(each / quantity * 100, f"100 {unit}")
-    return Price(each, "stk")
+    return Price(each / (quantity if unit == "stk" and quantity else 1), "stk")
 
 
 def brands(text: str | None) -> set[str]:
@@ -145,6 +146,10 @@ def like_for_like(offer: models.FlyerOffer, item: models.ReceiptItem) -> bool:
     # quantity is one item's size on both: "3 for 100" is three of the same item
     size, other = offer.quantity, item.quantity
     if offer.unit == item.unit and size and other and max(size, other) / min(size, other) > SIZE_RATIO:
+        return False
+    # A 12-pack of eggs against a line whose pieces aren't known: per piece
+    # on one side and per pack on the other can't be compared
+    if offer.unit == item.unit == "stk" and bool(size) != bool(other):
         return False
     return True
 

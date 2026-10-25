@@ -134,7 +134,8 @@
                 const about = o.brand ? [o.canonical_name, packSize(o)].filter(Boolean).join(" · ") : describe(o);
                 if (about) body.append(el("p", "brand", about));
                 body.append(el("p", "price", offerPrice(o)));
-                const unit = o.unit === "g" || o.unit === "ml" ? `${kr.format(o.per_unit)} kr / 100 ${o.unit}` : o.pack_size > 1 ? `${kr.format(o.each)} kr / stk` : "";
+                const unit = o.unit === "g" || o.unit === "ml" ? `${kr.format(o.per_unit)} kr / 100 ${o.unit}`
+                    : o.pack_size > 1 || o.quantity > 1 ? `${kr.format(o.per_unit)} kr / stk` : "";
                 const facts = [unit, o.is_member_price ? "medlemspris" : "", o.pack_size === 1 && o.deal ? o.deal : ""].filter(Boolean);
                 if (facts.length) body.append(el("p", "unit", facts.join(" · ")));
                 body.append(verdictTag(o));

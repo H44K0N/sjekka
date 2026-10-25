@@ -79,7 +79,7 @@ def latest_offers(rows) -> dict[tuple[str, str], Offer]:
         # Trumf also covers florists and the like (Mester Grønn): not a grocery store to compare
         if chain not in GROCERY_CHAINS or item.total_price is None or not item.canonical_name:
             continue
-        sized = item.unit in ("g", "ml") and item.quantity and item.price_per_unit
+        sized = item.unit in SIZED and item.quantity and item.price_per_unit
         lines.setdefault((item.canonical_name, chain), []).append(Offer(
             product=item.canonical_name, chain=chain,
             each=item.total_price / max(item.pack_size or 1, 1),
@@ -102,6 +102,8 @@ def by_product(offers: dict[tuple[str, str], Offer]) -> dict[str, dict[str, Offe
     return grouped
 
 
+# Units a size is given in: weight, volume, or the pieces in a pack (12 eggs)
+SIZED = ("g", "ml", "stk")
 # A line more than twice the typical size isn't priced from (see scale);
 # flyer verdicts call sizes this far apart different products
 SIZE_RATIO = 2
@@ -128,7 +130,7 @@ def scale(offers: list[Offer]) -> tuple[Callable[[Offer], float], str | None, Ca
     that fits has no price. Otherwise the price of one item is used.
     Returns the pricing function, the size it prices, if any, and the line
     to price an offer by (see cheapest_choice; None: none fits)."""
-    sized = [o for o in offers if o.unit in ("g", "ml") and o.quantity and o.per_unit]
+    sized = [o for o in offers if o.unit in SIZED and o.quantity and o.per_unit]
     if sized:
         unit, n = Counter(o.unit for o in sized).most_common(1)[0]
         if n * 2 > len(offers):
@@ -180,7 +182,7 @@ def flyer_deals(rows) -> dict[tuple[str, str], Offer]:
     for item, flyer in rows:
         if item.total_price is None:
             continue
-        sized = item.unit in ("g", "ml") and item.quantity and item.price_per_unit
+        sized = item.unit in SIZED and item.quantity and item.price_per_unit
         offer = Offer(
             product=item.canonical_name, chain=flyer.chain,
             each=item.total_price / max(item.pack_size or 1, 1),
