@@ -1507,3 +1507,22 @@ def test_the_number_of_dinners_is_chosen_and_remembered(dinners_page):
     assert page.evaluate("localStorage.getItem('sjekka.middager')") == "3"
     page.reload()
     expect(page.locator("#days button[aria-pressed=true]")).to_have_text("3")
+
+
+def test_the_phone_menu_has_room_for_every_page(browser, site):
+    # Five things in one row once left "sjekka" touching "tilbud" and hid "utforsk"
+    for width in (320, 360, 412):
+        context = browser.new_context(base_url=site[0], viewport={"width": width, "height": 700}, has_touch=True)
+        page = context.new_page()
+        page.goto("/handleliste.html?v=Lettmelk&v=Agurk&v=Seigmenn&v=Kj%C3%B8ttdeig&v=Smør&v=Egg&v=Brød&v=Ost&v=Skinke&v=Salat")
+        links = page.locator(".top nav a:not(.cta)")
+        expect(links).to_have_text(["utforsk", "tilbud", "middag", re.compile("^handleliste")])
+        boxes = [links.nth(i).bounding_box() for i in range(links.count())]
+        assert all(b["height"] >= 40 for b in boxes), width  # easy to tap
+        for left, right in zip(boxes, boxes[1:], strict=False):
+            assert right["x"] - (left["x"] + left["width"]) >= 12, (width, "links touch")
+        assert boxes[-1]["x"] + boxes[-1]["width"] <= width - 16, (width, "runs off the edge")
+        top = page.locator(".top .mark").bounding_box(), page.locator(".top .cta").bounding_box()
+        assert top[0]["y"] < boxes[0]["y"] and top[1]["y"] < boxes[0]["y"], width  # logo and button above the links
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), width
+        context.close()
