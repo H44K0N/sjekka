@@ -9,7 +9,7 @@ import math
 import re
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from statistics import median
 
@@ -75,6 +75,7 @@ class Offer:
     brand: str | None
     date: date | None
     until: date | None = None   # set for flyer offers: the last day they apply
+    variant: str | None = None
     deal: str | None = None
     # A multi-buy ("8 for 100") is that price only when this many are bought
     needs: int = 1
@@ -88,6 +89,9 @@ class Offer:
     # among them): a product's typical size is judged from all it was bought
     # in, and a chain whose latest is a multipack still has a price for one
     history: list["Offer"] = field(default_factory=list)
+    # A flyer's other offers for the product at the chain (this one is the
+    # cheapest): one of them may be the exact item someone wants
+    others: list["Offer"] = field(default_factory=list)
 
 
 def latest_offers(rows) -> dict[tuple[str, str], Offer]:
@@ -104,7 +108,7 @@ def latest_offers(rows) -> dict[tuple[str, str], Offer]:
             product=item.canonical_name, chain=chain,
             each=item.total_price / max(item.pack_size or 1, 1),
             per_unit=item.price_per_unit if sized else None,
-            unit=item.unit, quantity=item.quantity, brand=item.brand, date=receipt.purchase_date,
+            unit=item.unit, quantity=item.quantity, brand=item.brand, variant=item.variant, date=receipt.purchase_date,
             pieces=pieces_named(item.raw_name) if item.unit != "stk" else None, line=item, source=receipt,
         ))
     offers = {}
@@ -222,15 +226,82 @@ def flyer_deals(rows) -> dict[tuple[str, str], Offer]:
             product=item.canonical_name, chain=flyer.chain,
             each=item.total_price / max(item.pack_size or 1, 1),
             per_unit=item.price_per_unit if sized else None,
-            unit=item.unit, quantity=item.quantity, brand=item.brand, date=flyer.valid_from,
+            unit=item.unit, quantity=item.quantity, brand=item.brand, variant=item.variant, date=flyer.valid_from,
             until=flyer.valid_to, deal=item.deal,
             needs=max(item.pack_size or 1, 1) if item.deal else 1,
             pieces=pieces_named(item.raw_name) if item.unit != "stk" else None, line=item, source=flyer,
         )
         key = (offer.product, offer.chain)
-        if key not in deals or offer.each < deals[key].each:
+        if key not in deals:
             deals[key] = offer
+        elif offer.each < deals[key].each:
+            offer.others = [deals[key], *deals[key].others]
+            deals[key].others = []
+            deals[key] = offer
+        else:
+            deals[key].others.append(offer)
     return deals
+
+
+# ---- one item, not any of the product ----
+# A product is generic: "Brus" holds Coca-Cola Zero, Pepsi Max and Eplebrus,
+# so its cheapest is whichever drink is cheapest. That answers "what's the
+# cheapest pizza?", but someone after Coca-Cola Zero wants that drink
+# compared, so an item is the product with its brand and variant.
+
+def plain(text: str | None) -> str:
+    """Brands and variants as Gemini spells them loosely: "Coca-Cola" is "Coca Cola"."""
+    return re.sub(r"[^0-9a-zæøå%]", "", (text or "").lower())
+
+
+def ident(brand: str | None, variant: str | None) -> str:
+    """Which item a brand and variant name. Gemini splits them loosely, so it's
+    their words together, each once: "Pepsi Max" with variant "Max" is "Pepsi
+    Max", and "Solo" "Super" is "Solo Super"."""
+    words = f"{brand or ''} {variant or ''}".lower().split()
+    return plain("".join(dict.fromkeys(words)))
+
+
+@dataclass(frozen=True)
+class Item:
+    product: str
+    brand: str
+    variant: str | None = None
+
+    @property
+    def key(self) -> str:
+        """How the shopping list and the API name the item."""
+        return f"{self.product}|{self.brand}|{self.variant or ''}"
+
+    def matches(self, offer: Offer, flyer: bool = False) -> bool:
+        """A line of this item. A flyer offer without a variant ("Coca-Cola,
+        4 varianter") covers every variant of its brand."""
+        if ident(offer.brand, offer.variant) == ident(self.brand, self.variant):
+            return True
+        return flyer and not offer.variant and plain(offer.brand) == plain(self.brand)
+
+
+def narrow(offers: dict[tuple[str, str], Offer], item: Item, flyer: bool = False) -> dict[str, Offer]:
+    """chain -> the item's own lines there, newest (or cheapest offer) first."""
+    found = {}
+    for (product, chain), offer in offers.items():
+        if product != item.product:
+            continue
+        lines = [o for o in [*(offer.history or [offer]), *offer.others] if item.matches(o, flyer)]
+        if lines:
+            found[chain] = replace(lines[0], history=lines, others=[])
+    return found
+
+
+def items_of(offers: dict[tuple[str, str], Offer]) -> list[Item]:
+    """Every branded item among one product's lines, spelled as most often written."""
+    spellings: dict[str, Counter] = {}
+    for offer in offers.values():
+        for line in offer.history or [offer]:
+            if line.brand:
+                spellings.setdefault(ident(line.brand, line.variant), Counter())[(line.brand, line.variant)] += 1
+    product = next(iter(offers.values())).product if offers else ""
+    return [Item(product, *names.most_common(1)[0][0]) for names in spellings.values()]
 
 
 def chain_index(products: dict[str, dict[str, float]]) -> dict[str, float]:
@@ -249,14 +320,21 @@ def chain_index(products: dict[str, dict[str, float]]) -> dict[str, float]:
 
 
 def price_list(wanted: list[tuple[str, int]], offers: dict[tuple[str, str], Offer],
-               deals: dict[tuple[str, str], Offer] | None = None) -> dict:
+               deals: dict[tuple[str, str], Offer] | None = None, items: list[Item] = ()) -> dict:
     """Prices `wanted` (product name, count) at every chain that has a known
     price for at least one of them. `deals` are flyer offers valid today:
     they're used where they beat the receipt price, but never count towards
-    how expensive a chain usually is."""
+    how expensive a chain usually is. A wanted name can be an item's key
+    (see Item): it's priced from that item's lines only."""
     grouped = by_product(offers)
     on_offer = by_product(deals or {})
     index = chain_index({p: line_prices(chains)[0] for p, chains in grouped.items()})
+    for item in items:
+        mine, theirs = narrow(offers, item), narrow(deals or {}, item, flyer=True)
+        if mine:
+            grouped[item.key] = mine
+        if theirs:
+            on_offer[item.key] = theirs
 
     known = set(grouped) | set(on_offer)
     listed = [(name, count) for name, count in wanted if name in known]
@@ -306,6 +384,7 @@ def price_list(wanted: list[tuple[str, int]], offers: dict[tuple[str, str], Offe
                 "estimated": not is_known,
                 "date": str(offer.date) if offer and offer.date and not offer.until else None,
                 "brand": offer.brand if offer else None,
+                "variant": offer.variant if offer else None,
                 "offer_until": str(offer.until) if offer and offer.until else None,
                 "deal": offer.deal if offer else None,
             }

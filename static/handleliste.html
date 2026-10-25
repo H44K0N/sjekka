@@ -275,7 +275,8 @@
             const items = ShoppingList.read();
             $("empty").hidden = items.length > 0;
             $("list-actions").hidden = items.length === 0;
-            const lines = new Map((result?.items || []).map(i => [i.name, i]));
+            // Lines are named as the list names them: "Brus", or "Brus|Coca-Cola|Zero" for an item
+            const lines = new Map((result?.items || []).map(i => [i.key ?? i.name, i]));
             const unknown = new Set(result?.unknown || []);
             // Rows are rebuilt on every change, so put keyboard focus back
             // on the same control afterwards
@@ -285,14 +286,20 @@
             $("items").replaceChildren(...items.map(item => {
                 const li = el("li", "list-item");
                 const main = el("div", "what");
-                const name = el("a", "", item.name);
-                name.href = `/produkt.html?navn=${encodeURIComponent(item.name)}`;
+                const called = ShoppingList.label(item);
+                const name = el("a", "", called);
+                name.href = productLink(item);
                 main.append(name);
-                const line = lines.get(item.name);
+                // "Coca-Cola Zero" is that drink; "Brus" is whichever is cheapest
+                if (item.brand && item.variant) name.append(el("span", "kind", ` ${item.name.toLowerCase()}`));
+                const line = lines.get(ShoppingList.keyOf(item));
                 const hint = el("span", "hint");
                 if (line) {
                     const best = line.prices[line.cheapest];
-                    hint.append("billigst hos ", chainBadge(line.cheapest), el("span", "each", money(best.price / line.count) + forSize(line)));
+                    // Any of the product: say which one is the cheapest, so it's clear what the price is for
+                    const which = !item.brand && best.brand ? [best.brand, best.variant].filter(Boolean).join(" ") : "";
+                    hint.append(which ? `billigst: ${which} hos ` : "billigst hos ", chainBadge(line.cheapest),
+                        el("span", "each", money(best.price / line.count) + forSize(line)));
                     if (best.offer_until) {
                         const tag = el("span", "offer-tag", "tilbud");
                         tag.title = until(best.offer_until);
@@ -305,12 +312,12 @@
                         more.append(chainBadge(multi.chain), `${multi.deal} kr: ${money(multi.each)} stk hvis du tar ${multi.needs}`);
                         const take = el("button", "did-you-mean", `Ta ${multi.needs}`);
                         take.type = "button";
-                        take.setAttribute("aria-label", `Ta ${multi.needs} ${item.name} for tilbudet hos ${multi.chain}`);
-                        take.addEventListener("click", () => { ShoppingList.setCount(item.name, multi.needs); update(); });
+                        take.setAttribute("aria-label", `Ta ${multi.needs} ${called} for tilbudet hos ${multi.chain}`);
+                        take.addEventListener("click", () => { ShoppingList.setCount(item, multi.needs); update(); });
                         more.append(take);
                         hint.append(more);
                     }
-                } else if (unknown.has(item.name)) {
+                } else if (unknown.has(ShoppingList.keyOf(item))) {
                     hint.append(el("span", "none", "ingen priser ennå"));
                     // Names match exactly, so "Melk" finds no prices while
                     // "Lettmelk" has them: offer the names that do
@@ -320,9 +327,9 @@
                         for (const other of alike) {
                             const swap = el("button", "did-you-mean", other);
                             swap.type = "button";
-                            swap.setAttribute("aria-label", `Bytt ${item.name} med ${other}`);
+                            swap.setAttribute("aria-label", `Bytt ${called} med ${other}`);
                             swap.addEventListener("click", () => {
-                                ShoppingList.remove(item.name);
+                                ShoppingList.remove(item);
                                 ShoppingList.add(other, item.count);
                                 update();
                             });
@@ -335,30 +342,31 @@
                 const qty = el("div", "qty");
                 const minus = el("button", "", "−");
                 minus.type = "button";
-                minus.setAttribute("aria-label", `Færre ${item.name}`);
+                minus.setAttribute("aria-label", `Færre ${called}`);
                 minus.disabled = item.count <= 1;
-                minus.addEventListener("click", () => { ShoppingList.setCount(item.name, item.count - 1); update(); });
+                minus.addEventListener("click", () => { ShoppingList.setCount(item, item.count - 1); update(); });
                 const count = el("span", "", String(item.count));
                 count.setAttribute("aria-label", `${item.count} stk`);
                 const plus = el("button", "", "+");
                 plus.type = "button";
-                plus.setAttribute("aria-label", `Flere ${item.name}`);
+                plus.setAttribute("aria-label", `Flere ${called}`);
                 plus.disabled = item.count >= 99;
-                plus.addEventListener("click", () => { ShoppingList.setCount(item.name, item.count + 1); update(); });
+                plus.addEventListener("click", () => { ShoppingList.setCount(item, item.count + 1); update(); });
                 qty.append(minus, count, plus);
 
                 const remove = el("button", "remove");
                 remove.type = "button";
-                remove.setAttribute("aria-label", `Fjern ${item.name}`);
+                remove.setAttribute("aria-label", `Fjern ${called}`);
                 remove.addEventListener("click", () => {
                     // Keep focus in the list, not lost with the removed button
-                    const next = (li.nextElementSibling || li.previousElementSibling)?.dataset.name;
-                    ShoppingList.remove(item.name);
+                    const next = (li.nextElementSibling || li.previousElementSibling)?.dataset.key;
+                    ShoppingList.remove(item);
                     update();
-                    const row = [...$("items").children].find(r => r.dataset.name === next);
+                    const row = [...$("items").children].find(r => r.dataset.key === next);
                     (row ? row.querySelector(".remove") : input).focus();
                 });
                 li.dataset.name = item.name;
+                li.dataset.key = ShoppingList.keyOf(item);
                 li.append(main, qty, remove);
                 return li;
             }));
@@ -404,7 +412,7 @@
             const unknown = show ? result.unknown : [];
             $("unknown").hidden = !unknown.length;
             $("unknown").textContent = unknown.length
-                ? `${unknown.length === 1 ? "Denne" : "Disse"} har ingen registrert pris ennå og er ikke med i summen: ${unknown.join(", ")}.` : "";
+                ? `${unknown.length === 1 ? "Denne" : "Disse"} har ingen registrert pris ennå og er ikke med i summen: ${unknown.map(k => ShoppingList.label(ShoppingList.fromKey(k))).join(", ")}.` : "";
             $("bar").hidden = $("verdict").hidden;
             if (!show || !stores.length) return;
 
@@ -447,12 +455,12 @@
                 $("split-chains").replaceChildren(chains);
                 // Rounded like the totals when a price in it is an estimate
                 const guessed = Object.entries(s.plan).some(([name, chain]) =>
-                    result.items.find(i => i.name === name)?.prices[chain]?.estimated);
+                    result.items.find(i => (i.key ?? i.name) === name)?.prices[chain]?.estimated);
                 $("split-total").textContent = guessed ? `≈ ${kr.format(Math.round(s.total))} kr` : money(s.total);
                 $("split-save").textContent = `spar ${guessed ? `rundt ${kr.format(Math.round(s.saving))} kr` : money(s.saving)} ekstra`;
                 $("split-plan").replaceChildren(...s.chains.map(chain => {
                     const li = el("li");
-                    const names = Object.entries(s.plan).filter(([, c]) => c === chain).map(([n]) => n);
+                    const names = Object.entries(s.plan).filter(([, c]) => c === chain).map(([n]) => ShoppingList.label(ShoppingList.fromKey(n)));
                     li.append(chainBadge(chain), el("span", "", names.join(", ")));
                     return li;
                 }));
@@ -497,9 +505,10 @@
                 for (const line of result.items) {
                     const p = line.prices[store.chain];
                     const tr = el("tr", p.estimated ? "estimated" : "");
-                    const what = el("td", "", line.count > 1 ? `${line.count} × ${line.name}` : line.name);
+                    const called = line.brand ? ShoppingList.label(line) : line.name;
+                    const what = el("td", "", line.count > 1 ? `${line.count} × ${called}` : called);
                     // Products are grouped by name, so say which brand the price is for
-                    if (p.brand) what.append(el("span", "brand", ` ${p.brand}`));
+                    if (!line.brand && p.brand) what.append(el("span", "brand", ` ${[p.brand, p.variant].filter(Boolean).join(" ")}`));
                     if (line.size) what.append(el("span", "brand", forSize(line)));
                     tr.append(
                         what,
@@ -545,7 +554,8 @@
                     const merged = [];
                     for (const i of ShoppingList.read()) {
                         const name = result.renamed[i.name] || i.name;
-                        const same = merged.find(m => m.name.toLowerCase() === name.toLowerCase());
+                        const key = ShoppingList.keyOf({ ...i, name }).toLowerCase();
+                        const same = merged.find(m => ShoppingList.keyOf(m).toLowerCase() === key);
                         if (same) same.count = Math.min(same.count + i.count, 99);
                         else merged.push({ ...i, name });
                     }
@@ -582,17 +592,21 @@
         });
         input.addEventListener("focus", () => { $("undo").hidden = true; });
 
-        // ---- sharing: the list travels in the link as ?v=Melk&v=Smør~2 ----
+        // ---- sharing: the list travels in the link as ?v=Melk&v=Smør~2&v=Brus|Coca-Cola|Zero ----
 
         function listLink() {
             const params = new URLSearchParams();
-            for (const i of ShoppingList.read()) params.append("v", i.count > 1 ? `${i.name}~${i.count}` : i.name);
+            for (const i of ShoppingList.read()) {
+                const key = ShoppingList.keyOf(i).replace(/\|$/, "");  // "Lettmelk|Tine", not "Lettmelk|Tine|"
+                params.append("v", i.count > 1 ? `${key}~${i.count}` : key);
+            }
             return `${location.origin}${location.pathname}?${params}`;
         }
         function sharedList() {
             return new URLSearchParams(location.search).getAll("v").map(v => {
                 const m = v.match(/^(.*)~(\d+)$/);
-                return m ? { name: m[1].trim(), count: Math.min(Math.max(+m[2], 1), 99) } : { name: v.trim(), count: 1 };
+                const entry = ShoppingList.fromKey((m ? m[1] : v).trim());
+                return { ...entry, name: entry.name.trim(), count: m ? Math.min(Math.max(+m[2], 1), 99) : 1 };
             }).filter(i => i.name);
         }
 
@@ -617,7 +631,7 @@
             if (!shared.length) return;
             const clearUrl = () => history.replaceState(null, "", location.pathname);
             const mine = ShoppingList.read();
-            const same = mine.length === shared.length && shared.every(s => mine.some(m => m.name === s.name && m.count === s.count));
+            const same = mine.length === shared.length && shared.every(s => mine.some(m => ShoppingList.keyOf(m) === ShoppingList.keyOf(s) && m.count === s.count));
             if (!mine.length || same) {
                 ShoppingList.write(shared);
                 clearUrl();
@@ -636,7 +650,7 @@
             $("shared").hidden = false;
             const done = () => { $("shared").hidden = true; clearUrl(); update(); input.focus(); };
             $("shared-replace").onclick = () => { ShoppingList.write(shared); done(); };
-            $("shared-merge").onclick = () => { for (const s of shared) ShoppingList.add(s.name, s.count); done(); };
+            $("shared-merge").onclick = () => { for (const s of shared) ShoppingList.add(s, s.count); done(); };
             $("shared-dismiss").onclick = done;
         }
 

@@ -554,6 +554,20 @@ main.planner-page { max-width: 1040px; }
 .list-item .what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .list-item .what a { overflow-wrap: anywhere; transition: color 150ms; }
 .list-item .what a:hover { color: var(--accent); }
+.list-item .what a .kind { font-size: 13px; color: var(--soft); }
+/* a product's items: Coca-Cola Zero, Pepsi Max, … each with its own page */
+.items-section { margin-top: 40px; }
+.items-section .note { margin: 6px 0 0; max-width: 40em; font-size: 15px; color: var(--soft); }
+.item-list { margin: 12px 0 0; padding: 0; list-style: none; }
+.item-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+@media (max-width: 600px) { .item-row { grid-template-columns: minmax(0, 1fr); } }
+.item-row a { font-size: 18px; overflow-wrap: anywhere; }
+.item-row a:hover { color: var(--accent); }
+.item-where { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--soft); font-variant-numeric: tabular-nums; }
+.item-where .chain { height: 20px; }
+.item-count { grid-column: 1 / -1; font-size: 13px; color: var(--soft); }
+.item-list + .text-button { margin-top: 10px; }
+.best-what { display: block; margin-top: 6px; font-size: 14px; color: var(--soft); }
 .hint { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--soft); font-variant-numeric: tabular-nums; }
 .hint .chain { height: 20px; }
 .hint .each { white-space: nowrap; }

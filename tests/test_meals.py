@@ -11,7 +11,7 @@ TODAY = date(2026, 10, 24)
 
 
 def row(name, chain, price, *, unit="g", quantity=500, days=0):
-    item = SimpleNamespace(canonical_name=name, total_price=price, pack_size=1, unit=unit, quantity=quantity,
+    item = SimpleNamespace(variant=None, canonical_name=name, total_price=price, pack_size=1, unit=unit, quantity=quantity,
                            price_per_unit=round(price / quantity * 100, 2), brand=None, raw_name=None)
     return item, SimpleNamespace(store_chain=chain, purchase_date=TODAY - timedelta(days=days))
 
@@ -100,7 +100,7 @@ def test_fewer_portions_cost_proportionally_less_and_the_cheapest_dinner_comes_f
 def test_offers_lower_the_price_and_the_saving_is_what_they_took_off(two_dinners):
     offers = basket.latest_offers(ROWS)
     flyer = SimpleNamespace(chain="Rema 1000", valid_from=TODAY, valid_to=TODAY + timedelta(days=4))
-    offer = SimpleNamespace(canonical_name="Kjøttdeig", total_price=30.0, pack_size=1, unit="g", quantity=400,
+    offer = SimpleNamespace(variant=None, canonical_name="Kjøttdeig", total_price=30.0, pack_size=1, unit="g", quantity=400,
                             price_per_unit=7.5, brand="Gilde", deal=None, raw_name=None)
     deals = basket.flyer_deals([(offer, flyer)])
     bolognese = next(r for r in meals.suggest(offers, deals)["recipes"] if r["id"] == "bolo")
@@ -110,7 +110,7 @@ def test_offers_lower_the_price_and_the_saving_is_what_they_took_off(two_dinners
 
 def test_a_product_only_the_flyers_know_has_a_price_but_no_saving(two_dinners):
     flyer = SimpleNamespace(chain="Kiwi", valid_from=TODAY, valid_to=TODAY + timedelta(days=4))
-    only = SimpleNamespace(canonical_name="Pasta", total_price=15.0, pack_size=1, unit="g", quantity=500,
+    only = SimpleNamespace(variant=None, canonical_name="Pasta", total_price=15.0, pack_size=1, unit="g", quantity=500,
                            price_per_unit=3.0, brand=None, deal=None, raw_name=None)
     deals = basket.flyer_deals([(only, flyer)])
     result = meals.suggest({}, deals)

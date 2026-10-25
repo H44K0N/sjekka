@@ -290,10 +290,27 @@ def get_products(db: Session = Depends(get_db)):
     return products
 
 
+def item_summary(item: basket.Item, offers) -> dict | None:
+    """One item of a product: where it's cheapest now, at its usual size."""
+    mine = basket.narrow(offers, item)
+    price_of, size, lines = basket.choices(mine)
+    if not lines:
+        return None
+    chain = min(lines, key=lambda c: price_of(lines[c]))
+    return {
+        "brand": item.brand, "variant": item.variant, "key": item.key, "size": size,
+        "prices": sum(len(o.history) for o in mine.values()), "chains": len(mine),
+        "cheapest": {"chain": chain, "price": round(price_of(lines[chain]), 2)},
+        "latest_date": str(max(o.date for o in mine.values() if o.date)) if any(o.date for o in mine.values()) else None,
+    }
+
+
 @app.get("/products/{name}")
-def get_product(name: str, db: Session = Depends(get_db)):
+def get_product(name: str, merke: str | None = None, variant: str | None = None, db: Session = Depends(get_db)):
     """Every registered price of one product, oldest first, for the product
-    page. A link with a name the product no longer has still finds it."""
+    page. A link with a name the product no longer has still finds it.
+    `items` are the brands and variants it's been bought as; `merke` (and
+    `variant`, none when left out) narrows the prices to one of them."""
     def prices_of(name):
         return (
             db.query(models.ReceiptItem, models.Receipt)
@@ -308,6 +325,20 @@ def get_product(name: str, db: Session = Depends(get_db)):
     if not rows:
         raise HTTPException(404, "Fant ikke produktet.")
 
+    every = basket.latest_offers(rows)
+    items = [s for item in basket.items_of(every) if (s := item_summary(item, every))]
+    items.sort(key=lambda s: (-s["prices"], s["brand"].lower(), (s["variant"] or "").lower()))
+    chosen = None
+    if merke:
+        chosen = basket.Item(name, merke, variant or None)
+        rows = [(i, r) for i, r in rows if basket.ident(i.brand, i.variant) == basket.ident(chosen.brand, chosen.variant)]
+        if not rows:
+            raise HTTPException(404, "Fant ikke varen.")
+        # As the item is most often spelled
+        known = next((s for s in items if basket.ident(s["brand"], s["variant"]) == basket.ident(merke, variant)), None)
+        if known:
+            chosen = basket.Item(name, known["brand"], known["variant"])
+
     latest = rows[-1][0]
     # The line each chain is priced by, as on the shopping list, and that
     # price at the product's usual size, so stores selling it in different
@@ -318,6 +349,8 @@ def get_product(name: str, db: Session = Depends(get_db)):
         "canonical_name": name,
         "category": latest.category,
         "size": size,
+        "item": {"brand": chosen.brand, "variant": chosen.variant, "key": chosen.key} if chosen else None,
+        "items": items,
         "prices": [
             {
                 "store_chain": receipt.store_chain,
@@ -402,6 +435,9 @@ def get_batch(batch: str, db: Session = Depends(get_db)):
 class ListItem(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     count: int = Field(default=1, ge=1, le=99)
+    # An exact item ("Coca-Cola Zero") rather than the cheapest of the product
+    brand: str | None = Field(default=None, max_length=200)
+    variant: str | None = Field(default=None, max_length=200)
 
 
 class ShoppingList(BaseModel):
@@ -417,12 +453,17 @@ def price_basket(shopping_list: ShoppingList, db: Session = Depends(get_db)):
     in_use = names.Names(db)
     wanted: dict[str, int] = {}
     renamed = {}
+    exact: dict[str, tuple[basket.Item, str]] = {}  # key priced -> the item, and the key the list knows it by
     for item in shopping_list.items:
         name = in_use.resolve(item.name)
         if name != item.name and name.lower() != item.name.lower():
             renamed[item.name] = name
         else:
             name = item.name
+        if item.brand:
+            one = basket.Item(name, item.brand, item.variant or None)
+            exact[one.key] = (one, basket.Item(item.name, item.brand, item.variant or None).key)
+            name = one.key
         wanted[name] = wanted.get(name, 0) + item.count
     rows = (
         db.query(models.ReceiptItem, models.Receipt)
@@ -431,7 +472,16 @@ def price_basket(shopping_list: ShoppingList, db: Session = Depends(get_db)):
         .all()
     )
     deals = basket.flyer_deals(flyers.active_offers(db, date.today()))
-    return {**basket.price_list(list(wanted.items()), basket.latest_offers(rows), deals), "renamed": renamed}
+    result = basket.price_list(list(wanted.items()), basket.latest_offers(rows), deals, [one for one, _ in exact.values()])
+    # An item's line says which item it is, under the key the list sent
+    for line in result["items"]:
+        if line["name"] in exact:
+            one, sent = exact[line["name"]]
+            line.update(name=one.product, key=sent, brand=one.brand, variant=one.variant)
+        else:
+            line["key"] = line["name"]
+    result["unknown"] = [exact[name][1] if name in exact else name for name in result["unknown"]]
+    return {**result, "renamed": renamed}
 
 
 @app.get("/meals")

@@ -59,6 +59,15 @@ function prices(p) {
     return { each: each != null ? `${kr.format(each)} kr` : "–", unit };
 }
 
+// A product's page, or one item's: /produkt.html?navn=Brus&merke=Coca-Cola&variant=Zero
+function productLink(what) {
+    const e = typeof what === "string" ? { name: what } : what;
+    let url = `/produkt.html?navn=${encodeURIComponent(e.name)}`;
+    if (e.brand) url += `&merke=${encodeURIComponent(e.brand)}`;
+    if (e.brand && e.variant) url += `&variant=${encodeURIComponent(e.variant)}`;
+    return url;
+}
+
 // A package's size, "600 g", "1 kg", "1,5 l" or "12 stk", so a family
 // pizza isn't mistaken for a small one at a big price
 function packSize(p) {
