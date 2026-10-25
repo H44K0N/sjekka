@@ -119,3 +119,14 @@ function fold(label, ...content) {
     details.append(el("summary", "", label), ...content);
     return details;
 }
+
+// Someone who has seen a page before knows what it's for: its introduction
+// folds to the heading, so the search and the prices come first
+function foldIntroOnReturn() {
+    const intro = document.querySelector(".intro");
+    const key = `sjekka.sett${location.pathname}`;
+    try {
+        if (intro && localStorage.getItem(key)) intro.classList.add("compact");
+        localStorage.setItem(key, "1");
+    } catch { /* storage blocked: always the full introduction */ }
+}

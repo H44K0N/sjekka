@@ -1105,3 +1105,33 @@ def test_one_store_is_not_called_the_cheapest(page):
     page.goto("/produkt.html?navn=Kj%C3%B8ttdeig")
     expect(page.locator(".store")).to_have_count(1)
     expect(page.locator(".store .amount")).not_to_contain_text("billigst")
+
+
+def test_a_page_seen_before_folds_its_introduction(page):
+    page.goto("/")
+    expect(page.locator(".intro .lede")).to_be_visible()
+    page.goto("/tilbud.html")
+    expect(page.locator(".intro .lede")).to_be_visible()  # each page explains itself once
+    page.goto("/")
+    expect(page.locator(".intro")).to_have_class(re.compile("compact"))
+    expect(page.locator(".intro .lede")).to_be_hidden()
+    expect(page.locator(".intro .actions")).to_be_hidden()
+    expect(page.locator("header .cta")).to_be_visible()  # uploading is still a tap away
+    page.goto("/tilbud.html")
+    expect(page.locator(".intro .lede")).to_be_hidden()
+
+
+def test_explore_shows_products_a_page_at_a_time(page):
+    def many(route):
+        first = route.fetch().json()[0]
+        route.fulfill(json=[{**first, "canonical_name": f"Vare {n:03d}"} for n in range(130)])
+    page.route("**/products", many)
+    page.goto("/")
+    expect(cards(page)).to_have_count(48)
+    expect(page.locator("#count")).to_have_text("130 produkter")
+    page.get_by_role("button", name="Vis flere (82 til)").click()
+    expect(cards(page)).to_have_count(96)
+    # A search starts from the first page again
+    page.locator("#search").fill("vare 1")
+    expect(cards(page)).to_have_count(30)  # Vare 100-129
+    expect(page.locator("#more")).to_be_hidden()
