@@ -188,6 +188,7 @@
                 who.append(chainBadge(store.chain));
                 const about = describe(p);
                 if (about) who.append(el("span", "brand", about));
+                if (p.raw_name) who.append(el("span", "raw", `«${p.raw_name}»`));
                 const price = el("div", "amount");
                 price.append(el("b", "", amount(p)));
                 // Per 100 g or per piece, or for the usual size when the two
@@ -205,8 +206,11 @@
                 const tr = el("tr");
                 const store = el("td");
                 store.append(chainBadge(p.store_chain));
+                const what = el("td", "", describe(p) || "–");
+                // The receipt's own words: the name above is read from them
+                if (p.raw_name) what.append(el("span", "raw", `«${p.raw_name}»`));
                 tr.append(el("td", "", p.purchase_date ? new Date(p.purchase_date).toLocaleDateString("nb-NO") : "–"), store,
-                    el("td", "", describe(p) || "–"), el("td", "", amount(p)),
+                    what, el("td", "", amount(p)),
                     el("td", "", `${kr.format(comparable(p))} ${unitLabel(p)}`));
                 return tr;
             }));

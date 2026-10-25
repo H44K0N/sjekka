@@ -62,6 +62,7 @@ def test_products_say_what_is_sold_by_weight(client, db):
     by_weight = {p["canonical_name"]: p["by_weight"] for p in client.get("/products").json()}
     assert by_weight == {"Appelsiner": True, "Lettmelk": False}
     assert client.get("/products/Appelsiner").json()["prices"][0]["by_weight"] is True
+    assert client.get("/products/Lettmelk").json()["prices"][0]["raw_name"] == "Tine lettmelk 1l"
 
 
 def test_products_include_the_variant_and_size(client, db):

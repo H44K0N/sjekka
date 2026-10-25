@@ -88,3 +88,9 @@ def test_known_names_are_offered_for_reuse(monkeypatch, tmp_path):
 
 def test_names_leave_brands_out():
     assert '"MONSTER ULTRA WHITE 0,5L" → "Energidrikk"' in extractor.DEFINITIONS
+
+
+def test_variants_keep_every_word_of_the_line_and_add_none():
+    # "COCA-COLA ORIGINAL CREA" (Creamy Vanilla, cut short by the till) was read as plain Original
+    assert '"COCA-COLA ORIGINAL CREA" → variant "Original Crea"' in extractor.DEFINITIONS
+    assert "Never add a word that isn't on the line" in extractor.DEFINITIONS
