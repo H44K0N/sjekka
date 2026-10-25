@@ -125,7 +125,7 @@ AXE = Path(__file__).parent / "vendor" / "axe.min.js"  # axe-core, pinned (MPL-2
 
 @pytest.mark.parametrize("path", ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/finnes-ikke.html", "/personvern.html",
                                   "/om.html", "/handleliste.html", "/handleliste.html?v=Lettmelk~2&v=Kj%C3%B8ttdeig&v=Safran",
-                                  "/tilbud.html", "/produkt.html?navn=Seigmenn"])
+                                  "/tilbud.html", "/middag.html", "/produkt.html?navn=Seigmenn"])
 def test_pages_pass_automated_accessibility_checks(page, path):
     page.goto(path)
     page.wait_for_load_state("networkidle")
@@ -262,7 +262,7 @@ def test_product_names_are_not_rendered_as_html(page):
 def test_no_horizontal_scroll_on_a_phone(browser, site):
     context = browser.new_context(base_url=site[0], viewport={"width": 360, "height": 740})
     page = context.new_page()
-    for path in ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/handleliste.html?v=Lettmelk&v=Agurk", "/tilbud.html"]:
+    for path in ["/", "/upload.html", "/takk.html", "/produkt.html?navn=Lettmelk", "/handleliste.html?v=Lettmelk&v=Agurk", "/tilbud.html", "/middag.html"]:
         page.goto(path)
         page.wait_for_load_state("networkidle")
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), path
@@ -1317,3 +1317,156 @@ def test_suggested_products_are_added_with_one_tap_and_the_page_stays(page):
     chips.first.focus()
     page.keyboard.press("Enter")
     expect(page.locator("#items .list-item")).to_have_count(3)
+
+
+# Dinners (the page, with /meals answered by a fixed set)
+
+def a_dinner(id, name, kind="kjøtt", per=20.0, offers=0, saving=0.0, minutes=30, rough=False):
+    return {"id": id, "name": name, "blurb": f"{name} er god.", "minutes": minutes, "kind": kind, "portions": 2, "chain": "Kiwi",
+            "total": per * 2, "per_portion": per, "buy_total": per * 3, "saving": saving, "offers": offers, "rough": rough,
+            "ingredients": [{"label": "400 g kjøttdeig", "product": "Kjøttdeig", "count": 1, "price": per, "estimated": False,
+                             "offer": bool(offers), "offer_until": None, "deal": None, "brand": None},
+                            {"label": "Ris", "product": "Ris", "count": 1, "price": per, "estimated": rough, "offer": False,
+                             "offer_until": None, "deal": None, "brand": None}],
+            "unpriced": [], "pantry": ["salt", "olje"], "steps": ["Stek det.", "Server det."]}
+
+
+DINNERS = [a_dinner("bolo", "Bolognese", per=18, offers=2, saving=12, minutes=35), a_dinner("pizza", "Pizza", "svin", per=24, minutes=25),
+           a_dinner("laks", "Laks", "fisk", per=40, offers=1, saving=4), a_dinner("linser", "Linsegryte", "vegetar", per=11, minutes=20)]
+
+
+def plan_of(ids, portions=2):
+    chosen = [d for d in DINNERS if d["id"] in ids]
+    return {"portions": portions, "chain": "Kiwi", "total": 300.0, "per_portion": 15.0, "shared_saving": 41.0, "offer_saving": 12.0,
+            "rough": False, "days": [{"day": ["Mandag", "Tirsdag", "Onsdag"][i], "id": d["id"], "name": d["name"], "minutes": d["minutes"],
+                                      "kind": d["kind"], "per_portion": d["per_portion"], "offers": d["offers"],
+                                      "alternatives": [x["id"] for x in DINNERS if x["id"] not in ids]} for i, d in enumerate(chosen)],
+            "shopping": [{"product": "Kjøttdeig", "count": 2, "price": 120.0, "size": "400 g", "estimated": False, "offer": True,
+                          "used_in": ["Bolognese", "Pizza"]},
+                         {"product": "Ris", "count": 1, "price": 30.0, "size": "1000 g", "estimated": False, "offer": False,
+                          "used_in": ["Bolognese"]}]}
+
+
+@pytest.fixture
+def dinners_page(page):
+    asked = []
+
+    def answer(route):
+        url = route.request.url
+        asked.append(url)
+        ids = re.search(r"ids=([^&]*)", url)
+        wanted = ids[1].split(",") if ids else ["bolo", "pizza", "linser"]
+        route.fulfill(json={"portions": 2, "recipes": DINNERS, "plan": plan_of(wanted)})
+    page.route("**/meals*", answer)
+    page.goto("/middag.html")
+    expect(page.locator("#grid .card").first).to_be_visible()
+    page.asked = asked
+    return page
+
+
+def test_the_dinners_page_shows_a_plan_for_the_week_and_every_dinner_cheapest_first(dinners_page):
+    page = dinners_page
+    expect(page.locator("#plan-title")).to_have_text("3 middager for 300 kr")
+    expect(page.locator("#plan-days .plan-name")).to_have_text(["Bolognese", "Pizza", "Linsegryte"])
+    expect(page.locator("#plan-days .plan-weekday")).to_have_text(["Mandag", "Tirsdag", "Onsdag"])
+    expect(page.locator("#plan-facts")).to_have_text("Delte pakker sparer 41 kr. Tilbud sparer 12 kr.")
+    expect(page.locator("#grid .card h3")).to_have_text(["Bolognese", "Pizza", "Laks", "Linsegryte"])  # as the server ordered them
+
+
+def test_dinners_with_offers_get_their_own_row_with_the_saving(dinners_page):
+    page = dinners_page
+    # Only dinners with at least two offers and a real saving
+    expect(page.locator("#deal-grid .card h3")).to_have_text(["Bolognese"])
+    expect(page.locator("#deal-grid .verdict-tag")).to_have_text("2 på tilbud · spar 12 kr")
+
+
+def test_a_dinner_unfolds_into_ingredients_and_steps_and_goes_on_the_list(dinners_page):
+    page = dinners_page
+    card = page.locator("#grid .card").filter(has_text="Pizza")
+    card.locator("summary").click()
+    expect(card.locator(".ingredients li")).to_have_count(2)
+    expect(card.locator(".steps li")).to_have_text(["Stek det.", "Server det."])
+    expect(card).to_contain_text("Fra skapet: salt, olje.")
+    card.get_by_role("button", name="Legg på handlelisten").click()
+    expect(card.locator(".status")).to_contain_text("2 varer lagt til")
+    assert page.evaluate("JSON.parse(localStorage.getItem('sjekka.handleliste')).map(i => i.name)") == ["Kjøttdeig", "Ris"]
+    expect(page.locator("[data-list-count]")).to_have_text("2")
+
+
+def test_the_whole_week_goes_on_the_list_in_whole_packages(dinners_page):
+    page = dinners_page
+    page.get_by_role("button", name=re.compile("Legg alt på handlelisten")).click()
+    expect(page.locator("#plan-status")).to_have_text("2 varer lagt til.")
+    expect(page.locator("#plan-list")).to_be_visible()
+    assert page.evaluate("JSON.parse(localStorage.getItem('sjekka.handleliste'))") == [
+        {"name": "Kjøttdeig", "count": 2}, {"name": "Ris", "count": 1}]
+    page.locator("#plan-shopping summary").click()
+    expect(page.locator("#shopping li").first).to_contain_text("2 × Kjøttdeig (400 g)")
+    expect(page.locator("#shopping li").first).to_contain_text("Bolognese, Pizza")
+
+
+def test_a_dinner_in_the_plan_can_be_swapped_for_another(dinners_page):
+    page = dinners_page
+    swap = page.get_by_role("button", name="Bytt Tirsdag: Pizza")
+    expect(swap).to_have_attribute("aria-expanded", "false")
+    swap.click()
+    options = page.locator('li[data-id="pizza"] .swap-list button')
+    expect(options).to_have_text(["Laks · 40 kr"])
+    options.first.click()
+    expect(page.locator("#plan-days .plan-name")).to_have_text(["Bolognese", "Laks", "Linsegryte"])
+    assert "ids=bolo,laks,linser" in page.asked[-1] and "portions=2" in page.asked[-1]
+    # Focus stays with the person, on the day they changed
+    expect(page.get_by_role("button", name=re.compile("^Bytt Tirsdag"))).to_be_focused()
+
+
+def test_the_number_of_portions_is_asked_for_and_remembered(dinners_page):
+    page = dinners_page
+    expect(page.locator("#portions button[aria-pressed=true]")).to_have_text("2")
+    page.locator("#portions button", has_text="4").click()
+    expect(page.locator("#portions button[aria-pressed=true]")).to_have_text("4")
+    assert "portions=4" in page.asked[-1] and "ids" not in page.asked[-1]
+    assert page.evaluate("localStorage.getItem('sjekka.porsjoner')") == "4"
+    page.reload()
+    expect(page.locator("#portions button[aria-pressed=true]")).to_have_text("4")
+
+
+def test_dinners_can_be_filtered_by_kind_and_time(dinners_page):
+    page = dinners_page
+    page.locator("#kinds button", has_text="Fisk").click()
+    expect(page.locator("#grid .card h3")).to_have_text(["Laks"])
+    page.locator("#kinds button", has_text="Kjøtt").click()  # pork is meat
+    expect(page.locator("#grid .card h3")).to_have_text(["Bolognese", "Pizza"])
+    page.locator("#kinds button", has_text="Alle").click()
+    page.get_by_label("Under 30 min").check()  # 30 counts: only the 35-minute bolognese goes
+    expect(page.locator("#grid .card h3")).to_have_text(["Pizza", "Laks", "Linsegryte"])
+    page.locator("#kinds button", has_text="Kylling").click()
+    expect(page.locator("#none")).to_be_visible()
+
+
+def test_a_dinner_in_the_plan_opens_its_recipe_even_when_the_list_is_filtered(dinners_page):
+    page = dinners_page
+    page.locator("#kinds button", has_text="Fisk").click()
+    page.locator("#plan-days .plan-name", has_text="Bolognese").click()
+    card = page.locator("#meal-bolo")
+    expect(card).to_be_visible()
+    expect(card.locator("details")).to_have_attribute("open", "")
+
+
+def test_the_dinners_page_says_so_when_there_are_no_prices_to_go_on(page):
+    page.route("**/meals*", lambda route: route.fulfill(json={"portions": 2, "recipes": [], "plan": None}))
+    page.goto("/middag.html")
+    expect(page.locator("#notice")).to_contain_text("ikke nok priser")
+    expect(page.locator("#plan")).to_be_hidden()
+    expect(page.locator("#grid .card")).to_have_count(0)
+
+
+def test_the_dinners_page_says_so_when_prices_cannot_be_fetched(page):
+    page.route("**/meals*", lambda route: route.fulfill(status=500, body="no"))
+    page.goto("/middag.html")
+    expect(page.locator("#notice")).to_contain_text("Kunne ikke hente middager")
+
+
+def test_the_dinners_page_is_in_every_menu(page):
+    for path in ["/", "/tilbud.html", "/handleliste.html", "/om.html"]:
+        page.goto(path)
+        expect(page.get_by_role("navigation").get_by_role("link", name="middag")).to_be_visible()
