@@ -325,6 +325,8 @@ def get_product(name: str, db: Session = Depends(get_db)):
                 "purchase_date": str(receipt.purchase_date) if receipt.purchase_date else None,
                 "brand": item.brand,
                 "variant": item.variant,
+                # What the receipt itself said, so a misread is there to see
+                "raw_name": item.raw_name,
                 "quantity": item.quantity,
                 "unit": item.unit,
                 "pack_size": item.pack_size,

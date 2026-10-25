@@ -59,6 +59,7 @@ def seed(db_path):
             db.add(models.ReceiptItem(
                 receipt_id=receipt.id, canonical_name=name, brand=brand, category=cat, quantity=qty,
                 unit=unit, pack_size=pack, total_price=price, price_per_unit=ppu,
+                raw_name="Q LETTMELK 1L" if brand == "Q" else None,
             ))
         # This week's flyers: a real discount on Seigmenn (12,90 before), and
         # an offer for a product no receipt has, with the flyer's own claim
@@ -184,8 +185,11 @@ def test_cards_say_how_big_the_package_is(page):
 def test_product_page_says_the_size_of_each_price(page):
     page.goto("/produkt.html?navn=Lettmelk")
     expect(page.locator(".store").nth(0).locator(".brand")).to_have_text("Q · 1 l")
+    # The receipt's own words, so a misread name can be seen
+    expect(page.locator(".store").nth(0).locator(".raw")).to_have_text("«Q LETTMELK 1L»")
     page.locator(".history summary").click()
     expect(page.locator("#history tr").first).to_contain_text("Tine · 1 l")
+    expect(page.locator("#history tr", has_text="Q · 1 l").locator(".raw")).to_have_text("«Q LETTMELK 1L»")
 
 
 def test_multipacks_show_the_price_of_one(page):

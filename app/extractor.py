@@ -33,10 +33,15 @@ DEFINITIONS = """## DEFINITIONS
   - "XTRA KJØTTDEIG" → "Xtra"
   - "KJØTTDEIG" (no brand visible) → null
 
-**variant**: Any meaningful differentiator beyond the base product, or null.
+**variant**: Every word of the name that isn't the brand, the product or the
+size, as written, or null when there are none.
   - fat percentage: "3.5%", "0.5% laktosefri"
-  - cut/type: "Angus", "Spicy", "Original"
-  - Only include if it meaningfully affects the product comparison.
+  - flavour, cut or type: "Angus", "Spicy", "Vanilje", "Zero", "Uten sukker"
+  - Keep a word even when you don't know it, and keep a word the till cut
+    short as it stands: "COCA-COLA ORIGINAL CREA" → variant "Original Crea",
+    not "Original". Two products told apart by one word must not end up alike.
+  - Never add a word that isn't on the line: "COCA-COLA 0,5L" has no variant,
+    not "Original".
 
 **quantity**: The size/amount of ONE single unit.
   - 260g bag → quantity: 260, unit: "g"
