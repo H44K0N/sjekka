@@ -41,6 +41,14 @@ def test_the_product_with_most_prices_behind_it_is_the_one_priced():
     assert meals.choose(("Ris",), {"Pasta": 3}) is None
 
 
+def test_a_chain_priced_mostly_by_guesses_is_not_named_cheapest():
+    # The guessed total is lowest, as guesses often are, but it's a guess
+    assert meals.pick_chain({"Kiwi": 100.0, "Spar": 90.0}, {"Kiwi": 0.0, "Spar": 0.8}) == "Kiwi"
+    assert meals.pick_chain({"Kiwi": 100.0, "Spar": 90.0}, {"Kiwi": 0.5, "Spar": 0.5}) == "Spar"
+    # When every chain is a guess, the cheapest of them is the answer there is
+    assert meals.pick_chain({"Kiwi": 100.0, "Spar": 90.0}, {"Kiwi": 0.9, "Spar": 0.8}) == "Spar"
+
+
 def test_a_dinner_without_a_price_for_a_main_ingredient_is_left_out_but_a_minor_one_is_not():
     needs_rice = dinner("a", "A", "vegetar", ing("Pasta", "Pasta"), ing("Ris", "Ris"))
     assert meals.resolve(needs_rice, KNOWN) is None
@@ -111,6 +119,8 @@ def test_the_week_shares_packages_between_dinners(two_dinners):
     assert plan["chain"] == "Kiwi" and plan["total"] == 115.0
     assert plan["per_portion"] == pytest.approx(115 / 8, abs=0.01)
     assert plan["shared_saving"] == 0.0
+    # The food uses its shares only: 0.8 + 0.8 of the pasta (32), the mince (60) and the cream (15)
+    assert plan["used_total"] == 107.0 and plan["used_per_portion"] == pytest.approx(107 / 8, abs=0.01)
 
 
 def test_a_week_buys_less_than_its_dinners_bought_one_by_one(monkeypatch):

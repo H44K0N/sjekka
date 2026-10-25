@@ -77,6 +77,17 @@ def money(value: float) -> float:
     return round(value, 2)
 
 
+# A chain can only be named cheapest on prices that are mostly real: a total
+# made of guesses is the lowest one often enough to win by luck
+MOST_GUESSED = 0.5
+
+
+def pick_chain(totals: dict[str, float], guessed: dict[str, float]) -> str:
+    """The cheapest chain among those with mostly real prices (any, if none has)."""
+    solid = [chain for chain in totals if guessed[chain] <= MOST_GUESSED] or list(totals)
+    return min(solid, key=totals.get)
+
+
 def plain_price(plain, units, product: str, chain: str) -> float:
     """The price without offers; a product only the flyers know has none, so no saving."""
     return plain.get(product, {}).get(chain, units[product][chain]).price
@@ -87,7 +98,8 @@ def price_recipe(recipe: Recipe, lines, portions: int, units, plain) -> dict:
     scale = portions / 4
     chains = set.intersection(*(set(units[product]) for _, product in lines if product))
     totals = {chain: sum(i.share * scale * units[p][chain].price for i, p in lines if p) for chain in chains}
-    chain = min(totals, key=totals.get)
+    n = sum(1 for _, p in lines if p)
+    chain = pick_chain(totals, {c: sum(units[p][c].estimated for _, p in lines if p) / n for c in chains})
     ingredients, unpriced = [], []
     bought = 0.0
     for ingredient, product in lines:
@@ -132,7 +144,8 @@ def buy_cost(counts: dict[str, int], chain: str, units) -> float:
 
 def cheapest_chain(counts: dict[str, int], units) -> str:
     chains = set.intersection(*(set(units[product]) for product in counts))
-    return min(chains, key=lambda chain: buy_cost(counts, chain, units))
+    return pick_chain({chain: buy_cost(counts, chain, units) for chain in chains},
+                      {chain: sum(units[product][chain].estimated for product in counts) / len(counts) for chain in chains})
 
 
 def plan_week(priced: dict[str, dict], resolved: dict[str, list], units, plain, portions: int,
@@ -167,6 +180,8 @@ def plan_week(priced: dict[str, dict], resolved: dict[str, list], units, plain, 
     total = buy_cost(counts, chain, units)
     apart = sum(buy_cost(packages([resolved[rid]], portions), chain, units) for rid in chosen)
     without_offers = sum(count * plain_price(plain, units, product, chain) for product, count in counts.items())
+    # The packages are bought whole; the dinners use only their share of them
+    used = sum(i.share * portions / 4 * units[p][chain].price for rid in chosen for i, p in resolved[rid] if p)
     used_in: dict[str, list[str]] = {}
     for rid in chosen:
         for _, product in resolved[rid]:
@@ -182,6 +197,7 @@ def plan_week(priced: dict[str, dict], resolved: dict[str, list], units, plain, 
     return {
         "portions": portions, "chain": chain, "total": money(total),
         "per_portion": money(total / (portions * len(chosen))),
+        "used_total": money(used), "used_per_portion": money(used / (portions * len(chosen))),
         "shared_saving": money(max(apart - total, 0)), "offer_saving": money(max(without_offers - total, 0)),
         "rough": estimated > len(shopping) - estimated,
         "days": [{"day": WEEKDAYS[i], "id": rid, "name": priced[rid]["name"], "minutes": priced[rid]["minutes"],

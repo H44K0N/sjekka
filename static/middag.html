@@ -45,6 +45,7 @@
                 <div class="seg" id="portions"></div>
             </div>
             <p class="notice" id="notice">Henter middager …</p>
+            <div id="dinners-body" aria-live="polite">
 
             <div class="plan" id="plan" hidden>
                 <p class="meta">Ukas middagsplan</p>
@@ -85,6 +86,7 @@
                 <summary>Slik regner vi</summary>
                 <p class="note">Hver vare i middagen prises som resten av Sjekka: siste pris fra kvitteringene, og tilbud fra kundeavisene mens de gjelder. Mangler en butikk pris, anslår vi den og sier fra. Prisen per porsjon er det middagen bruker av hver pakke. Planen for uka velger middager som deler pakker, og regner det du faktisk må kjøpe, hele pakker, i den ene butikken som blir billigst. Olje, salt, krydder og andre skapvarer regnes ikke med.</p>
             </details>
+            </div>
         </section>
     </main>
 
@@ -150,6 +152,9 @@
                 tags.append(t);
             }
             if (tags.childNodes.length) body.append(tags);
+            // How long the offers last: the soonest to end, since the dinner is only cheap while all of them run
+            const ends = r.ingredients.filter(i => i.offer_until).map(i => i.offer_until).sort()[0];
+            if (ends) body.append(el("p", "unit", `Tilbud ${until(ends)}`));
 
             const where = el("p", "where");
             const shop = el("span", "shop");
@@ -224,8 +229,14 @@
             const n = plan.days.length;
             $("plan-title").textContent = `${n} ${n === 1 ? "middag" : "middager"} for ${about(plan.rough)}${rounded(plan.total)}`;
             const sub = $("plan-sub");
+            // The packages are bought whole, so a trip costs more than the food it feeds
+            // to a household of one or two: say both, so the two numbers don't clash
+            const leftovers = plan.used_total < plan.total * 0.85;
             sub.replaceChildren("Alt kjøpt hos ", chainBadge(plan.chain),
-                ` · ${about(plan.rough)}${rounded(plan.per_portion)} per porsjon · ${plan.portions} ${plan.portions === 1 ? "porsjon" : "porsjoner"} hver kveld`);
+                ` · ${plan.portions} ${plan.portions === 1 ? "porsjon" : "porsjoner"} hver kveld · ${about(plan.rough)}${rounded(plan.per_portion)} per porsjon`);
+            if (leftovers) {
+                sub.append(` med hele pakker. Selve maten bruker bare ${about(plan.rough)}${rounded(plan.used_per_portion)} per porsjon, resten er pakker som holder til senere.`);
+            }
 
             $("plan-days").replaceChildren(...plan.days.map((day, index) => {
                 const li = el("li", "plan-day");
@@ -267,8 +278,13 @@
             const facts = [];
             if (plan.shared_saving >= 1) facts.push(`Delte pakker sparer ${rounded(plan.shared_saving)}.`);
             if (plan.offer_saving >= 1) facts.push(`Tilbud sparer ${rounded(plan.offer_saving)}.`);
-            if (plan.rough) facts.push("Mange av prisene er anslått, så summen er omtrentlig.");
-            $("plan-facts").textContent = facts.join(" ");
+            if (plan.portions <= 2) facts.push("Tips: lag hele oppskriften og ta med rester dagen etter, så blir hver porsjon billigere.");
+            $("plan-facts").replaceChildren(facts.join(" "));
+            if (plan.rough) {
+                const link = el("a", "", "Last opp en kvittering");
+                link.href = "/upload.html";
+                $("plan-facts").append(" Mange av prisene er anslått, så summen er omtrentlig. ", link, " så blir den sikrere.");
+            }
 
             const items = plan.shopping.reduce((sum, s) => sum + s.count, 0);
             $("plan-add").textContent = `Legg alt på handlelisten (${plan.shopping.length} ${plan.shopping.length === 1 ? "vare" : "varer"})`;
@@ -305,16 +321,24 @@
 
         async function load() {
             drawControls();
-            $("notice").hidden = false;
-            $("notice").textContent = "Henter middager …";
+            // New numbers are on their way: show the old ones as old, so a tap on them isn't wasted
+            $("dinners-body").classList.add("busy");
+            $("dinners-body").setAttribute("aria-busy", "true");
+            const token = ++planToken;
             try {
                 const res = await fetch(`/meals?portions=${portions}`);
                 if (!res.ok) throw new Error();
-                data = await res.json();
+                const fresh = await res.json();
+                if (token !== planToken) return;   // asked again meanwhile
+                data = fresh;
             } catch {
+                $("dinners-body").classList.remove("busy");
+                $("notice").hidden = false;
                 $("notice").textContent = "Kunne ikke hente middager. Prøv å laste siden på nytt.";
                 return;
             }
+            $("dinners-body").classList.remove("busy");
+            $("dinners-body").setAttribute("aria-busy", "false");
             const any = data.recipes.length > 0;
             $("notice").hidden = any;
             $("notice").textContent = "Vi har ikke nok priser til å foreslå middager ennå. Last opp en kvittering, så kommer de.";
