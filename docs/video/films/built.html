@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How Sjekka was built</title>
+<link rel="stylesheet" href="studio.css">
+<script src="/lib/gsap.min.js"></script>
+<style>
+  .pill { position: absolute; display: inline-flex; align-items: center; gap: 12px; height: 56px; padding: 0 26px; border-radius: 999px;
+    font-size: 30px; background: var(--ink-3); box-shadow: 0 0 0 1.5px var(--line-strong); white-space: nowrap; }
+  .pill.on { background: var(--accent); color: var(--ink); box-shadow: none; }
+  .big-num { font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .quote { position: absolute; font: 400 52px/1.3 "Mono", monospace; color: var(--text); white-space: pre-wrap; }
+  .cursor-bar { display: inline-block; width: 0.5em; height: 1em; background: var(--accent); vertical-align: -0.12em; margin-left: 2px; }
+  .li { position: absolute; font-size: 34px; color: #d8d1c5; white-space: nowrap; }
+  .li::before { content: "·"; color: var(--accent); margin-right: 14px; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+import { W, H, stage, load, h, place, words, Film, onVoice, count, ready, middle } from "./studio.js";
+import { scene, chapter, subs, node, wire, packet, glow, stagger, check, code } from "./kit.js";
+
+const { shots } = await load("built");
+const film = new Film("built");
+const tl = film.tl;
+const GAP = 0.55;
+let t = 0.7;
+
+function crop(parent, state, key, x, y, scale = 1) {
+  const b = shots[state].boxes[key];
+  const d = h("div", "abs", parent);
+  Object.assign(d.style, { left: `${x}px`, top: `${y}px`, width: `${b[2] * scale}px`, height: `${b[3] * scale}px`, borderRadius: "14px",
+    backgroundImage: `url("/shots/desktop/${state}.png")`, backgroundSize: `${shots[state].width * scale}px ${shots[state].height * scale}px`,
+    backgroundPosition: `${-b[0] * scale}px ${-b[1] * scale}px`, boxShadow: "0 0 0 1px rgba(236,230,220,0.14), 0 30px 80px rgba(0,0,0,0.55)" });
+  return d;
+}
+const mark = h("div", "abs", stage, "sjekka");
+mark.style.cssText = "left:120px;top:36px;font-size:30px;font-weight:700;letter-spacing:-.03em;z-index:50;opacity:0";
+const bar = h("div", "abs", stage);
+bar.style.cssText = `left:0;bottom:0;height:4px;width:${W}px;background:var(--accent);transform-origin:0 0;z-index:50;opacity:.7`;
+const next = (line, gap = GAP) => line.end + gap;
+
+// ---------- 0. Intro ----------
+const iLine = film.say("intro", t);
+const intro = scene(film, stage, 0, iLine.end + GAP - 0.1);
+const title = words(intro, "Built by *one* <br>developer, <br>and an *AI.*", "abs");
+title.style.cssText += "font-size:158px;font-weight:700;letter-spacing:-.035em;line-height:1.02";
+place(title, 120, 0);
+middle(title, H / 2);
+title.spans.forEach((s, i) => tl.fromTo(s, { yPercent: 115 }, { yPercent: 0, duration: 0.8, ease: "expo.out" }, iLine.words[i + 2].s - 0.05));
+film.score("570", 0, 0, { fadeIn: 2, level: 0.5, duck: 0.03 });
+film.fx("whoosh", iLine.start, 0.6);
+tl.to(mark, { autoAlpha: 1, duration: 0.6 }, 0);
+t = next(iLine);
+
+// ---------- 1. Roles ----------
+const rLine = film.say("roles", t);
+const ro = scene(film, stage, t - 0.1, rLine.end + GAP - 0.1);
+chapter(film, ro, "01", "Who does what.", t);
+const hk = node(ro, 120, 360, 780, 440, "Haakon", "Decides");
+const cl = node(ro, 1020, 360, 780, 440, "Claude Code", "Engineers");
+[[hk, ["What to build, and in which order", "Judges the result, as a user would", "Says when it ships"], rLine.at("decides")],
+ [cl, ["Reads the code and the live site", "Writes the change, and its tests", "Opens the pull request"], rLine.at("reads")]].forEach(([n, items, at], k) => {
+  const v = n.querySelector(".v"); v.style.cssText += ";font-size:64px;font-weight:700;margin:6px 0 26px";
+  items.forEach((txt, i) => {
+    const li = h("div", "", n, txt); li.style.cssText = "font-size:32px;line-height:1.4;color:#d8d1c5;padding-left:26px;position:relative";
+    li.insertAdjacentHTML("afterbegin", '<span style="position:absolute;left:0;color:var(--accent)">·</span>');
+    tl.fromTo(li, { autoAlpha: 0, x: 24 }, { autoAlpha: 1, x: 0, duration: 0.5, ease: "power3.out" }, at + 0.3 + i * 0.55 - (k ? 0 : 0.3));
+  });
+});
+stagger(film, [hk], t + 0.4);
+tl.fromTo(cl, { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, rLine.at("Claude") - 0.3);
+glow(film, hk, rLine.at("decides"), 2.6);
+glow(film, cl, rLine.at("does"), 4.2);
+wire(film, ro, [906, 580], [1010, 580], rLine.at("does") - 0.1, 0.5);
+film.fx("pop", rLine.at("Claude"), 0.4);
+subs(film, rLine, ro);
+t = next(rLine);
+
+// ---------- 2. Prompts ----------
+const pLine = film.say("prompts", t);
+const pr = scene(film, stage, t - 0.1, pLine.end + GAP - 0.1);
+chapter(film, pr, "02", "A sentence is enough.", t);
+const q = h("div", "quote", pr);
+place(q, 120, 330, 1000);
+const PROMPT = "Grocery list that auto checks what store is the cheapest";
+const typed = h("span", "", q); const cur = h("span", "cursor-bar", q);
+const tq = { n: 0 };
+const typeFrom = pLine.at("Grocery") - 0.1, typeTo = pLine.at("cheapest") + 0.5;
+tl.set(q, { autoAlpha: 0 }, 0);
+tl.set(q, { autoAlpha: 1 }, typeFrom - 0.2);
+typed.textContent = "";
+tl.to(tq, { n: PROMPT.length, duration: typeTo - typeFrom, ease: "none", onUpdate: () => { typed.textContent = PROMPT.slice(0, Math.round(tq.n)); } }, typeFrom);
+tl.to(cur, { opacity: 0, duration: 0.01 }, typeTo + 1.4);
+const who = h("div", "abs soft", pr, "Haakon, in one sentence"); place(who, 124, 280); who.style.fontSize = "26px";
+tl.fromTo(who, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.5 }, typeFrom - 0.2);
+// ... and what it became
+const bec = h("div", "abs", pr); place(bec, 0, 0);
+const arrowP = h("div", "abs", bec, "↓"); place(arrowP, 120, 560); arrowP.style.cssText += ";font-size:80px;color:var(--accent)";
+const res1 = crop(bec, "list", "verdict", 120, 660, 0.9);
+const res2 = crop(bec, "list", "ranking", 820, 560, 0.9);
+const tag = h("div", "pill on", bec, "The shopping list, built overnight");
+place(tag, 1180, 330);
+const bat = pLine.at("became") - 0.2;
+tl.fromTo([arrowP, res1, res2, tag], { autoAlpha: 0, y: 30 }, { autoAlpha: 1, y: 0, duration: 0.7, ease: "power3.out", stagger: 0.18 }, bat);
+film.fx("chime", bat + 0.2, 0.35);
+film.fx("tick", typeFrom, 0.2); film.fx("tick", typeFrom + 0.6, 0.2); film.fx("tick", typeFrom + 1.2, 0.2);
+subs(film, pLine, pr);
+t = next(pLine);
+
+// ---------- 3. Numbers ----------
+const nLine = film.say("numbers", t);
+const nu = scene(film, stage, t - 0.1, nLine.end + GAP - 0.1);
+const stats = [[74, "pull requests", "70"], [472, "tests", "500"], [98, "% of the code covered", "every"]];
+stats.forEach(([n, label, anchor], i) => {
+  const x = 120 + i * 600;
+  const num = h("div", "big-num abs", nu); place(num, x, 360); num.style.fontSize = "190px";
+  const lb = h("div", "abs soft", nu, label); place(lb, x + 6, 580); lb.style.fontSize = "40px";
+  const at = nLine.at(anchor) - 0.2;
+  tl.fromTo([num, lb], { autoAlpha: 0, y: 40 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "expo.out", stagger: 0.08 }, at);
+  count(film, num, 0, n, at, 1.2, {});
+  film.fx("hit", at + 0.2, 0.3);
+});
+subs(film, nLine, nu);
+t = next(nLine);
+
+// ---------- 4. Pipeline ----------
+const lLine = film.say("pipeline", t);
+const pl = scene(film, stage, t - 0.1, lLine.end + GAP - 0.1);
+chapter(film, pl, "03", "Every change, the same road.", t);
+const Y0 = 350;
+const br = node(pl, 120, Y0 + 90, 250, 150, "Step 1", "Branch");
+const prn = node(pl, 440, Y0 + 90, 280, 150, "Step 2", "Pull request");
+const L1 = node(pl, 820, Y0 - 10, 600, 190, "Lint and test", "Every test, on every core");
+const L2 = node(pl, 820, Y0 + 230, 600, 190, "Build and smoke test", "The Docker image, at the same time");
+const dep = node(pl, 1530, Y0 + 90, 270, 150, "Then", "Deploy");
+[[br, "branch"], [prn, "pull"], [L1, "linters"], [L2, "Docker"]].forEach(([n, w], i) => {
+  tl.fromTo(n, { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, lLine.at(w) - 0.25);
+});
+tl.set(dep, { autoAlpha: 0 }, 0);
+tl.fromTo(dep, { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, lLine.end - 0.8);
+wire(film, pl, [376, Y0 + 165], [432, Y0 + 165], lLine.at("pull") - 0.2, 0.4);
+wire(film, pl, [726, Y0 + 165], [810, Y0 + 85], lLine.at("linters") - 0.2, 0.5);
+wire(film, pl, [726, Y0 + 165], [810, Y0 + 325], lLine.at("Docker") - 0.2, 0.5);
+wire(film, pl, [1426, Y0 + 85], [1520, Y0 + 165], lLine.end - 0.9, 0.4);
+wire(film, pl, [1426, Y0 + 325], [1520, Y0 + 165], lLine.end - 0.9, 0.4);
+const chips = [[L1, ["lint", "unit", "browser", "accessibility"], "browser"], [L2, ["build", "smoke test"], "smoke"]];
+chips.forEach(([n, list, anchor]) => {
+  list.forEach((c, i) => {
+    const el = h("span", "chip", pl, c);
+    el.style.cssText += `position:absolute;left:${(n === L1 ? 840 : 840) + i * (n === L1 ? 130 : 150)}px;top:${n === L1 ? Y0 + 190 : Y0 + 430}px;height:40px;font-size:22px;padding:0 16px`;
+    tl.fromTo(el, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.4 }, lLine.at(anchor) - 0.4 + i * 0.15);
+  });
+});
+glow(film, L1, lLine.at("run"), 2.4);
+glow(film, L2, lLine.at("smoke") - 0.2, 1.4);
+film.fx("tick", lLine.at("branch"), 0.3); film.fx("tick", lLine.at("pull"), 0.3); film.fx("pop", lLine.at("Docker"), 0.3);
+subs(film, lLine, pl);
+t = next(lLine);
+
+// ---------- 5. Deploy ----------
+const dLine = film.say("deploy", t);
+const dp = scene(film, stage, t - 0.1, dLine.end + GAP - 0.1);
+chapter(film, dp, "04", "Ship, and roll back.", t);
+const both = h("div", "pill", dp, "Lint and tests pass  +  Image passes");
+place(both, 120, 340); both.style.fontSize = "34px"; both.style.height = "64px";
+tl.fromTo(both, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, t + 0.3);
+code(dp, 120, 450, 900, `<span class="c"># the CI deploy key can run exactly one command</span>
+<span class="k">command</span>=<span class="s">"/opt/sjekka/deploy.sh"</span>,
+<span class="k">no-pty</span>, <span class="k">no-port-forwarding</span> ssh-ed25519 AAAA…`, 24);
+const kc = dp.lastElementChild;
+tl.fromTo(kc, { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, dLine.at("key") - 0.3);
+const sn = node(dp, 1130, 340, 670, 130, "1", "Start the new version");
+const sh = node(dp, 1130, 500, 670, 130, "2", "Healthy?  Keep it.");
+const sr = node(dp, 1130, 660, 670, 130, "3", "Not healthy?  Put the old one back.");
+[[sn, "starts"], [sh, "version"], [sr, "rolls"]].forEach(([n, w]) => tl.fromTo(n, { autoAlpha: 0, x: 40 }, { autoAlpha: 1, x: 0, duration: 0.6, ease: "power3.out" }, dLine.at(w) - 0.3));
+glow(film, sr, dLine.at("rolls"), 2.6);
+const gt = h("div", "big-num abs", dp, "1:49"); place(gt, 120, 690); gt.style.cssText += ";font-size:150px;color:var(--accent)";
+const gl = h("div", "abs soft", dp, "from merge to production"); place(gl, 126, 860); gl.style.fontSize = "36px";
+tl.fromTo([gt, gl], { autoAlpha: 0, y: 30 }, { autoAlpha: 1, y: 0, duration: 0.7, ease: "expo.out", stagger: 0.1 }, dLine.at("merge") - 0.2);
+film.fx("chime", dLine.at("merge"), 0.35);
+subs(film, dLine, dp);
+t = next(dLine);
+
+// ---------- 6. Infra ----------
+const fLine = film.say("infra", t);
+const fr = scene(film, stage, t - 0.1, fLine.end + GAP - 0.1);
+chapter(film, fr, "05", "Nothing open to the internet.", t);
+const vis = node(fr, 120, 430, 340, 170, "Visitor", "Any browser");
+const cf = node(fr, 590, 430, 440, 170, "Cloudflare", "Tunnel in, bot protection");
+const vps = node(fr, 1160, 430, 400, 170, "The server", "Docker, no open ports");
+const bk = node(fr, 1160, 700, 400, 150, "Every night", "Database backup");
+[[vis, 0.3], [cf, fLine.at("Cloudflare") - 0.3], [vps, fLine.at("server") - 0.3], [bk, fLine.at("database") - 0.3]].forEach(([n, at]) => tl.fromTo(n, { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, at));
+wire(film, fr, [466, 515], [580, 515], fLine.at("Cloudflare") - 0.2, 0.4);
+wire(film, fr, [1036, 515], [1150, 515], fLine.at("server") - 0.2, 0.4);
+wire(film, fr, [1360, 606], [1360, 690], fLine.at("database") - 0.2, 0.4);
+packet(film, fr, [[300, 515], [810, 515], [1360, 515]], fLine.at("tunnel"), 1.2);
+const zero = h("div", "pill on", fr, "0 open ports");
+place(zero, 1580, 360);
+tl.fromTo(zero, { autoAlpha: 0, scale: 0.8 }, { autoAlpha: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, fLine.at("open"));
+film.fx("pop", fLine.at("open"), 0.4);
+glow(film, vps, fLine.at("open"), 1.8);
+subs(film, fLine, fr);
+t = next(fLine);
+
+// ---------- 7. Limits ----------
+const mLine = film.say("limits", t);
+const li = scene(film, stage, t - 0.1, mLine.end + GAP - 0.1);
+chapter(film, li, "06", "The AI doesn't get free rein.", t);
+const rowsL = [["The production server and its data are off limits", mLine.at("touch")], ["Merging needs Haakon's go-ahead", mLine.at("Merging")], ["Every bug fix comes with a test that fails without it", mLine.at("test")]];
+const cl2 = rowsL.map(([txt, at], i) => ({ ...check(li, 160, 360 + i * 150, 1500, txt), at }));
+cl2.forEach(({ row, ring, at }) => {
+  ring.innerHTML = "&#8212;";
+  tl.fromTo(row, { autoAlpha: 0, x: 40 }, { autoAlpha: 1, x: 0, duration: 0.5, ease: "power3.out" }, at - 0.5);
+  tl.fromTo(ring, { scale: 0 }, { scale: 1, duration: 0.4, ease: "back.out(3)" }, at - 0.1);
+  film.fx("slam", at - 0.1, 0.4);
+});
+subs(film, mLine, li);
+t = next(mLine);
+
+// ---------- 8. Personas ----------
+const aLine = film.say("personas", t);
+const ps = scene(film, stage, t - 0.1, aLine.end + GAP - 0.1);
+chapter(film, ps, "07", "The AI tests it as five users.", t);
+const P = [["Student", "A phone, dark mode"], ["Parent", "An 18-item list"], ["Senior", "An iPad, large text"], ["Data donor", "Re-uploads a Trumf history"], ["Sceptic", "Opens a shared list"]];
+P.forEach(([k, v], i) => {
+  const n = node(ps, 120 + i * 350, 340, 322, 210, k, v);
+  n.querySelector(".v").style.fontSize = "32px";
+  tl.fromTo(n, { autoAlpha: 0, y: 30 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, aLine.at("five") - 0.1 + i * 0.28);
+  film.fx("pop", aLine.at("five") + i * 0.28, 0.25);
+});
+[[52, "screenshots", "52"], [6, "root causes", "root"], [6, "fixes", "fixes"]].forEach(([n, label, anchor], i) => {
+  const x = 120 + i * 600;
+  const num = h("div", "big-num abs", ps); place(num, x, 670); num.style.fontSize = "150px";
+  const lb = h("div", "abs soft", ps, label); place(lb, x + 4, 840); lb.style.fontSize = "38px";
+  const at = (anchor === "52" ? aLine.at("52") : aLine.at(anchor, anchor === "fixes" ? 20 : 0)) - 0.2;
+  tl.fromTo([num, lb], { autoAlpha: 0, y: 30 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "expo.out", stagger: 0.08 }, at);
+  count(film, num, 0, n, at, 0.9, {});
+});
+subs(film, aLine, ps);
+t = next(aLine);
+
+// ---------- 9. Root causes ----------
+const cLine = film.say("roots", t);
+const rc = scene(film, stage, t - 0.1, cLine.end + GAP - 0.1);
+chapter(film, rc, "08", "Root causes, not symptoms.", t);
+const sym = node(rc, 120, 380, 500, 340, "Symptom", "Pizza has a third of its prices");
+const cause = node(rc, 710, 380, 500, 340, "Root cause", "The same pizza had three names", "hot");
+const fix = node(rc, 1300, 380, 500, 340, "One change", "Every product gets one name  (#70)");
+[[sym, cLine.at("Pizza")], [cause, cLine.at("Grandiosa") - 0.6], [fix, cLine.at("One") - 0.3]].forEach(([n, at]) => tl.fromTo(n, { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, at));
+wire(film, rc, [626, 550], [700, 550], cLine.at("Grandiosa") - 0.7, 0.4);
+wire(film, rc, [1216, 550], [1290, 550], cLine.at("One") - 0.4, 0.4);
+["Grandiosa", "Pizza Grandiosa", "Pizza"].forEach((c, i) => {
+  const el = h("span", "chip", rc, c);
+  el.style.cssText += `position:absolute;left:${[738, 880, 1078][i]}px;top:640px;font-size:22px;height:40px;padding:0 16px`;
+  tl.fromTo(el, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.4 }, [cLine.at("Grandiosa"), cLine.at("Pizza", 8), cLine.at("Pizza", 17)][i]);
+});
+glow(film, cause, cLine.at("Grandiosa"), 4);
+glow(film, fix, cLine.at("One"), 2);
+film.fx("chime", cLine.at("One"), 0.3);
+subs(film, cLine, rc);
+t = next(cLine);
+
+// ---------- 10. The log ----------
+const gLine = film.say("log", t);
+const lg = scene(film, stage, t - 0.1, gLine.end + GAP - 0.1);
+chapter(film, lg, "09", "Everything written down.", t);
+const doc = h("div", "node", lg);
+place(doc, 120, 330, 1000, 530);
+h("div", "k", doc, "docs/AI.md");
+const sections = [["Decisions", gLine.at("decision")], ["Prompts", gLine.at("prompt")], ["Mistakes the AI made", gLine.at("mistake")]];
+sections.forEach(([txt, at], i) => {
+  const s = h("div", "", doc, txt); s.style.cssText = "font-size:56px;font-weight:700;letter-spacing:-.02em;margin:22px 0 4px;" + (i === 2 ? "color:var(--accent)" : "");
+  const l = h("div", "", s); l.style.cssText = "height:12px;border-radius:6px;background:var(--line-strong);margin-top:12px;width:" + [820, 700, 760][i] + "px";
+  tl.fromTo(s, { autoAlpha: 0, x: -30 }, { autoAlpha: 1, x: 0, duration: 0.55, ease: "power3.out" }, at - 0.25);
+  film.fx("tick", at, 0.3);
+});
+const pub = h("div", "pill on", lg, "In the open: public in the repository");
+place(pub, 1190, 520);
+tl.fromTo(pub, { autoAlpha: 0, scale: 0.9 }, { autoAlpha: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, gLine.at("public") - 0.2);
+subs(film, gLine, lg);
+t = next(gLine);
+
+// ---------- 11. This film ----------
+const mLine2 = film.say("film", t);
+const fm = scene(film, stage, t - 0.1, mLine2.end + GAP - 0.1);
+chapter(film, fm, "10", "Even this film.", t);
+const steps = [["Script", mLine2.at("script")], ["Voice", mLine2.at("voice")], ["Music edit", mLine2.at("music")], ["Every frame", mLine2.at("frame")]];
+steps.forEach(([k, at], i) => {
+  const n = node(fm, 120 + i * 440, 400, 380, 160, `Step ${i + 1}`, k);
+  tl.fromTo(n, { autoAlpha: 0, y: 28 }, { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" }, at - 0.3);
+  if (i) wire(film, fm, [120 + i * 440 - 56, 480], [120 + i * 440 - 8, 480], at - 0.25, 0.3);
+  film.fx("pop", at - 0.2, 0.3);
+});
+const fcount = h("div", "big-num abs", fm); place(fcount, 120, 660); fcount.style.fontSize = "130px";
+count(film, fcount, 0, 3570, mLine2.at("frame") - 0.4, 1.4, {});
+const fl2 = h("div", "abs soft", fm, "frames, drawn by code, at 60 a second"); place(fl2, 124, 810); fl2.style.fontSize = "38px";
+tl.fromTo([fcount, fl2], { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "expo.out", stagger: 0.08 }, mLine2.at("frame") - 0.4);
+subs(film, mLine2, fm);
+t = next(mLine2, 0.7);
+
+// ---------- 12. Outro ----------
+const oLine = film.say("outro", t);
+const ot = scene(film, stage, t - 0.2, oLine.end + 3.2, { fade: 0.6 });
+const otx = words(ot, "One developer. <br>One AI. <br>*Shipping every day.*", "abs");
+otx.style.cssText += "font-size:150px;font-weight:700;letter-spacing:-.035em;line-height:1.04";
+place(otx, 120, 0);
+middle(otx, H / 2 - 20);
+otx.spans.forEach((s, i) => tl.fromTo(s, { yPercent: 115 }, { yPercent: 0, duration: 0.8, ease: "expo.out" }, oLine.words[i].s - 0.05));
+film.fx("impact", oLine.at("shipping"), 0.5);
+const ourl = h("div", "abs", ot, "sjekka.tischbein.dev  ·  github.com/H44K0N/sjekka");
+ourl.style.cssText += `left:120px;top:${H - 170}px;font-size:34px;color:var(--accent)`;
+tl.fromTo(ourl, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.8 }, oLine.end - 0.3);
+tl.to(mark, { autoAlpha: 0, duration: 0.4 }, t - 0.3);
+const total_s = oLine.end + 3.2;
+tl.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: total_s, ease: "none" }, 0);
+film.finish(total_s + 0.6);
+await ready();
+</script>
+</body>
+</html>

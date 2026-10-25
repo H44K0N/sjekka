@@ -1,6 +1,7 @@
 """Runs the real Sjekka app and worker for the video, with demo data and the
 Gemini call replaced by a fixed answer for the demo receipt."""
 import os
+import random
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -68,6 +69,37 @@ OFFERS = [
 ]
 
 
+# Price history for the films: a few months of receipts for the products
+# the films show, in seven chains, so the ranking and timelines have
+# something to show. Seeded, so every recording sees the same prices.
+HISTORY = {
+    # name: (brand, category, qty, unit, price at the dearest chain)
+    "Kjøttdeig": ("Gilde", "Kjøtt", 400, "g", 64.90),
+    "Lettmelk": ("Tine", "Meieri", 1000, "ml", 26.50),
+    "Laksefilet": ("Lerøy", "Fisk", 400, "g", 94.90),
+    "Grovbrød": ("Bakers", "Bakeri", 750, "g", 44.90),
+    "Bananer": (None, "Frukt og grønt", 1000, "g", 29.90),
+    "Norvegia": ("Tine", "Meieri", 500, "g", 79.90),
+}
+# How each chain prices against the dearest, roughly
+CHAIN_LEVEL = {"Rema 1000": 0.93, "Kiwi": 0.86, "Coop Extra": 0.91, "Spar": 0.97, "Coop Prix": 0.95, "Joker": 1.02, "Meny": 1.0}
+
+
+def history_rows():
+    rng = random.Random(7)
+    rows = []
+    for name, (brand, cat, qty, unit, top) in HISTORY.items():
+        for chain, level in CHAIN_LEVEL.items():
+            for days in sorted(rng.sample(range(14, 150), 5)):
+                if rng.random() < 0.15:
+                    continue
+                # Prices creep up over the months, as they do
+                drift = 1 - 0.0006 * days
+                price = top * level * drift * rng.uniform(0.97, 1.03)
+                rows.append((name, brand, cat, qty, unit, 1, round(price, 1) - 0.1 + 0.0, chain, days))
+    return rows
+
+
 def seed_offers(db):
     # Started yesterday, so receipts from before it count as the usual price
     by_chain = {}
@@ -89,7 +121,7 @@ def seed():
     if db.query(models.Receipt).count():
         return
     seed_offers(db)
-    for name, brand, cat, qty, unit, pack, price, store, days in SEED:
+    for name, brand, cat, qty, unit, pack, price, store, days in SEED + history_rows():
         receipt = models.Receipt(image_filename="demo.jpg", store_chain=store,
                                  purchase_date=today - timedelta(days=days))
         db.add(receipt)

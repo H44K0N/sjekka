@@ -914,21 +914,22 @@ body.has-sticky main { padding-bottom: 88px; }
   .intro.home .actions { margin-top: 20px; }
 }
 
-/* About page: the two promo films side by side at the same height (16:9 next
-   to 9:16 needs a 3.16 : 1 split), stacked with the phone one first on phones */
+/* About page: one promo film in the shape of the screen (wide, or tall on a
+   phone), then the two technical films side by side (stacked on a phone) */
 .about .lede { max-width: 38em; }
-.promo { display: grid; grid-template-columns: 3.16fr 1fr; gap: 16px; align-items: start; margin: 48px 0 0; }
-.promo figure { margin: 0; }
-.promo video { display: block; width: 100%; height: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
-.promo .wide video { aspect-ratio: 16 / 9; }
-.promo .tall video { aspect-ratio: 9 / 16; }
-.promo figcaption { margin-top: 8px; font-size: 13px; color: var(--soft); }
+.films { margin: 48px 0 0; }
+.films figure { margin: 0; }
+.films video { display: block; width: 100%; height: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; aspect-ratio: 16 / 9; }
+.films .film-main.tall { max-width: 340px; margin: 0 auto; }
+.films .film-main.tall video { aspect-ratio: 9 / 16; }
+.films figcaption { margin-top: 8px; font-size: 14px; line-height: 1.5; color: var(--soft); }
+.films figcaption b { color: var(--text); font-weight: 400; }
+.film-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 32px; }
 .about-facts { max-width: 720px; margin-top: 56px; }
 .about-facts a { color: var(--text); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; }
 footer a[aria-current="page"] { color: var(--text); }
 @media (max-width: 700px) {
-  .promo { grid-template-columns: 1fr; }
-  .promo .tall { order: -1; max-width: 320px; margin: 0 auto; width: 100%; }
+  .film-pair { grid-template-columns: 1fr; }
 }
 
 /* Front page: a search that matches this week's offers links to them */
@@ -943,4 +944,4 @@ footer a[aria-current="page"] { color: var(--text); }
 /* Offers page: while most offers can't be checked, ask for a receipt */
 .ask { margin: 0 0 20px; padding: 12px 16px; font-size: 15px; color: var(--soft); border: 1px dashed var(--hover); border-radius: 10px; }
 .ask a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-.promo-note { grid-column: 1 / -1; margin: 4px 0 0; font-size: 13px; color: var(--soft); }
+.promo-note { margin: 16px 0 0; max-width: 46em; font-size: 13px; color: var(--soft); }

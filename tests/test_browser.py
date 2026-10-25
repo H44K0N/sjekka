@@ -926,21 +926,38 @@ def test_a_clear_gap_on_estimates_is_rounded(page):
 
 def test_about_page_shows_the_films_without_loading_them(page):
     page.goto("/om.html")
-    videos = page.locator(".promo video")
-    expect(videos).to_have_count(2)
+    videos = page.locator(".films video")
+    expect(videos).to_have_count(3)
     # Nothing is downloaded until someone presses play
-    for i in range(2):
+    for i in range(3):
         expect(videos.nth(i)).to_have_attribute("preload", "none")
+        expect(videos.nth(i).locator("track")).to_have_attribute("srclang", "en")
     page.get_by_role("contentinfo").get_by_role("link", name="om").click()
     expect(page).to_have_url(re.compile("/om.html$"))
 
 
-def test_about_page_puts_the_phone_film_first_on_a_phone(browser, site):
-    phone = browser.new_page(viewport={"width": 390, "height": 844}, base_url=site[0])
-    phone.goto("/om.html")
-    tall, wide = phone.locator(".promo .tall").bounding_box(), phone.locator(".promo .wide").bounding_box()
-    assert tall["y"] < wide["y"]
-    phone.close()
+def test_the_promo_film_is_the_one_for_the_screen_it_is_watched_on(browser, site):
+    for size, film, tall in [({"width": 1280, "height": 800}, "sjekka-promo-desktop", False),
+                             ({"width": 390, "height": 844}, "sjekka-promo-mobil", True)]:
+        screen = browser.new_page(viewport=size, base_url=site[0])
+        screen.goto("/om.html")
+        video = screen.locator("#promo video")
+        expect(video.locator("source")).to_have_attribute("src", f"/video/{film}.mp4")
+        expect(video.locator("track")).to_have_attribute("src", f"/video/{film}.vtt")
+        assert video.get_attribute("poster") == f"/video/{film}.jpg"
+        box = video.bounding_box()
+        assert (box["height"] > box["width"]) is tall
+        screen.close()
+
+
+def test_a_promo_film_already_playing_is_not_swapped_when_the_screen_turns(browser, site):
+    screen = browser.new_page(viewport={"width": 1280, "height": 800}, base_url=site[0])
+    screen.goto("/om.html")
+    # Pretend it has been playing: the page must leave its source alone
+    screen.evaluate("Object.defineProperty(document.querySelector('#promo video'), 'currentTime', { value: 5 })")
+    screen.set_viewport_size({"width": 390, "height": 844})
+    expect(screen.locator("#promo video source")).to_have_attribute("src", "/video/sjekka-promo-desktop.mp4")
+    screen.close()
 
 
 def test_a_search_that_matches_offers_links_to_them(page):

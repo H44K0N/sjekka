@@ -222,14 +222,19 @@ def test_every_page_links_to_the_privacy_and_about_pages(client):
         assert 'href="/personvern.html"' in footer and 'href="/om.html"' in footer, path
 
 
-def test_the_about_page_has_both_films(client):
+def test_the_about_page_has_all_the_films(client):
     html = client.get("/om.html").text
-    for name in ["sjekka-film-desktop", "sjekka-film-mobil"]:
-        assert f'src="/video/{name}.mp4"' in html and f'poster="/video/{name}.jpg"' in html
+    # The phone's promo is swapped in by the page's script, the rest are in the markup
+    assert "sjekka-promo-mobil" in html
+    for name in ["sjekka-promo-desktop", "sjekka-slik-fungerer", "sjekka-slik-bygget"]:
+        assert f'/video/{name}.mp4"' in html and f'/video/{name}.jpg"' in html
+    for name in ["sjekka-promo-desktop", "sjekka-promo-mobil", "sjekka-slik-fungerer", "sjekka-slik-bygget"]:
         video = client.get(f"/video/{name}.mp4")
         assert video.status_code == 200 and video.headers["content-type"] == "video/mp4"
-        assert len(video.content) < 8_000_000, "keep the films small"
+        assert len(video.content) < 10_000_000, "keep the films small"
         assert client.get(f"/video/{name}.jpg").status_code == 200
+        captions = client.get(f"/video/{name}.vtt")
+        assert captions.status_code == 200 and captions.text.startswith("WEBVTT")
 
 
 def test_pages_load_nothing_from_google(client):

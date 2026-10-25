@@ -177,9 +177,13 @@ docker compose start app
 <details>
 <summary>Videos</summary>
 
-**Promo films** (on the about page, committed in `static/video/`): a 45-second story with an English voice-over, for desktop and phone. `docs/video/promo.sh` records them on demo data. The lines are in `promo_script.py`, voiced with [Kokoro](https://github.com/thewh1teagle/kokoro-onnx), an open-source text-to-speech model that runs locally; the voice is AI-generated, and the about page says so. The music is "Motivating Mornings" by Ahjay Stelino from [Mixkit](https://mixkit.co/free-stock-music/) (royalty free, no credit required), cut by `music.py` so it lifts as Sjekka appears; `sfx.py` makes a few quiet sound effects and `promo_mix.py` puts it together.
+**Films** (on the about page, committed in `static/video/`): four short films with an English voice-over, burned-in subtitles and `.vtt` captions, all made from code by `docs/video/studio.sh` on demo data (Gemini is never called):
 
-**Walkthroughs** (not committed): `docs/video/make.sh` records a longer narrated tour of the app and how it's built, for desktop and phone, with Gemini replaced by a fixed answer. The narration is in `narration.py` and the slides in `slides.html`; update facts like the test count there.
+- a story about using Sjekka, as one film for desktop and one for phones; the about page picks the one that fits the screen,
+- how the app works, from the receipt photo to the cheapest basket,
+- how it was built with AI, and the pipeline that ships it.
+
+How they're made: `capture.py` screenshots every page and state of the real app, and the films (`films/*.html`, a [GSAP](https://gsap.com) timeline) move those stills, so the camera can zoom without blurring text. `render.py` plays a film frame by frame in headless Chromium, `mix.py` adds the sound and encodes it with ffmpeg. The script for the voice is `films/lines.json`. The voice is [Chatterbox](https://github.com/resemble-ai/chatterbox) (MIT), an open-source text-to-speech model run locally on a GPU; `voice.py` records five takes of each line and keeps the best, judged by transcribing it back with Whisper. The voice is AI-generated, carries Chatterbox's inaudible watermark, and the about page says so. The sound effects are synthesised in `mix.py`. The music is royalty free from [Mixkit](https://mixkit.co/free-stock-music/) (no credit required, given anyway): "Golden Storm" by Diego Nava, and "Focus on Yourself" and "Sonor #2" by Eugenio Mininni. The promo opens on a wall of this week's real flyer offers, fetched from the Tjek catalogues by `flyers.py`; they're the chains' advertising, so they're only in the film, never in the repository. `docs/video/studio.sh` explains the setup at the top. The numbers the films state (tests, pull requests, timings) are written in `films/built.html`: update them when they change.
 
 Both drive the real app with Playwright. The phone versions show the site in a phone-width frame scaled up, since Playwright records CSS pixels.
 
