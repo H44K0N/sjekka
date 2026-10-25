@@ -24,6 +24,7 @@ Most of Sjekka from PR #22 on was built by describing outcomes, not code. Haakon
 | "Think about what implications changing this logic might have. Then fix both issues in separate PRs" | Before any code, the trade-off was written out: storing a 4-pack as "4 for 20 kr" would have suggested you can buy one cup, so a multipack became one package of the full size instead. |
 | "Go through a couple of user flows as a user. Screenshot the journey, analyze the images", then: "Do them all! For the smaller changes, bundle them in one PR" | 22 screenshots, 17 findings, and seven PRs merged the same afternoon (#38–#44): loose produce priced per kilo, offers in the list suggestions, honest rounding when most prices are estimates, and a bundle of smaller fixes. |
 | "Do another pass as a customer, look for improvements and root causes for unwanted behavior" | Root causes rather than symptoms: Tjek's tile shop *Megaflis* matched the pattern for *Coop Mega*, and chains publish overlapping weekend flyers. Six fixes, merged in one go (#48–#53). |
+| "Take on the persona of 5 distinctly different probable users ... rate each finding from 1 to 10 ... focus on root causes and assumptions ... If a wider change can fix multiple issues in one change, make the change", given at bedtime | Five personas (a student on a phone in dark mode, a parent building an 18-item list, a senior on an iPad with large text, a data donor re-uploading a Trumf history, a sceptic opening a shared list) walked through a copy of the production database. 52 screenshots and about 25 findings came down to six root causes, each fixed in its own PR, merged overnight (#60–#68). The worst was the offers page's whole point: offers judged "real" against another brand, a pack a quarter of the size, or a price 20 months old. The flows were then run again on fresh production data to confirm the fixes. |
 | "They don't tell a story. Frame it as a story: the large chains want you to spend as much as possible on groceries. We are here to declare war on the big chains" | The promo films on the about page: an English voice-over, promo signs piling up in a zigzag, and the reveal of Sjekka as the answer to one question (#46). |
 
 ### The decisions that were Haakon's
@@ -118,6 +119,7 @@ Add a line here for each AI-assisted change.
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
 | 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
+| 24–25 Oct 2026 | #55–#68: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -176,3 +178,12 @@ Add a line here for each AI-assisted change.
 | #57 | A photo and a Trumf export of the same shop count once; the copy already saved is removed | Rule checked on production data first: it found exactly the one known duplicate, and nothing near it |
 | #58 | Names that match: Gemini reuses known product names everywhere, brands kept out of names, chains under one name, florists out of comparisons; answers no longer cut off | From the first real upload: 482 receipt names and 864 offer names shared only 105; one part failed with Gemini's answer cut short |
 | #59 | The first Trumf history read again with the parser | Dry-run on production first: it touches only that history's 258 receipts |
+| #60 | Offers judged only against recent receipts (180 days) for the same brand and a similar size | Persona walkthrough: on production, 8 "real" offers and 118 "lowest known" were mostly wrong; now 1 and 45 |
+| #61 | List prices compared like for like: weighed against weighed, at the most common size, and labelled "for 1 l"; ties on estimates called ties; splits only on known prices | "Epler billigst hos Joker 5,47 kr" was one weighed apple against 29,90 kr a kilo |
+| #62 | Enter adds what was typed; suggestions ranked by closeness and how many stores sell them; the total bar goes when the list is cleared; a shared list says where it came from | "melk" + Enter had put Melkeglede (sweets) on the list |
+| #63 | Receipts keep their printed total; the same total recognises a history uploaded again | Re-uploading the friend's history saved 2 receipts twice; checked on a fresh production copy: 304 totals filled, nothing removed |
+| #64 | The product page says how old the cheapest price is, and leads with the unit price when sizes differ | "Billigst nå" on a price from February 2025 |
+| #65 | Pages seen before fold their introduction; the front page shows 48 products at a time | The search was 1000 px down on a phone; the front page was 32 000 px tall |
+| #66 | Smaller truths: the thank-you text after reading, upload errors in the box, offers worded differently listed once, the about page on estimates | |
+| #67 | "Mente du" ranks a word and a compound ending alike, the commoner first | Found when re-running the walkthrough: "Melk" offered Litago melk, not Lettmelk |
+| #68 | A product in one store shows "Pris nå", without repeating the price per item | Found when re-running the walkthrough |
