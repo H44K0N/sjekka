@@ -271,6 +271,7 @@ def test_upload_flow(page, site, tmp_path):
         db.commit()
     engine.dispose()
     expect(page.locator("#state")).to_have_text("Lest. Prisene ligger nå i oversikten.", timeout=8000)
+    expect(page.locator("#lede")).to_have_text("Kvitteringen er lest, og bildet er slettet.")
     expect(page.locator("#found .chain img")).to_have_attribute("alt", "Rema 1000")
     expect(page.locator("#items a")).to_have_text("Rømme")
     expect(page.locator("#items a")).to_have_attribute("href", "/produkt.html?navn=R%C3%B8mme")
@@ -295,6 +296,9 @@ def test_upload_rejects_non_images_before_sending(page, tmp_path):
     page.set_input_files("#receipt", text)
     expect(page.locator("#status")).to_contain_text("må være et bilde")
     expect(page.locator("#btn")).to_be_disabled()
+    # Said where the file was chosen, too
+    expect(page.locator("#drop")).to_have_class(re.compile("invalid"))
+    expect(page.locator("#prompt")).to_contain_text("må være et bilde")
 
 
 def test_upload_shows_server_errors(page):

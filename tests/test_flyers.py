@@ -299,6 +299,16 @@ def test_an_offer_in_two_overlapping_flyers_is_listed_once(clean, db):
         ("Coop Mega", 10), ("Coop Mega", 12), ("Kiwi", 10)]
 
 
+def test_copies_worded_differently_but_alike_are_listed_once(clean, db):
+    # The real case: Spar's two flyers had "Sjokoladepudding 2-pk Danette" and "2-pk. Danette"
+    pudding = {"canonical_name": "Sjokoladepudding", "brand": "Danette", "quantity": 200, "unit": "g", "total_price": 20}
+    add_flyer(db, "Spar", [{**pudding, "raw_name": "Sjokoladepudding 2-pk Danette, 200 g"}])
+    add_flyer(db, "Spar", [{**pudding, "raw_name": "Sjokoladepudding 2-pk. Danette, 200 g"},
+                           {**pudding, "raw_name": "Sjokoladepudding vanilje Danette", "variant": "Vanilje"}])
+    names = sorted((o["variant"] or "") for o in clean.get("/offers").json())
+    assert names == ["", "Vanilje"]
+
+
 def test_offers_endpoint_filters(clean, db):
     add_receipt_price(db, "Kaffe", "Kiwi", 100, days_ago=10)
     add_flyer(db, "Kiwi", [{"canonical_name": "Kaffe", "total_price": 99}, {"canonical_name": "Melk", "total_price": 20}])

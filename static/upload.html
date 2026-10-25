@@ -81,20 +81,35 @@
         // A receipt as a file instead of a photo: a PDF, or a CSV or JSON export
         const isReceiptFile = f => /\.(pdf|csv|json)$/i.test(f.name) || ["application/pdf", "text/csv", "application/json"].includes(f.type);
 
+        // A file that can't be used: said in the box where it was chosen, not
+        // only below the button, and nothing is left looking ready to send
+        function refuse(text) {
+            file = null;
+            btn.disabled = true;
+            drop.querySelector("img")?.remove();
+            document.getElementById("file").hidden = true;
+            drop.classList.add("invalid");
+            document.getElementById("prompt").hidden = false;
+            document.getElementById("prompt").textContent = text;
+            document.getElementById("hint").textContent = "Trykk for å velge et bilde eller en fil";
+            setStatus(text, true);
+        }
+
         function choose(f) {
             if (!f) return;
             const asFile = isReceiptFile(f);
             // Some phones send HEIC with no type; the server checks the file itself.
             if (!asFile && f.type && !TYPES.includes(f.type)) {
-                setStatus("Filen må være et bilde (JPEG, PNG, WebP eller HEIC), eller PDF, CSV eller JSON.", true);
+                refuse("Filen må være et bilde (JPEG, PNG, WebP eller HEIC), eller PDF, CSV eller JSON.");
                 return;
             }
             const maxMb = asFile && !/\.pdf$/i.test(f.name) && f.type !== "application/pdf" ? 1 : MAX_MB;
             if (f.size > maxMb * 1024 * 1024) {
-                setStatus(`${asFile ? "Filen" : "Bildet"} er for stort. Maks ${maxMb} MB.`, true);
+                refuse(`${asFile ? "Filen" : "Bildet"} er for stort. Maks ${maxMb} MB.`);
                 return;
             }
             file = f;
+            drop.classList.remove("invalid");
             setStatus("");
             btn.disabled = false;
 

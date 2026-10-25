@@ -211,14 +211,18 @@ def offer_list(db: Session, today: date, name: str | None = None) -> list[dict]:
 
     result = []
     # Chains publish overlapping flyers for the same week (Coop Mega's "Uke 43"
-    # and "Mega Helg uke 43" share 58 offers), and Gemini may name each copy
-    # differently: an offer is the same one when chain, text and price are
+    # and "Mega Helg uke 43" share 58 offers). A copy is the same offer when
+    # its text and price are the same (however Gemini named it), or when it
+    # would look the same: the same product, size and price, however the
+    # flyer worded it ("2-pk." and "2-pk")
     seen = set()
     for offer, flyer in offers:
-        same = (flyer.chain, offer.raw_name or offer.canonical_name, offer.total_price, offer.pack_size)
-        if same in seen:
+        as_written = ("text", flyer.chain, offer.raw_name or offer.canonical_name, offer.total_price, offer.pack_size)
+        as_shown = ("look", flyer.chain, offer.canonical_name, (offer.brand or "").lower(), (offer.variant or "").lower(),
+                    offer.quantity, offer.unit, offer.total_price, offer.pack_size)
+        if as_written in seen or as_shown in seen:
             continue
-        seen.add(same)
+        seen.update((as_written, as_shown))
         price = comparable(offer.total_price, offer.pack_size, offer.unit, offer.quantity)
         result.append({
             "canonical_name": offer.canonical_name,

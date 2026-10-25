@@ -343,6 +343,8 @@ h1 {
 }
 .drop:hover, .drop.dragging { border-color: var(--accent); background: rgba(236, 230, 220, 0.04); }
 .drop:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
+.drop.invalid { border-color: var(--error); }
+.drop.invalid #prompt { color: var(--error); }
 .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .drop .label { font-size: 13px; }
 .drop img {
