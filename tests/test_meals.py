@@ -49,6 +49,16 @@ def test_a_chain_priced_mostly_by_guesses_is_not_named_cheapest():
     assert meals.pick_chain({"Kiwi": 100.0, "Spar": 90.0}, {"Kiwi": 0.9, "Spar": 0.8}) == "Spar"
 
 
+def test_a_dinner_is_compared_only_at_the_chains_with_mostly_real_prices():
+    totals = {"Kiwi": 100.0, "Meny": 120.0, "Spar": 90.0, "Obs": 110.0, "Joker": 130.0}
+    guessed = {"Kiwi": 0.0, "Meny": 0.25, "Spar": 0.8, "Obs": 0.5, "Joker": 0.0}
+    at, compared = meals.compare(totals, guessed, 4)
+    # Spar's low guess isn't compared; at most three are shown, cheapest first
+    assert [(c["chain"], c["per_portion"]) for c in at] == [("Kiwi", 25.0), ("Obs", 27.5), ("Meny", 30.0)]
+    assert compared == 4
+    assert meals.compare({"Spar": 90.0}, {"Spar": 1.0}, 4) == ([], 0)
+
+
 def test_a_dinner_without_a_price_for_a_main_ingredient_is_left_out_but_a_minor_one_is_not():
     needs_rice = dinner("a", "A", "vegetar", ing("Pasta", "Pasta"), ing("Ris", "Ris"))
     assert meals.resolve(needs_rice, KNOWN) is None
@@ -71,6 +81,8 @@ def test_a_dinner_is_priced_by_its_share_of_each_package_at_the_cheapest_chain(t
     assert [(i["label"], i["price"]) for i in bolognese["ingredients"]] == [("Pasta", 24.0), ("Kjøttdeig", 50.0)]
     # The packages are bought whole: a whole bag of pasta, not 0.8 of one
     assert bolognese["buy_total"] == 80.0
+    assert bolognese["compared"] == 2
+    assert [(c["chain"], c["total"]) for c in bolognese["compare"]] == [("Rema 1000", 74.0), ("Kiwi", 76.0)]
     assert bolognese["steps"] == ["Lag maten."] and bolognese["pantry"] == ["salt"]
 
 
@@ -117,6 +129,9 @@ def test_the_week_shares_packages_between_dinners(two_dinners):
     assert pasta["count"] == 2 and sorted(pasta["used_in"]) == ["Bolognese", "Pastaen"]
     # Kiwi: 2 bags of pasta (40) + mince (60) + cream (15). Bought apart it's 80 + 35: the same, since 0.8 + 0.8 needs two bags
     assert plan["chain"] == "Kiwi" and plan["total"] == 115.0
+    # Rema: 60 + 50 + 18
+    assert [(c["chain"], c["total"]) for c in plan["compare"]] == [("Kiwi", 115.0), ("Rema 1000", 128.0)]
+    assert plan["compared"] == 2
     assert plan["per_portion"] == pytest.approx(115 / 8, abs=0.01)
     assert plan["shared_saving"] == 0.0
     # The food uses its shares only: 0.8 + 0.8 of the pasta (32), the mince (60) and the cream (15)

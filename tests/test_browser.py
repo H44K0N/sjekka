@@ -1321,9 +1321,10 @@ def test_suggested_products_are_added_with_one_tap_and_the_page_stays(page):
 
 # Dinners (the page, with /meals answered by a fixed set)
 
-def a_dinner(id, name, kind="kjøtt", per=20.0, offers=0, saving=0.0, minutes=30, rough=False, ends=None):
+def a_dinner(id, name, kind="kjøtt", per=20.0, offers=0, saving=0.0, minutes=30, rough=False, ends=None, compared=2):
+    at = [{"chain": "Kiwi", "total": per * 2, "per_portion": per}, {"chain": "Meny", "total": per * 2 + 10, "per_portion": per + 5}]
     return {"id": id, "name": name, "blurb": f"{name} er god.", "minutes": minutes, "kind": kind, "portions": 2, "chain": "Kiwi",
-            "total": per * 2, "per_portion": per, "buy_total": per * 3, "saving": saving, "offers": offers, "rough": rough,
+            "total": per * 2, "per_portion": per, "compare": at[:compared], "compared": compared, "buy_total": per * 3, "saving": saving, "offers": offers, "rough": rough,
             "ingredients": [{"label": "400 g kjøttdeig", "product": "Kjøttdeig", "count": 1, "price": per, "estimated": False,
                              "offer": bool(offers), "offer_until": ends, "deal": None, "brand": None},
                             {"label": "Ris", "product": "Ris", "count": 1, "price": per, "estimated": rough, "offer": False,
@@ -1332,12 +1333,14 @@ def a_dinner(id, name, kind="kjøtt", per=20.0, offers=0, saving=0.0, minutes=30
 
 
 DINNERS = [a_dinner("bolo", "Bolognese", per=18, offers=2, saving=12, minutes=35, ends=str(date.today() + timedelta(days=1))), a_dinner("pizza", "Pizza", "svin", per=24, minutes=25),
-           a_dinner("laks", "Laks", "fisk", per=40, offers=1, saving=4), a_dinner("linser", "Linsegryte", "vegetar", per=11, minutes=20)]
+           a_dinner("laks", "Laks", "fisk", per=40, offers=1, saving=4, compared=1), a_dinner("linser", "Linsegryte", "vegetar", per=11, minutes=20)]
 
 
 def plan_of(ids, portions=2):
     chosen = [d for d in DINNERS if d["id"] in ids]
-    return {"portions": portions, "chain": "Kiwi", "total": 300.0, "per_portion": 15.0, "shared_saving": 41.0, "offer_saving": 12.0,
+    return {"portions": portions, "chain": "Kiwi", "total": 300.0, "per_portion": 15.0, "compared": 2,
+            "compare": [{"chain": "Kiwi", "total": 300.0, "per_portion": 15.0}, {"chain": "Meny", "total": 342.0, "per_portion": 17.1}],
+            "shared_saving": 41.0, "offer_saving": 12.0,
             "rough": False, "used_total": 240.0, "used_per_portion": 12.0, "days": [{"day": ["Mandag", "Tirsdag", "Onsdag"][i], "id": d["id"], "name": d["name"], "minutes": d["minutes"],
                                       "kind": d["kind"], "per_portion": d["per_portion"], "offers": d["offers"],
                                       "alternatives": [x["id"] for x in DINNERS if x["id"] not in ids]} for i, d in enumerate(chosen)],
@@ -1371,6 +1374,19 @@ def test_the_dinners_page_shows_a_plan_for_the_week_and_every_dinner_cheapest_fi
     expect(page.locator("#plan-days .plan-weekday")).to_have_text(["Mandag", "Tirsdag", "Onsdag"])
     expect(page.locator("#plan-facts")).to_contain_text("Delte pakker sparer 41 kr. Tilbud sparer 12 kr.")
     expect(page.locator("#grid .card h3")).to_have_text(["Bolognese", "Pizza", "Laks", "Linsegryte"])  # as the server ordered them
+
+
+def test_a_dinner_says_what_it_costs_at_the_chains_it_was_compared_at(dinners_page):
+    page = dinners_page
+    pizza = page.locator("#grid .card").filter(has_text="Pizza")
+    # Cheapest only of the chains with enough prices, and the others right there
+    expect(pizza.locator(".where")).to_contain_text("billigst av 2 butikker med nok priser")
+    expect(pizza.locator(".meal-compare")).to_have_text("Kiwi 24 kr · Meny 29 kr per porsjon")
+    laks = page.locator("#grid .card").filter(has_text="Laks")
+    expect(laks.locator(".where")).to_contain_text("eneste butikk med nok priser")
+    expect(laks.locator(".meal-compare")).to_have_count(0)
+    expect(page.locator("#plan-sub")).to_contain_text("billigst av 2 butikker med nok priser")
+    expect(page.locator("#plan-sub .meal-compare")).to_have_text("Kiwi 300 kr · Meny 342 kr")
 
 
 def test_dinners_with_offers_get_their_own_row_with_the_saving(dinners_page):

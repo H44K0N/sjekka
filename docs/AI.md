@@ -122,7 +122,7 @@ Add a line here for each AI-assisted change.
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
 | 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
-| 24–26 Oct 2026 | #55–#81: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
+| 24–26 Oct 2026 | #55–#82: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -202,3 +202,4 @@ Add a line here for each AI-assisted change.
 | #79 | The shopping list's answer is kept in view on phones: a bar under the heading shows the cheapest store, the total, and the saving over the next best store, and stays at the top as you scroll; the verdict compares with the next best store first and the most expensive second; the front page's categories fold behind a "Kategori" pill | Haakon: "Yeah build that" (Claude's recommendation after he picked "clearer result"), and mid-way: "the categories on the main page take too much space, especially on mobile. Make it collapsed by default" |
 | #80 | A dinners page (`/middag.html`): 25 whole dinners priced from receipts and flyer offers, cheapest per portion first, a plan for the week that picks dinners sharing ingredients, a swap per day, one tap to put the trip on the shopping list. Walked through as the five earlier users, twice | Haakon: "A page with meal suggestions, based on known tilbuds and cheap prices. Whole dinners comprised of cheap ingredients. Be creative with this one, giving you full creative freedom. When finished, go through as the previous 5 users and get feedback on the user experience. Then iterate again." |
 | #81 | The phone menu in two rows: the logo and the upload button, then the four pages spread across the width, each easy to tap | Haakon, with a screenshot of the new "middag" link squeezed in: "Top nav bar is a little crowded." |
+| #82 | Dinners say what "cheapest" was compared with: "billigst av 2 butikker med nok priser", and each dinner and the week plan show their cost at the best-known chains | Haakon: "Why is there mostly kiwi entries in the dinner page? Seems like something must have gone wrong or is kiwi consistently cheaper for dinners?" Nothing was broken: the receipts are mostly Kiwi, so Kiwi was the only chain with enough real prices to be named, and the page claimed more than it knew |
