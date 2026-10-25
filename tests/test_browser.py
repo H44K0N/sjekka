@@ -1110,6 +1110,19 @@ def test_one_store_is_not_called_the_cheapest(page):
     page.goto("/produkt.html?navn=Kj%C3%B8ttdeig")
     expect(page.locator(".store")).to_have_count(1)
     expect(page.locator(".store .amount")).not_to_contain_text("billigst")
+    expect(page.locator("#best .label")).to_have_text("Pris nå")
+
+
+def test_a_price_per_item_is_not_repeated_as_a_unit_price(page):
+    def per_item(route):
+        product = route.fetch().json()
+        for p in product["prices"]:
+            p.update(unit="stk", quantity=None, price_per_unit=p["total_price"])
+        route.fulfill(json=product)
+    page.route("**/products/Kj%C3%B8ttdeig", per_item)
+    page.goto("/produkt.html?navn=Kj%C3%B8ttdeig")
+    expect(page.locator("#best-price")).to_have_text("89 kr")
+    expect(page.locator("#best-unit")).not_to_contain_text("/ stk")
 
 
 def test_a_page_seen_before_folds_its_introduction(page):
