@@ -854,7 +854,7 @@ def test_product_page_prices_loose_produce_per_kilo(page):
     page.route("**/products/Lettmelk", weighed)
     page.goto("/produkt.html?navn=Lettmelk")
     expect(page.locator("#best-price")).to_have_text("44,90 kr / kg")
-    expect(page.locator("#best-unit")).to_have_text("1,57 kg for 70,49 kr")
+    expect(page.locator("#best-unit")).to_have_text(re.compile(r"^1,57 kg for 70,49 kr · "))
     expect(page.locator("#scale-note")).to_contain_text("kr / kg")
 
 
@@ -1068,3 +1068,40 @@ def test_the_total_bar_goes_when_the_list_is_cleared(browser, site):
     page.get_by_role("button", name="Tøm listen").click()
     expect(page.locator("#sticky")).to_be_hidden()
     context.close()
+
+
+def test_an_old_cheapest_price_is_not_called_the_price_now(page):
+    # The real case: "Billigst nå" for a price from February 2025
+    def old(route):
+        product = route.fetch().json()
+        for p in product["prices"]:
+            p["purchase_date"] = "2025-02-15"
+        route.fulfill(json=product)
+    page.route("**/products/Lettmelk", old)
+    page.goto("/produkt.html?navn=Lettmelk")
+    expect(page.locator("#best .label")).to_have_text("Billigst sist vi så")
+    expect(page.locator("#best-unit")).to_contain_text("15. feb. 2025")
+
+
+def test_stores_selling_different_sizes_lead_with_the_unit_price(page):
+    # The real case: Kiwi's 1,75 l for 29,90 kr is cheapest, but looked dearer
+    # than Meny's 1 l for 21,90 kr
+    def sizes(route):
+        product = route.fetch().json()
+        first = product["prices"][0]
+        product["prices"] = [
+            {**first, "store_chain": "Meny", "quantity": 1000, "total_price": 21.9, "price_per_unit": 2.19},
+            {**first, "store_chain": "Kiwi", "quantity": 1750, "total_price": 29.9, "price_per_unit": 1.71},
+        ]
+        route.fulfill(json=product)
+    page.route("**/products/Lettmelk", sizes)
+    page.goto("/produkt.html?navn=Lettmelk")
+    expect(page.locator("#best-chain img")).to_have_attribute("alt", "Kiwi")
+    expect(page.locator("#best-price")).to_have_text("1,71 kr / 100 ml")
+    expect(page.locator("#best-unit")).to_have_text(re.compile(r"^29,90 kr for 1,75 l · "))
+
+
+def test_one_store_is_not_called_the_cheapest(page):
+    page.goto("/produkt.html?navn=Kj%C3%B8ttdeig")
+    expect(page.locator(".store")).to_have_count(1)
+    expect(page.locator(".store .amount")).not_to_contain_text("billigst")
