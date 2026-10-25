@@ -206,7 +206,7 @@
                 body.append(el("p", "price", each));
                 if (unit) body.append(el("p", "unit", unit));
                 const deal = offerFor.get(p.canonical_name);
-                if (deal && beats(deal, p)) body.append(el("p", "deal-tag", `Tilbud ${offerPrice(deal)} hos ${deal.chain}`));
+                if (deal && beats(deal, p)) body.append(el("p", "deal-tag", `Tilbud ${offerPrice(deal)} hos ${deal.chain}${deal.pack_size > 1 ? `, må kjøpe ${deal.pack_size}` : ""}`));
                 const where = el("p", "where");
                 const shop = el("span", "shop");
                 shop.append(chainBadge(p.store_chain));

@@ -76,6 +76,8 @@ class Offer:
     date: date | None
     until: date | None = None   # set for flyer offers: the last day they apply
     deal: str | None = None
+    # A multi-buy ("8 for 100") is that price only when this many are bought
+    needs: int = 1
     # The pieces the name says a pack of something weighed holds: a flyer
     # gives "COOP FROKOSTEGG 12 PK … 816 g" by weight, other eggs by count
     pieces: float | None = None
@@ -222,6 +224,7 @@ def flyer_deals(rows) -> dict[tuple[str, str], Offer]:
             per_unit=item.price_per_unit if sized else None,
             unit=item.unit, quantity=item.quantity, brand=item.brand, date=flyer.valid_from,
             until=flyer.valid_to, deal=item.deal,
+            needs=max(item.pack_size or 1, 1) if item.deal else 1,
             pieces=pieces_named(item.raw_name) if item.unit != "stk" else None, line=item, source=flyer,
         )
         key = (offer.product, offer.chain)
@@ -275,13 +278,24 @@ def price_list(wanted: list[tuple[str, int]], offers: dict[tuple[str, str], Offe
         prices = {c: price_of(o) for c, o in regular.items()}
         # The typical price comes from receipts; offers only when there's nothing else
         typical = median(prices.values()) if prices else median(price_of(o) for o in deal.values())
-        deal_used = {}
+        deal_used, multi_buys = {}, []
         for chain, o in deal.items():
-            if chain not in prices or price_of(o) < prices[chain]:
-                prices[chain] = price_of(o)
-                deal_used[chain] = o
+            # Without the offer: the receipt price, or the chain's estimate
+            usual = prices.get(chain, typical * index.get(chain, 1.0))
+            if chain in prices and price_of(o) >= usual:
+                continue
+            if count < o.needs:
+                # "8 for 100" doesn't make one can cost 12.50: say what taking eight would cost
+                if price_of(o) < usual:
+                    multi_buys.append({"chain": chain, "deal": o.deal, "needs": o.needs,
+                                       "each": round(price_of(o), 2), "until": str(o.until)})
+                continue
+            # The pieces beyond the last whole multi-buy cost what they usually do
+            bought = count - count % o.needs
+            prices[chain] = (bought * price_of(o) + (count - bought) * usual) / count
+            deal_used[chain] = o
 
-        line = {"name": name, "count": count, "size": size, "prices": {}}
+        line = {"name": name, "count": count, "size": size, "prices": {}, "multi_buys": multi_buys}
         for chain in chains:
             is_known = chain in prices
             price = prices[chain] if is_known else typical * index.get(chain, 1.0)

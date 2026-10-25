@@ -140,7 +140,9 @@
                     : o.pack_size > 1 || o.quantity > 1 ? `${kr.format(o.per_unit)} kr / stk` : "";
                 const facts = [unit, o.is_member_price ? "medlemspris" : "", o.pack_size === 1 && o.deal ? o.deal : ""].filter(Boolean);
                 if (facts.length) body.append(el("p", "unit", facts.join(" · ")));
-                body.append(verdictTag(o));
+                const tags = el("p", "offer-tags");
+                tags.append(...[mustBuy(o), verdictTag(o)].filter(Boolean));
+                body.append(tags);
                 // The explanation and what the flyer itself says (names are
                 // matched loosely) are there for whoever wants them
                 const details = [offerVerdict(o)];

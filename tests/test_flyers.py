@@ -350,6 +350,26 @@ def test_an_offer_beats_the_receipt_price_in_the_basket(clean, db):
     assert data["stores"][0]["chain"] == "Kiwi" and data["stores"][0]["offers"] == 1
 
 
+def test_a_multi_buy_counts_only_when_that_many_are_bought(clean, db):
+    add_receipt_price(db, "Energidrikk", "Obs", 30, days_ago=5)
+    add_receipt_price(db, "Energidrikk", "Kiwi", 27.5, days_ago=5)
+    add_flyer(db, "Obs", [{"canonical_name": "Energidrikk", "total_price": 100, "pack_size": 8, "deal": "8 for 100"}])
+
+    def basket_of(count):
+        return clean.post("/basket", json={"items": [{"name": "Energidrikk", "count": count}]}).json()["items"][0]
+
+    # One can isn't 12.50: that's the price when you take eight
+    one = basket_of(1)
+    assert one["prices"]["Obs"]["price"] == 30 and one["prices"]["Obs"]["offer_until"] is None
+    assert one["cheapest"] == "Kiwi"
+    assert one["multi_buys"] == [{"chain": "Obs", "deal": "8 for 100", "needs": 8, "each": 12.5, "until": str(WEEK[1])}]
+    eight = basket_of(8)
+    assert eight["prices"]["Obs"]["price"] == 100 and eight["prices"]["Obs"]["deal"] == "8 for 100"
+    assert eight["multi_buys"] == [] and eight["cheapest"] == "Obs"
+    # Two more than eight cost what they usually do
+    assert basket_of(10)["prices"]["Obs"]["price"] == 160
+
+
 def test_a_dearer_offer_is_ignored(clean, db):
     add_receipt_price(db, "Kaffe", "Kiwi", 60, days_ago=1)
     add_flyer(db, "Kiwi", [{"canonical_name": "Kaffe", "total_price": 70}])

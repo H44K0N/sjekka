@@ -122,7 +122,7 @@ Add a line here for each AI-assisted change.
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
 | 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
-| 24–26 Oct 2026 | #55–#83: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
+| 24–26 Oct 2026 | #55–#84: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -204,3 +204,4 @@ Add a line here for each AI-assisted change.
 | #81 | The phone menu in two rows: the logo and the upload button, then the four pages spread across the width, each easy to tap | Haakon, with a screenshot of the new "middag" link squeezed in: "Top nav bar is a little crowded." |
 | #82 | Dinners say what "cheapest" was compared with: "billigst av 2 butikker med nok priser", and each dinner and the week plan show their cost at the best-known chains | Haakon: "Why is there mostly kiwi entries in the dinner page? Seems like something must have gone wrong or is kiwi consistently cheaper for dinners?" Nothing was broken: the receipts are mostly Kiwi, so Kiwi was the only chain with enough real prices to be named, and the page claimed more than it knew |
 | #83 | A logo: the name in bold, bigger than the menu, with a champagne full stop; the same "s." as the tab and home-screen icon (drawn as a shape, since an icon can't load the font) and on the link preview | Haakon: "the logo at the top of the page is the same size as the rest of the nav bar. Lets create a couple logos and i can choose the right one for the brand". Five were drawn in the real header; Haakon chose "A. As is" |
+| #84 | A multi-buy says what it asks: "8 for 100 kr" with a "Må kjøpe 8 · 12,50 kr stk" tag on the offers and product pages, and the shopping list prices one can at its usual price and offers "Ta 8" instead of pretending one costs 12,50 | Haakon: "it doesnt really come across clearly enough that this only applies if you buy 8x500ml boxes of battery energy drink. Figure this out in a better way." |
