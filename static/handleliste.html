@@ -132,14 +132,13 @@
         }
 
         // How well a known name matches what was typed, best first: the name
-        // itself, then a word in it ("Revet ost"), then the end of a compound
-        // ("Lettmelk" is a kind of milk), then the start of one ("Melkesjokolade"
-        // is chocolate), then anywhere, then only the brand
+        // itself, then a kind of it, as a word in it ("Revet ost") or the end of
+        // a compound ("Lettmelk"), then the start of one ("Melkesjokolade" is
+        // chocolate), then anywhere, then only the brand
         function closeness(p, q) {
             const name = p.canonical_name.toLowerCase();
             if (name === q) return 0;
-            if (name.split(/[\s/,-]+/).includes(q)) return 1;
-            if (name.endsWith(q)) return 2;
+            if (name.split(/[\s/,-]+/).includes(q) || name.endsWith(q)) return 1;
             if (name.startsWith(q)) return 3;
             if (name.includes(q)) return 4;
             return (p.brand || "").toLowerCase().includes(q) ? 5 : null;

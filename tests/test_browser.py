@@ -1038,19 +1038,20 @@ def test_list_prices_say_what_size_they_are_for(page):
 def test_enter_adds_what_was_typed_not_a_longer_name(page):
     # The real case: "melk" + Enter put Melkeglede (sweets) on the list
     names = [{"canonical_name": n, "brand": None, "store_count": c, "store_chain": "Kiwi"}
-             for n, c in [("Melkeglede", 1), ("Kokosmelk", 1), ("Lettmelk", 2), ("Melkesjokolade", 3), ("Smør og olivenolje", 1)]]
+             for n, c in [("Melkeglede", 1), ("Kokosmelk", 1), ("Lettmelk", 2), ("Melkesjokolade", 3), ("Smør og olivenolje", 1),
+                          ("Litago melk", 1)]]
     page.route("**/products", lambda route: route.fulfill(json=names))
     page.goto("/handleliste.html")
     add = page.get_by_role("combobox", name="Legg til vare")
     add.fill("melk")
     # A kind of milk before milk chocolate, the commoner first
     expect(page.get_by_role("option")).to_have_text([
-        re.compile("^Lettmelk"), re.compile("^Kokosmelk"), re.compile("^Melkesjokolade"), re.compile("^Melkeglede"),
-        re.compile("«melk»")])
+        re.compile("^Lettmelk"), re.compile("^Kokosmelk"), re.compile("^Litago melk"), re.compile("^Melkesjokolade"),
+        re.compile("^Melkeglede"), re.compile("«melk»")])
     expect(page.get_by_role("option").last).to_have_attribute("aria-selected", "true")
     page.keyboard.press("Enter")
     assert list_names(page) == ["Melk"]
-    # ... and then offers the names that have prices
+    # ... and then offers the names that have prices: kinds of milk, the commoner first
     expect(page.locator(".list-item .did-you-mean").first).to_have_text("Lettmelk")
 
     # A name that is known is added as it is
