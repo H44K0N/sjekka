@@ -187,3 +187,46 @@ def test_a_store_that_is_not_a_grocery_chain_is_not_compared():
     # Trumf also lists florists that take the card
     offers = basket.latest_offers([row("Tulipaner", "Mester Grønn Sandvika", 200), row("Melk", "Kiwi", 20)])
     assert set(offers) == {("Melk", "Kiwi")}
+
+
+def test_mostly_weighed_products_are_compared_by_weight():
+    # The real case: one weighed apple (196 g, 5,47 kr) was "cheapest" against
+    # 29,90 kr a kilo, and a 6-pack priced per pack muddled it all
+    rows = [row("Epler", "Joker", 5.47, unit="g", quantity=196),
+            row("Epler", "Kiwi", 29.9, unit="g", quantity=1000),
+            row("Epler", "Extra", 32.9, unit="g", quantity=1000),
+            row("Epler", "Spar", 30, unit="stk")]
+    item = priced([("Epler", 1)], rows)["items"][0]
+    assert item["size"] == "1000 g"
+    assert item["prices"]["Joker"]["price"] == pytest.approx(27.91, abs=0.01)
+    assert item["cheapest"] == "Joker"
+    # The 6-pack can't be compared by weight, so Spar has no price for it
+    assert "Spar" not in item["prices"]
+
+
+def test_a_chain_whose_only_price_cant_be_compared_is_not_ranked():
+    rows = [row("Epler", "Kiwi", 29.9, unit="g", quantity=1000),
+            row("Epler", "Extra", 32.9, unit="g", quantity=1000),
+            row("Epler", "Spar", 30, unit="stk")]
+    assert {s["chain"] for s in priced([("Epler", 1)], rows)["stores"]} == {"Kiwi", "Extra"}
+
+
+@pytest.mark.parametrize("quantities, size", [
+    ([500, 1000, 1000], 1000),   # the most common size
+    ([125, 600, 500, 150], 310),  # all different: the median (325), to two figures
+    ([575], 575),
+])
+def test_the_typical_size_is_one_people_buy(quantities, size):
+    assert basket.typical_size(quantities) == pytest.approx(size, rel=0.05)
+
+
+def test_a_split_never_sends_you_to_a_store_on_a_guess():
+    # Rema has no coffee price; its estimate is cheap because Rema is cheap
+    # on meat. The split buys coffee where its price is known.
+    rows = [row("Kjøtt", "Kiwi", 160), row("Kjøtt", "Rema", 80),
+            row("Kaffe", "Kiwi", 100), row("Ost", "Kiwi", 100), row("Ost", "Rema", 60)]
+    result = priced([("Kjøtt", 1), ("Kaffe", 1), ("Ost", 1)], rows)
+    plan = result["split"]["plan"] if result["split"] else {}
+    assert plan.get("Kaffe", "Kiwi") == "Kiwi"
+    assert basket.pick({"A": {"x": (10, True)}, "B": {"x": (20, False)}}, "x", "A", "B") == "B"
+    assert basket.pick({"A": {"x": (10, False)}, "B": {"x": (20, False)}}, "x", "A", "B") == "A"

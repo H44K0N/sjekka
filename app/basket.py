@@ -7,6 +7,7 @@ typical price, scaled by how expensive the chain is on the products where we
 can compare. Estimates are always marked as such."""
 import math
 import re
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
@@ -96,26 +97,38 @@ def by_product(offers: dict[tuple[str, str], Offer]) -> dict[str, dict[str, Offe
     return grouped
 
 
-def scale(offers: list[Offer]) -> tuple[Callable[[Offer], float], str | None]:
+def typical_size(quantities: list[float]) -> float:
+    """The size to price a product at: the most common one, so the list
+    says "for 1 l" rather than "for 1083 ml"; with no size more common than
+    another, the median, rounded to two figures."""
+    size, n = Counter(quantities).most_common(1)[0]
+    return size if n > 1 else float(f"{median(quantities):.2g}")
+
+
+def scale(offers: list[Offer]) -> tuple[Callable[[Offer], float], str | None, Callable[[Offer], bool]]:
     """How to make one product's prices comparable.
 
-    When every offer has a size in the same unit, prices are scaled to the
+    When most offers have a size in the same unit, prices are scaled to the
     product's typical size (so 0.5 l at one store and 1 l at another compare
-    fairly); otherwise the price of one item is used. Returns the pricing
-    function and the size it prices, if any."""
-    units = {o.unit for o in offers}
-    if len(units) == 1 and all(o.per_unit for o in offers):
-        size = median(o.quantity for o in offers)
-        # From the price paid, not the rounded per_unit, so a store selling
-        # exactly this size shows exactly what it charged
-        return (lambda o: o.each / o.quantity * size), f"{size:g} {units.pop()}"
-    return (lambda o: o.each), None
+    fairly), and offers without that kind of size can't be compared: a
+    6-pack of apples against apples by the kilo. Otherwise the price of one
+    item is used. Returns the pricing function, the size it prices, if any,
+    and which offers it can price."""
+    sized = [o for o in offers if o.unit in ("g", "ml") and o.quantity and o.per_unit]
+    if sized:
+        unit, n = Counter(o.unit for o in sized).most_common(1)[0]
+        if n * 2 > len(offers):
+            size = typical_size([o.quantity for o in sized if o.unit == unit])
+            # From the price paid, not the rounded per_unit, so a store selling
+            # exactly this size shows exactly what it charged
+            return (lambda o: o.each / o.quantity * size), f"{size:g} {unit}", (lambda o: o in sized and o.unit == unit)
+    return (lambda o: o.each), None, (lambda o: True)
 
 
 def line_prices(chains: dict[str, Offer]) -> tuple[dict[str, float], str | None]:
     """What one product costs at each chain, made comparable (see scale)."""
-    price, size = scale(list(chains.values()))
-    return {c: price(o) for c, o in chains.items()}, size
+    price, size, fits = scale(list(chains.values()))
+    return {c: price(o) for c, o in chains.items() if fits(o)}, size
 
 
 def flyer_deals(rows) -> dict[tuple[str, str], Offer]:
@@ -167,14 +180,20 @@ def price_list(wanted: list[tuple[str, int]], offers: dict[tuple[str, str], Offe
     known = set(grouped) | set(on_offer)
     listed = [(name, count) for name, count in wanted if name in known]
     unknown = [name for name, _ in wanted if name not in known]
-    chains = sorted({c for name, _ in listed for c in [*grouped.get(name, {}), *on_offer.get(name, {})]})
+    # Each product's prices that can be compared (see scale)
+    comparable = {}
+    for name, _ in listed:
+        regular, deal = grouped.get(name, {}), on_offer.get(name, {})
+        price_of, size, fits = scale([*regular.values(), *deal.values()])
+        comparable[name] = (price_of, size, {c: o for c, o in regular.items() if fits(o)},
+                            {c: o for c, o in deal.items() if fits(o)})
+    chains = sorted({c for _, _, regular, deal in comparable.values() for c in [*regular, *deal]})
 
     items = []
     # cost[chain][product] = (price for `count` items, estimated?)
     cost: dict[str, dict[str, tuple[float, bool]]] = {c: {} for c in chains}
     for name, count in listed:
-        regular, deal = grouped.get(name, {}), on_offer.get(name, {})
-        price_of, size = scale([*regular.values(), *deal.values()])
+        price_of, size, regular, deal = comparable[name]
         prices = {c: price_of(o) for c, o in regular.items()}
         # The typical price comes from receipts; offers only when there's nothing else
         typical = median(prices.values()) if prices else median(price_of(o) for o in deal.values())
@@ -222,6 +241,16 @@ def price_list(wanted: list[tuple[str, int]], offers: dict[tuple[str, str], Offe
     }
 
 
+def pick(cost: dict[str, dict[str, tuple[float, bool]]], name: str, a: str, b: str) -> str:
+    """Which of two chains to buy a product at: where its price is known
+    rather than estimated (a split shouldn't send anyone to a store on a
+    guess), else the cheaper."""
+    (price_a, guess_a), (price_b, guess_b) = cost[a][name], cost[b][name]
+    if guess_a != guess_b:
+        return b if guess_a else a
+    return a if price_a <= price_b else b
+
+
 def best_split(cost: dict[str, dict[str, tuple[float, bool]]], stores: list[dict]) -> dict | None:
     """The cheapest way to buy the list across two chains, when it saves
     enough over the cheapest single chain to be worth a second stop."""
@@ -232,7 +261,7 @@ def best_split(cost: dict[str, dict[str, tuple[float, bool]]], stores: list[dict
     best = None
     for i, a in enumerate(chains):
         for b in chains[i + 1:]:
-            plan = {name: (a if cost[a][name][0] <= cost[b][name][0] else b) for name in cost[a]}
+            plan = {name: pick(cost, name, a, b) for name in cost[a]}
             if len(set(plan.values())) < 2:
                 continue
             total = sum(cost[chain][name][0] for name, chain in plan.items())

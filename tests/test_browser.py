@@ -996,3 +996,24 @@ def test_the_thank_you_page_follows_a_whole_history(page):
         "Lest. Prisene ligger nå i oversikten. 6 var allerede registrert og telles ikke to ganger. 1 av 12 deler kunne ikke leses.",
         timeout=10000)
     expect(page.locator("#found .chain img")).to_have_count(2)
+
+
+def test_a_win_by_øre_on_an_estimate_is_not_called_a_win(page):
+    # The real case: 39,89 against 39,90, with one of two prices estimated
+    def one_øre(route):
+        result = route.fetch().json()
+        rema, kiwi = result["stores"]
+        rema.update(total=39.89, known=1, estimated=1)
+        kiwi.update(total=39.90, known=1, estimated=1)
+        route.fulfill(json=result)
+    page.route("**/basket", one_øre)
+    page.goto("/handleliste.html?v=Lettmelk&v=Kj%C3%B8ttdeig")
+    expect(page.locator("#verdict .label").first).to_have_text("Trolig billigst for hele listen")
+    expect(page.locator("#verdict-note")).to_have_text("Omtrent likt med Kiwi. Flere kvitteringer gir et sikrere svar.")
+
+
+def test_list_prices_say_what_size_they_are_for(page):
+    page.goto("/handleliste.html?v=Lettmelk")
+    expect(page.locator(".list-item .hint")).to_contain_text("22,90 kr for 1 l")
+    page.locator(".rank-row").first.click()
+    expect(page.locator(".rank-detail tbody tr").first).to_contain_text("Lettmelk Q for 1 l")
