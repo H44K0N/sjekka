@@ -1193,3 +1193,56 @@ def test_explore_shows_products_a_page_at_a_time(page):
     page.locator("#search").fill("vare 1")
     expect(cards(page)).to_have_count(30)  # Vare 100-129
     expect(page.locator("#more")).to_be_hidden()
+
+
+def test_a_tap_on_a_suggestion_adds_it_even_when_the_field_loses_focus_first(page):
+    # On a phone a tap is pointerdown, then focus leaving the field, then click.
+    # The list used to be hidden on that blur, and the click fell through to
+    # the product link underneath: the tap opened the product page instead.
+    page.goto("/handleliste.html?v=Lettmelk&v=Agurk")
+    page.locator("#add").click()
+    page.keyboard.type("kjø")
+    option = page.locator("#suggestions li").first
+    expect(option).to_contain_text("Kjøttdeig")
+    option.dispatch_event("pointerdown")
+    page.evaluate("document.getElementById('add').blur()")
+    expect(option).to_be_visible()
+    option.click()
+    expect(page).to_have_url(re.compile(r"/handleliste\.html"))  # not on a product page
+    expect(page.locator("#items .list-item")).to_have_count(3)
+    expect(page.locator("#items li").last).to_contain_text("Kjøttdeig")
+    # And the field is ready for the next one
+    expect(page.locator("#add")).to_be_focused()
+
+
+def test_a_suggestion_can_be_added_many_times_in_a_row(page):
+    page.goto("/handleliste.html")
+    page.locator("#add").click()
+    for word, name in [("lett", "Lettmelk"), ("kjø", "Kjøttdeig"), ("agu", "Agurk")]:
+        page.keyboard.type(word)  # the field is still focused after each one
+        page.locator("#suggestions li").filter(has_text=name).first.click()
+    expect(page.locator("#items .list-item")).to_have_count(3)
+    expect(page).to_have_url(re.compile(r"/handleliste\.html$"))
+
+
+def test_suggested_products_are_added_with_one_tap_and_the_page_stays(page):
+    page.goto("/handleliste.html?v=Lettmelk")
+    chips = page.locator("#pick-list button")
+    expect(chips.first).to_be_visible()
+    # What's on offer comes first, and what's on the list is not suggested
+    expect(page.locator("#pick-list button.offer").first).to_be_visible()
+    expect(page.locator("#pick-list").get_by_text("Lettmelk")).to_have_count(0)
+    first = chips.first.get_attribute("aria-label")
+    name = first.removeprefix("Legg ").removesuffix(" på handlelisten")
+    before = chips.count()
+    chips.first.click()
+    expect(page).to_have_url(re.compile(r"/handleliste\.html"))
+    expect(page.locator("#items .list-item")).to_have_count(2)
+    expect(page.locator("#items")).to_contain_text(name)
+    expect(page.locator("#pick-list").get_by_label(first)).to_have_count(0)
+    # It's gone from the suggestions (the seed has fewer than a dozen products)
+    expect(chips).to_have_count(before - 1)
+    # The suggested panel answers to the keyboard like any button
+    chips.first.focus()
+    page.keyboard.press("Enter")
+    expect(page.locator("#items .list-item")).to_have_count(3)
