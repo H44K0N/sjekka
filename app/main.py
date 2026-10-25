@@ -29,6 +29,8 @@ from app import models
 from app import worker
 from app import basket
 from app import flyers
+from app import meals
+from app import recipes
 from app import names
 from app import tjek
 from app import receipt_files
@@ -428,6 +430,23 @@ def price_basket(shopping_list: ShoppingList, db: Session = Depends(get_db)):
     )
     deals = basket.flyer_deals(flyers.active_offers(db, date.today()))
     return {**basket.price_list(list(wanted.items()), basket.latest_offers(rows), deals), "renamed": renamed}
+
+
+@app.get("/meals")
+def get_meals(portions: int = 4, ids: str | None = None, db: Session = Depends(get_db)):
+    """Dinner suggestions priced from receipts and this week's offers, cheapest
+    first, and a plan for the week. `ids` is a chosen set of dinners to plan
+    (after the visitor swapped one)."""
+    rows = (
+        db.query(models.ReceiptItem, models.Receipt)
+        .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
+        .filter(models.ReceiptItem.total_price.isnot(None))
+        .all()
+    )
+    deals = basket.flyer_deals(flyers.active_offers(db, date.today()))
+    # Unknown names are ignored; with none left, the plan picks for itself
+    chosen = [i for i in (ids or "").split(",") if i in recipes.BY_ID] or None
+    return meals.suggest(basket.latest_offers(rows), deals, portions, chosen)
 
 
 @app.get("/offers")

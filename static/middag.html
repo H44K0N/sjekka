@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sjekka – Middag</title>
+    <meta name="theme-color" content="#0d0c0b">
+    <meta name="description" content="Hele middager av det som er billigst akkurat nå, regnet ut fra kvitteringer og ukas tilbud.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Sjekka">
+    <meta property="og:title" content="Sjekka – Hva blir det til middag?">
+    <meta property="og:description" content="Hele middager av det som er billigst akkurat nå, og en middagsplan for uka.">
+    <meta property="og:url" content="https://sjekka.tischbein.dev/middag.html">
+    <meta property="og:image" content="https://sjekka.tischbein.dev/og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="preload" href="/fonts/Libron-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header class="top">
+        <a href="/" class="mark">sjekka</a>
+        <nav>
+            <a href="/">utforsk</a>
+            <a href="/tilbud.html">tilbud</a>
+            <a href="/middag.html" aria-current="page">middag</a>
+            <a href="/handleliste.html">handleliste <span class="list-count" data-list-count hidden></span></a>
+            <a href="/upload.html" class="cta">last opp</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="intro">
+            <p class="meta">Middag</p>
+            <h1>Hva blir det til middag?</h1>
+            <p class="lede">Hele middager av det som er billigst akkurat nå, regnet ut fra kvitteringer og ukas tilbud. Ingen oppskrift er dyrere enn varene den består av.</p>
+        </section>
+
+        <section class="dinners" aria-labelledby="dinners-heading">
+            <h2 class="visually-hidden" id="dinners-heading">Middagsforslag</h2>
+            <div class="portions" role="group" aria-label="Antall porsjoner">
+                <span class="label" id="portions-label">Porsjoner</span>
+                <div class="seg" id="portions"></div>
+            </div>
+            <p class="notice" id="notice">Henter middager …</p>
+
+            <div class="plan" id="plan" hidden>
+                <p class="meta">Ukas middagsplan</p>
+                <h2 id="plan-title"></h2>
+                <p class="plan-sub" id="plan-sub"></p>
+                <ol class="plan-days" id="plan-days"></ol>
+                <p class="plan-facts" id="plan-facts"></p>
+                <div class="plan-actions">
+                    <button type="button" class="button primary" id="plan-add"></button>
+                    <a class="button" id="plan-list" href="/handleliste.html" hidden>Se handlelisten <span class="arrow">→</span></a>
+                    <span class="status" id="plan-status" role="status"></span>
+                </div>
+                <details class="fold" id="plan-shopping">
+                    <summary>Dette må du kjøpe</summary>
+                    <ul class="shopping" id="shopping"></ul>
+                    <p class="note">Pakkene kjøpes hele, så noe blir til overs. Det er derfor middagene velges så de deler pakker.</p>
+                </details>
+            </div>
+
+            <div class="deals" id="deals" hidden>
+                <div class="listbar"><h2 class="label">På tilbud denne uka</h2></div>
+                <div class="grid meals" id="deal-grid"></div>
+            </div>
+
+            <div class="all" id="all" hidden>
+                <div class="listbar">
+                    <h2 class="label">Billigst nå</h2>
+                    <div class="listbar-tools">
+                        <div class="seg" id="kinds" role="group" aria-label="Type middag"></div>
+                        <label class="switch"><input type="checkbox" id="quick"> Under 30 min</label>
+                    </div>
+                </div>
+                <div class="grid meals" id="grid"></div>
+                <p class="notice" id="none" hidden>Ingen middager passer. Prøv en annen type.</p>
+            </div>
+
+            <details class="fold method" id="method" hidden>
+                <summary>Slik regner vi</summary>
+                <p class="note">Hver vare i middagen prises som resten av Sjekka: siste pris fra kvitteringene, og tilbud fra kundeavisene mens de gjelder. Mangler en butikk pris, anslår vi den og sier fra. Prisen per porsjon er det middagen bruker av hver pakke. Planen for uka velger middager som deler pakker, og regner det du faktisk må kjøpe, hele pakker, i den ene butikken som blir billigst. Olje, salt, krydder og andre skapvarer regnes ikke med.</p>
+            </details>
+        </section>
+    </main>
+
+    <footer>
+        <span>sjekka · <a href="/personvern.html">personvern</a> · <a href="/om.html">om</a></span>
+        <span>Har du sjekka i dag?</span>
+    </footer>
+
+    <script src="/common.js"></script>
+    <script src="/chains.js"></script>
+    <script src="/list.js"></script>
+    <script>
+        const $ = id => document.getElementById(id);
+        const PORTION_CHOICES = [1, 2, 3, 4, 5, 6];
+        const KINDS = [["alle", "Alle"], ["kylling", "Kylling"], ["fisk", "Fisk"], ["kjøtt", "Kjøtt"], ["vegetar", "Vegetar"]];
+        // Pork and sausages are meat to someone choosing dinner
+        const KIND_GROUP = { svin: "kjøtt", pølse: "kjøtt" };
+
+        let portions = 2;
+        try { portions = Math.max(1, Math.min(8, +localStorage.getItem("sjekka.porsjoner") || 2)); } catch { /* the default */ }
+        let data = null;
+        let chosen = null;           // the dinners in the plan, once someone swaps one
+        let kind = "alle";
+        let planToken = 0;
+
+        const rounded = v => `${kr.format(Math.round(v))} kr`;
+        const about = rough => rough ? "ca. " : "";
+
+        function segment(box, choices, current, pick) {
+            box.replaceChildren(...choices.map(([value, label]) => {
+                const b = el("button", "", label);
+                b.type = "button";
+                b.setAttribute("aria-pressed", String(value === current));
+                b.addEventListener("click", () => pick(value));
+                return b;
+            }));
+        }
+
+        function drawControls() {
+            segment($("portions"), PORTION_CHOICES.map(n => [n, String(n)]), portions, n => {
+                portions = n; chosen = null;
+                try { localStorage.setItem("sjekka.porsjoner", String(n)); } catch { /* not kept */ }
+                load();
+            });
+            segment($("kinds"), KINDS, kind, k => { kind = k; drawControls(); drawAll(); });
+        }
+
+        // ---- a dinner ----
+
+        function dinnerCard(r) {
+            const card = el("article", "card meal");
+            card.id = `meal-${r.id}`;
+            const body = el("div", "body");
+            const title = el("h3", "", r.name);
+            body.append(title, el("p", "brand", r.blurb));
+            const price = el("p", "price", `${about(r.rough)}${rounded(r.per_portion)}`);
+            price.append(el("small", "", " per porsjon"));
+            body.append(price);
+            body.append(el("p", "unit", `${about(r.rough)}${rounded(r.total)} for ${r.portions} · ${r.minutes} min`));
+            const tags = el("p", "meal-tags");
+            if (r.offers) {
+                const t = el("span", "verdict-tag real", r.saving >= 1 ? `${r.offers} på tilbud · spar ${rounded(r.saving)}` : `${r.offers} på tilbud`);
+                tags.append(t);
+            }
+            if (tags.childNodes.length) body.append(tags);
+
+            const where = el("p", "where");
+            const shop = el("span", "shop");
+            shop.append(chainBadge(r.chain));
+            where.append(shop, el("span", "", "billigst hos"));
+
+            const fold = el("details", "fold meal-recipe");
+            fold.append(el("summary", "", "Ingredienser og fremgangsmåte"));
+            const list = el("ul", "ingredients");
+            for (const i of r.ingredients) {
+                const li = el("li", i.estimated ? "estimated" : "");
+                li.append(el("span", "", i.label), el("span", "amount", `${i.estimated ? "ca. " : ""}${kr.format(i.price)} kr`));
+                if (i.offer) li.append(el("span", "offer-tag", "tilbud"));
+                list.append(li);
+            }
+            fold.append(list);
+            const from = [...r.pantry].join(", ");
+            if (from) fold.append(el("p", "note", `Fra skapet: ${from}.`));
+            if (r.unpriced.length) fold.append(el("p", "note", `Uten pris ennå, ikke regnet med: ${r.unpriced.join(", ").toLowerCase()}.`));
+            const steps = el("ol", "steps");
+            for (const s of r.steps) steps.append(el("li", "", s));
+            fold.append(steps);
+
+            const add = el("button", "button small", "Legg på handlelisten");
+            add.type = "button";
+            const status = el("span", "status", "");
+            status.setAttribute("role", "status");
+            add.addEventListener("click", () => {
+                for (const i of r.ingredients) ShoppingList.add(i.product, i.count);
+                status.textContent = `${r.ingredients.length} varer lagt til. `;
+                const link = el("a", "", "Se listen");
+                link.href = "/handleliste.html";
+                status.append(link);
+            });
+            const actions = el("div", "meal-actions");
+            actions.append(add, status);
+            card.append(body, where, fold, actions);
+            return card;
+        }
+
+        // ---- the lists of dinners ----
+
+        function drawAll() {
+            const dinners = data.recipes.filter(r => (kind === "alle" || (KIND_GROUP[r.kind] || r.kind) === kind) &&
+                (!$("quick").checked || r.minutes <= 30));
+            $("grid").replaceChildren(...dinners.map(dinnerCard));
+            $("none").hidden = dinners.length > 0;
+        }
+
+        function drawDeals() {
+            const deals = data.recipes.filter(r => r.offers >= 2 && r.saving >= 1)
+                .sort((a, b) => b.saving - a.saving).slice(0, 3);
+            $("deals").hidden = deals.length === 0;
+            $("deal-grid").replaceChildren(...deals.map(r => { const c = dinnerCard(r); c.id = `deal-${r.id}`; return c; }));
+        }
+
+        // ---- the plan for the week ----
+
+        function openDinner(id) {
+            // The list may be filtered: show everything so the dinner is there
+            if (!$(`meal-${id}`)) { kind = "alle"; $("quick").checked = false; drawControls(); drawAll(); }
+            const card = $(`meal-${id}`);
+            if (!card) return;
+            card.querySelector("details").open = true;
+            card.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        function drawPlan() {
+            const plan = data.plan;
+            $("plan").hidden = !plan;
+            if (!plan) return;
+            const n = plan.days.length;
+            $("plan-title").textContent = `${n} ${n === 1 ? "middag" : "middager"} for ${about(plan.rough)}${rounded(plan.total)}`;
+            const sub = $("plan-sub");
+            sub.replaceChildren("Alt kjøpt hos ", chainBadge(plan.chain),
+                ` · ${about(plan.rough)}${rounded(plan.per_portion)} per porsjon · ${plan.portions} ${plan.portions === 1 ? "porsjon" : "porsjoner"} hver kveld`);
+
+            $("plan-days").replaceChildren(...plan.days.map((day, index) => {
+                const li = el("li", "plan-day");
+                li.dataset.id = day.id;
+                const name = el("button", "plan-name", day.name);
+                name.type = "button";
+                name.addEventListener("click", () => openDinner(day.id));
+                const meta = el("span", "plan-meta", `${day.minutes} min`);
+                if (day.offers) meta.append(el("span", "offer-tag", "tilbud"));
+                const pp = el("span", "plan-pp", rounded(day.per_portion));
+                const swap = el("button", "text-button", "Bytt");
+                swap.type = "button";
+                swap.setAttribute("aria-label", `Bytt ${day.day}: ${day.name}`);
+                swap.setAttribute("aria-expanded", "false");
+                const options = el("div", "swap-list");
+                options.hidden = true;
+                for (const id of day.alternatives) {
+                    const r = data.recipes.find(x => x.id === id);
+                    if (!r) continue;
+                    const pick = el("button", "chip-button", `${r.name} · ${rounded(r.per_portion)}`);
+                    pick.type = "button";
+                    pick.addEventListener("click", () => {
+                        chosen = plan.days.map(d => d.id);
+                        chosen[index] = id;
+                        loadPlan(day.day);
+                    });
+                    options.append(pick);
+                }
+                swap.addEventListener("click", () => {
+                    options.hidden = !options.hidden;
+                    swap.setAttribute("aria-expanded", String(!options.hidden));
+                });
+                const head = el("div", "plan-row");
+                head.append(el("span", "plan-weekday", day.day), name, meta, pp, swap);
+                li.append(head, options);
+                return li;
+            }));
+
+            const facts = [];
+            if (plan.shared_saving >= 1) facts.push(`Delte pakker sparer ${rounded(plan.shared_saving)}.`);
+            if (plan.offer_saving >= 1) facts.push(`Tilbud sparer ${rounded(plan.offer_saving)}.`);
+            if (plan.rough) facts.push("Mange av prisene er anslått, så summen er omtrentlig.");
+            $("plan-facts").textContent = facts.join(" ");
+
+            const items = plan.shopping.reduce((sum, s) => sum + s.count, 0);
+            $("plan-add").textContent = `Legg alt på handlelisten (${plan.shopping.length} ${plan.shopping.length === 1 ? "vare" : "varer"})`;
+            $("plan-add").onclick = () => {
+                for (const s of plan.shopping) ShoppingList.add(s.product, s.count);
+                $("plan-status").textContent = `${plan.shopping.length} varer lagt til.`;
+                $("plan-list").hidden = false;
+            };
+            $("plan-list").hidden = true;
+            $("plan-status").textContent = "";
+            $("shopping").replaceChildren(...plan.shopping.map(s => {
+                const li = el("li", s.estimated ? "estimated" : "");
+                li.append(el("span", "", `${s.count > 1 ? `${s.count} × ` : ""}${s.product}${s.size ? ` (${packSizeOf(s.size)})` : ""}`),
+                    el("span", "amount", `${s.estimated ? "ca. " : ""}${kr.format(s.price)} kr`));
+                if (s.offer) li.append(el("span", "offer-tag", "tilbud"));
+                li.append(el("small", "", s.used_in.join(", ")));
+                return li;
+            }));
+        }
+        // "570 g" to "570 g", "1000 g" to "1 kg"
+        const packSizeOf = size => { const [q, u] = size.split(" "); return packSize({ quantity: +q, unit: u }) || size; };
+
+        // ---- loading ----
+
+        async function loadPlan(focusDay) {
+            const token = ++planToken;
+            const res = await fetch(`/meals?portions=${portions}&ids=${chosen.join(",")}`);
+            if (!res.ok || token !== planToken) return;
+            data.plan = (await res.json()).plan;
+            drawPlan();
+            // The swap button is rebuilt: put focus back where the person was
+            $("plan-days").querySelector(`[aria-label^="Bytt ${focusDay}"]`)?.focus();
+        }
+
+        async function load() {
+            drawControls();
+            $("notice").hidden = false;
+            $("notice").textContent = "Henter middager …";
+            try {
+                const res = await fetch(`/meals?portions=${portions}`);
+                if (!res.ok) throw new Error();
+                data = await res.json();
+            } catch {
+                $("notice").textContent = "Kunne ikke hente middager. Prøv å laste siden på nytt.";
+                return;
+            }
+            const any = data.recipes.length > 0;
+            $("notice").hidden = any;
+            $("notice").textContent = "Vi har ikke nok priser til å foreslå middager ennå. Last opp en kvittering, så kommer de.";
+            $("all").hidden = $("method").hidden = !any;
+            if (!any) { $("plan").hidden = $("deals").hidden = true; return; }
+            drawPlan();
+            drawDeals();
+            drawAll();
+        }
+
+        $("quick").addEventListener("change", () => data && drawAll());
+        foldIntroOnReturn();
+        load();
+    </script>
+</body>
+</html>

@@ -243,7 +243,7 @@ def test_pages_have_link_previews(client):
         assert 'name="twitter:card" content="summary_large_image"' in html, path
 
 
-PAGES = ["/", "/upload.html", "/takk.html", "/produkt.html", "/personvern.html", "/om.html", "/finnes-ikke.html",
+PAGES = ["/", "/upload.html", "/takk.html", "/produkt.html", "/personvern.html", "/om.html", "/middag.html", "/finnes-ikke.html",
          "/handleliste.html", "/tilbud.html"]
 
 
