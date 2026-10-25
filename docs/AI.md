@@ -119,7 +119,7 @@ Add a line here for each AI-assisted change.
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
 | 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
-| 24–25 Oct 2026 | #55–#70: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
+| 24–25 Oct 2026 | #55–#73: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -188,3 +188,6 @@ Add a line here for each AI-assisted change.
 | #67 | "Mente du" ranks a word and a compound ending alike, the commoner first | Found when re-running the walkthrough: "Melk" offered Litago melk, not Lettmelk |
 | #68 | A product in one store shows "Pris nå", without repeating the price per item | Found when re-running the walkthrough |
 | #70 | One name per product and one spelling per brand: "Grandiosa", "Pizza grandiosa" and "Pizza" are one Pizza with Grandiosa as its brand, at save and for what was saved before; old names in saved lists and links still find the product. List prices use the size people buy over all purchases, and never scale a multipack down to one bottle | 344 names on receipts, 179 of them on one receipt only; the same pizza had a third of its prices on each of three products. The user chose generic products with brands inside: "this is the cheapest of all pizzas right now" |
+| #71 | A chain is priced by the cheapest brand it sells now (each brand's latest price from the last 180 days), not by whatever was bought there last | Followed #70: with brands inside one product, "the latest line" was often a family pack or a dear brand |
+| #72 | Packs are counted in pieces ("EGG 12STK" is 12 stk) and compared per piece | A 6-pack of eggs looked cheaper than a 12-pack; Gemini gave piece counts only about half the time |
+| #73 | Product cards and the product page show the same choice as the shopping list, and a pack given by weight whose name says how many pieces it holds counts as pieces when the product is counted in pieces (Coop's "12 PK … 816 g" eggs) | Searching "grandiosa" showed a 1 kg pizza at 169 kr. The user asked for these two after #72 |

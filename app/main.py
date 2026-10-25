@@ -201,42 +201,43 @@ async def health():
 
 @app.get("/products")
 def get_products(db: Session = Depends(get_db)):
-    from sqlalchemy import func
-
-    subquery = (
-        db.query(
-            models.ReceiptItem.canonical_name,
-            func.max(models.Receipt.purchase_date).label("latest_date")
-        )
-        .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
-        .group_by(models.ReceiptItem.canonical_name)
-        .subquery()
-    )
-
-    items = (
+    """One card per product. A product is generic ("Pizza") with brands and
+    sizes inside it, so the card shows what the shopping list prices it by:
+    the cheapest a shopper can pick now, at its usual size, at the cheapest
+    chain (see basket.choices). Not the latest line, which might be a family
+    pizza. A product only bought outside grocery chains shows its latest."""
+    rows = (
         db.query(models.ReceiptItem, models.Receipt)
         .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
-        .join(subquery, (models.ReceiptItem.canonical_name == subquery.c.canonical_name) &
-                        (models.Receipt.purchase_date == subquery.c.latest_date))
+        .filter(models.ReceiptItem.canonical_name.isnot(None))
         .all()
     )
+    latest, chains, newest, brands = {}, {}, {}, {}
+    for item, receipt in rows:
+        name = item.canonical_name
+        if item.brand:
+            brands.setdefault(name, set()).add(item.brand)
+        if receipt.store_chain:
+            chains.setdefault(name, set()).add(receipt.store_chain)
+        if receipt.purchase_date and (name not in newest or receipt.purchase_date > newest[name]):
+            newest[name] = receipt.purchase_date
+        if name not in latest or (receipt.purchase_date or date.min) >= (latest[name][1].purchase_date or date.min):
+            latest[name] = (item, receipt)
 
-    store_counts = dict(
-        db.query(models.ReceiptItem.canonical_name, func.count(func.distinct(models.Receipt.store_chain)))
-        .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
-        .group_by(models.ReceiptItem.canonical_name)
-        .all()
-    )
+    shown = dict(latest)
+    for name, offers in basket.by_product(basket.latest_offers(rows)).items():
+        price_of, _, lines = basket.choices(offers)
+        if lines:
+            best = min(lines.values(), key=price_of)
+            shown[name] = (best.line, best.source)
 
-    seen = set()
     products = []
-    for item, receipt in items:
-        if item.canonical_name in seen:
-            continue
-        seen.add(item.canonical_name)
+    for name, (item, receipt) in shown.items():
         products.append({
-            "canonical_name": item.canonical_name,
+            "canonical_name": name,
             "brand": item.brand,
+            # Every brand bought, so a search for one finds the product
+            "brands": sorted(brands.get(name, ())),
             "variant": item.variant,
             "category": item.category,
             "unit": item.unit,
@@ -247,7 +248,9 @@ def get_products(db: Session = Depends(get_db)):
             "by_weight": worker.sold_by_weight(item.raw_name, item.unit),
             "store_chain": receipt.store_chain,
             "purchase_date": str(receipt.purchase_date),
-            "store_count": store_counts.get(item.canonical_name, 1),
+            # When it was last bought anywhere, for sorting by newest
+            "latest_date": str(newest[name]) if name in newest else None,
+            "store_count": max(len(chains.get(name, ())), 1),
         })
 
     return products
@@ -272,9 +275,15 @@ def get_product(name: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "Fant ikke produktet.")
 
     latest = rows[-1][0]
+    # The line each chain is priced by, as on the shopping list, and that
+    # price at the product's usual size, so stores selling it in different
+    # sizes or units rank fairly
+    price_of, size, lines = basket.choices({c: o for (_, c), o in basket.latest_offers(rows).items()})
+    priced = {id(o.line): price_of(o) for o in lines.values()}
     return {
         "canonical_name": name,
         "category": latest.category,
+        "size": size,
         "prices": [
             {
                 "store_chain": receipt.store_chain,
@@ -290,6 +299,7 @@ def get_product(name: str, db: Session = Depends(get_db)):
                 "by_weight": worker.sold_by_weight(item.raw_name, item.unit),
                 "is_member_price": bool(item.is_member_price),
                 "deal": item.deal,
+                "compared": round(priced[id(item)], 2) if id(item) in priced else None,
             }
             for item, receipt in rows
         ],

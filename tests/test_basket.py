@@ -9,12 +9,12 @@ from app import basket, models, worker
 TODAY = date(2026, 10, 24)
 
 
-def row(name, chain, price, *, unit=None, quantity=None, pack=1, days=0, brand=None):
+def row(name, chain, price, *, unit=None, quantity=None, pack=1, days=0, brand=None, raw=None):
     """A (ReceiptItem, Receipt) pair as the query returns them."""
     each = price / pack if price is not None else None
     per_unit = worker.price_per(each, quantity, unit) if each else None
     item = SimpleNamespace(canonical_name=name, total_price=price, pack_size=pack, unit=unit,
-                           quantity=quantity, price_per_unit=per_unit, brand=brand)
+                           quantity=quantity, price_per_unit=per_unit, brand=brand, raw_name=raw)
     receipt = SimpleNamespace(store_chain=chain, purchase_date=TODAY - timedelta(days=days))
     return item, receipt
 
@@ -274,6 +274,20 @@ def test_packs_counted_in_pieces_are_compared_per_piece():
     assert item["size"] == "12 stk"
     assert {c: p["price"] for c, p in item["prices"].items()} == {"Kiwi": 56.4, "Meny": 58.2, "Rema 1000": 40.93}
     assert item["cheapest"] == "Rema 1000"
+
+
+def test_a_weighed_pack_of_something_counted_is_priced_by_its_pieces():
+    # Coop's flyer gives its eggs by weight; the name says how many
+    rows = [row("Egg", "Kiwi", 56.4, unit="stk", quantity=12), row("Egg", "Meny", 49.9, unit="stk", quantity=15),
+            row("Egg", "Coop Prix", 68.9, unit="g", quantity=816, raw="COOP FROKOSTEGG 12 PK 816 g")]
+    item = priced([("Egg", 1)], rows)["items"][0]
+    assert item["size"] == "12 stk"
+    assert {c: (p["price"], p["estimated"]) for c, p in item["prices"].items()} == {
+        "Kiwi": (56.4, False), "Meny": (39.92, False), "Coop Prix": (68.9, False)}
+    # But a product mostly sold by weight stays by weight
+    rows = [row("Pizzabunn", "Kiwi", 39.9, unit="g", quantity=460), row("Pizzabunn", "Meny", 42.9, unit="g", quantity=460),
+            row("Pizzabunn", "Rema", 35.0, unit="g", quantity=230, raw="PIZZABUNN 2PK 230G")]
+    assert priced([("Pizzabunn", 1)], rows)["items"][0]["size"] == "460 g"
 
 
 def test_a_split_never_sends_you_to_a_store_on_a_guess():

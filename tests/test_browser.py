@@ -150,12 +150,13 @@ def test_explore_page_shows_products_and_stats(page):
 
 def test_prices_use_norwegian_formatting(page):
     page.goto("/")
+    # The cheapest milk now, though the latest bought was Tine at Kiwi
     milk = cards(page).filter(has_text="Lettmelk")
-    expect(milk.locator(".price")).to_have_text("24,90 kr")
-    expect(milk.locator(".unit")).to_have_text("2,49 kr / 100 ml")
-    expect(milk.locator(".brand")).to_have_text("Tine · 1 l")
-    expect(milk.locator(".where .chain img")).to_have_attribute("alt", "Kiwi")
-    expect(milk.locator(".where")).to_contain_text("i dag")
+    expect(milk.locator(".price")).to_have_text("22,90 kr")
+    expect(milk.locator(".unit")).to_have_text("2,29 kr / 100 ml")
+    expect(milk.locator(".brand")).to_have_text("Q · 1 l")
+    expect(milk.locator(".where .chain img")).to_have_attribute("alt", "Rema 1000")
+    expect(milk.locator(".where")).to_contain_text("3 dager siden")
 
 
 def test_cards_say_how_big_the_package_is(page):
@@ -206,9 +207,11 @@ def test_dates_read_naturally(page):
 def test_search_matches_name_and_brand(page):
     page.goto("/")
     expect(cards(page)).to_have_count(5)
+    # Any brand of the product, not just the one on the card
     page.fill("#search", "tine")
     expect(cards(page)).to_have_count(1)
     expect(cards(page).first).to_contain_text("Lettmelk")
+    expect(cards(page).first.locator(".brand")).to_contain_text("Q")
     page.fill("#search", "KJØTT")
     expect(cards(page)).to_have_count(1)
     page.fill("#search", "finnes ikke")
@@ -403,7 +406,7 @@ def test_sorting_by_price_and_newest(page):
     page.goto("/")
     expect(cards(page).first).to_be_visible()
     sort_by(page, "Lavest pris")
-    # One item each: <img…> 10,00 · Seigmenn 38,70/3 = 12,90 · Agurk 30/2 = 15,00 · Lettmelk 24,90 · Kjøttdeig 89,00
+    # One item each: <img…> 10,00 · Seigmenn 38,70/3 = 12,90 · Agurk 30/2 = 15,00 · Lettmelk 22,90 · Kjøttdeig 89,00
     assert card_names(page) == ['<img src=x onerror="window.pwned=1">', "Seigmenn", "Agurk", "Lettmelk", "Kjøttdeig"]
     expect(page.locator("#sort-current")).to_have_text("lavest pris")
     sort_by(page, "Nyest")
