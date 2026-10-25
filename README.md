@@ -77,7 +77,7 @@ Run the same checks as CI before pushing:
 ruff check .
 shellcheck deploy/*.sh docs/video/*.sh
 playwright install chromium      # once; or set CHROMIUM_PATH=/usr/bin/chromium
-pytest --cov=app
+pytest -n auto --cov=app       # -n auto: on every core
 ```
 
 About 350 tests, and none of them call Gemini: it's replaced with fakes, so they're free, fast and give the same result every time. CI also requires the browser tests and at least 95 % coverage.
@@ -112,9 +112,9 @@ Production runs at https://sjekka.tischbein.dev: one Docker container on a VPS, 
 
 `.github/workflows/pipeline.yml` runs on every pull request and every push to `main`:
 
-1. **Lint and test**: `ruff check`, `shellcheck` and `pytest`.
-2. **Build and smoke test**: builds the image, starts it and checks the main endpoints. On `main` it's pushed to `ghcr.io/h44k0n/sjekka`, tagged with the commit and `latest`.
-3. **Deploy** (`main` only): logs in to the VPS as `sjekka-deploy`, whose key can only run `/opt/sjekka/deploy.sh`. That script starts the new image and puts the old one back if the container doesn't become healthy. The last step checks the public URL; Cloudflare's bot protection challenges GitHub's runners, so that check usually only logs a warning.
+1. **Lint and test**: `ruff check`, `shellcheck` and `pytest`, spread over the runner's cores.
+2. **Build and smoke test**, at the same time as the tests: builds the image, starts it and checks the main endpoints. On `main` it's pushed to `ghcr.io/h44k0n/sjekka`, tagged with the commit.
+3. **Deploy** (`main` only, once both have passed): tags the image `latest`, then logs in to the VPS as `sjekka-deploy`, whose key can only run `/opt/sjekka/deploy.sh`. That script starts the new image and puts the old one back if the container doesn't become healthy. The last step checks the public URL; Cloudflare's bot protection challenges GitHub's runners, so that check usually only logs a warning.
 
 The server was set up with `deploy/setup-vps.sh` (Docker, the deploy user, `/opt/sjekka`, the restricted key, the nightly backup). `compose.yaml` and `deploy/` reach the server only through that script, so re-run it after changing them:
 

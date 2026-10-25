@@ -21,7 +21,7 @@ Crowdsourced Norwegian grocery prices: people upload receipt photos, Gemini read
 ```bash
 pip install -r requirements-dev.txt
 ruff check . && shellcheck deploy/*.sh docs/video/*.sh
-CHROMIUM_PATH=/usr/bin/chromium pytest --cov=app   # or `playwright install chromium` once
+CHROMIUM_PATH=/usr/bin/chromium pytest -n auto --cov=app   # or `playwright install chromium` once
 DATA_DIR=/tmp/sjekka RUN_WORKER=0 uvicorn app.main:app   # site without calling Gemini
 ```
 
