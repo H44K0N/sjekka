@@ -109,6 +109,7 @@
         let products = [];          // from /products, for suggestions
         let result = null;          // the last /basket answer
         let request = null;
+        let keepIntro = false;      // a list from a link: show what the page is for, once
 
         // ---- adding products ----
 
@@ -130,34 +131,54 @@
             return [...fromReceipts, ...offersOnly];
         }
 
-        // Known names that contain a name without prices: "Melk" -> Lettmelk,
-        // Helmelk. Ones ending with it first (a kind of milk, not milk
-        // chocolate), then the shortest
-        function similar(name) {
-            const q = name.toLowerCase();
+        // How well a known name matches what was typed, best first: the name
+        // itself, then a word in it ("Revet ost"), then the end of a compound
+        // ("Lettmelk" is a kind of milk), then the start of one ("Melkesjokolade"
+        // is chocolate), then anywhere, then only the brand
+        function closeness(p, q) {
+            const name = p.canonical_name.toLowerCase();
+            if (name === q) return 0;
+            if (name.split(/[\s/,-]+/).includes(q)) return 1;
+            if (name.endsWith(q)) return 2;
+            if (name.startsWith(q)) return 3;
+            if (name.includes(q)) return 4;
+            return (p.brand || "").toLowerCase().includes(q) ? 5 : null;
+        }
+
+        // Known names for a query, best first; among equally close ones, those
+        // sold in more stores, then A-Å
+        function matches(text) {
+            const q = text.trim().toLowerCase();
+            if (!q) return [];
             const onList = new Set(ShoppingList.read().map(i => i.name.toLowerCase()));
-            const names = [...new Set(known().map(p => p.canonical_name))]
-                .filter(n => n.toLowerCase() !== q && n.toLowerCase().includes(q) && !onList.has(n.toLowerCase()));
-            return names.sort((a, b) => (b.toLowerCase().endsWith(q) - a.toLowerCase().endsWith(q)) || a.length - b.length ||
-                a.localeCompare(b, "nb")).slice(0, 3);
+            const seen = new Set();
+            return known()
+                .map(p => ({ ...p, score: closeness(p, q) }))
+                .filter(p => p.score !== null && !onList.has(p.canonical_name.toLowerCase()) &&
+                    !seen.has(p.canonical_name) && seen.add(p.canonical_name))
+                .sort((a, b) => a.score - b.score || (b.store_count || 1) - (a.store_count || 1) ||
+                    a.canonical_name.localeCompare(b.canonical_name, "nb"));
+        }
+
+        // Known names that contain a name without prices: "Melk" -> Lettmelk, Helmelk
+        function similar(name) {
+            return matches(name).filter(p => p.score > 0 && p.score < 5).slice(0, 3).map(p => p.canonical_name);
         }
 
         function suggest() {
             const q = input.value.trim().toLowerCase();
-            options = [];
-            if (q) {
-                const onList = new Set(ShoppingList.read().map(i => i.name.toLowerCase()));
-                const hits = known().filter(p => !onList.has(p.canonical_name.toLowerCase()) &&
-                    (p.canonical_name.toLowerCase().includes(q) || (p.brand || "").toLowerCase().includes(q)));
-                // Names that start with the query first
-                hits.sort((a, b) => (b.canonical_name.toLowerCase().startsWith(q) - a.canonical_name.toLowerCase().startsWith(q)) ||
-                    a.canonical_name.localeCompare(b.canonical_name, "nb"));
-                options = hits.slice(0, 7).map(p => ({ name: p.canonical_name, detail: p.detail }));
-                if (!options.some(o => o.name.toLowerCase() === q)) {
-                    options.push({ name: input.value.trim(), detail: "legg til uansett", free: true });
-                }
+            const hits = matches(q);
+            options = hits.slice(0, 7).map(p => ({ name: p.canonical_name, detail: p.detail }));
+            if (q && !options.some(o => o.name.toLowerCase() === q)) {
+                options.push({ name: input.value.trim(), detail: "legg til uansett", free: true });
             }
-            active = options.length && !options[0].free ? 0 : -1;
+            // Enter adds what was typed. A whole word ("melk", "smør") is meant
+            // as it is, so a longer name is only picked by choosing it: "melk"
+            // never puts Melkeglede on the list. A word only begun ("seig")
+            // is finished with the best match.
+            const exact = options.findIndex(o => !o.free && o.name.toLowerCase() === q);
+            const aWord = hits.length && hits[0].score <= 2;
+            active = exact >= 0 ? exact : !hits.length || aWord ? options.length - 1 : 0;
             drawSuggestions();
         }
 
@@ -445,8 +466,9 @@
             renderList();
             const items = ShoppingList.read();
             // Once there's a list, it matters more than the explanation
-            $("intro").classList.toggle("compact", items.length > 0);
-            if (!items.length) { result = null; renderResult(); return; }
+            $("intro").classList.toggle("compact", items.length > 0 && !keepIntro);
+            keepIntro = false;
+            if (!items.length) { result = null; renderResult(); showSticky(); return; }
             request?.abort();
             request = new AbortController();
             $("result").setAttribute("aria-busy", "true");
@@ -527,7 +549,19 @@
             const clearUrl = () => history.replaceState(null, "", location.pathname);
             const mine = ShoppingList.read();
             const same = mine.length === shared.length && shared.every(s => mine.some(m => m.name === s.name && m.count === s.count));
-            if (!mine.length || same) { ShoppingList.write(shared); clearUrl(); return; }
+            if (!mine.length || same) {
+                ShoppingList.write(shared);
+                clearUrl();
+                // Someone sent this: say so, and keep the explanation of what
+                // this page does until they've seen it
+                $("shared-text").textContent = `Noen har delt en handleliste med deg: ${shared.length} ${shared.length === 1 ? "vare" : "varer"}. Endre den som du vil; den lagres bare her.`;
+                $("shared").hidden = false;
+                $("shared-replace").hidden = $("shared-merge").hidden = true;
+                $("shared-dismiss").textContent = "Greit";
+                $("shared-dismiss").onclick = () => { $("shared").hidden = true; update(); input.focus(); };
+                keepIntro = true;
+                return;
+            }
 
             $("shared-text").textContent = `Du har åpnet en delt handleliste med ${shared.length} ${shared.length === 1 ? "vare" : "varer"}. Din egen liste har ${mine.length}.`;
             $("shared").hidden = false;

@@ -509,7 +509,7 @@ def test_list_finds_the_cheapest_store_for_the_whole_list(page):
     add = page.get_by_role("combobox", name="Legg til vare")
     add.fill("melk")
     expect(page.get_by_role("option").first).to_have_text(re.compile("^Lettmelk"))
-    page.keyboard.press("Enter")
+    page.get_by_role("option").first.click()
     add.fill("kjøtt")
     page.get_by_role("option", name=re.compile("^Kjøttdeig")).click()
     expect(page.locator(".list-item")).to_have_count(2)
@@ -582,8 +582,14 @@ def test_removing_and_clearing_with_undo(page):
 
 def test_shared_list_link(page, browser, site):
     page.goto("/handleliste.html?v=Lettmelk~3&v=Agurk")
-    # An empty list just takes the shared one, and the link is tidied away
+    # An empty list just takes the shared one, and the link is tidied away.
+    # Whoever opens it is told where it came from, and what the page is for
     expect(page.locator(".list-item")).to_have_count(2)
+    expect(page.locator("#shared-text")).to_contain_text("Noen har delt en handleliste med deg: 2 varer")
+    expect(page.get_by_role("button", name="Bruk den delte")).to_be_hidden()
+    expect(page.locator("#intro .lede")).to_be_visible()
+    page.get_by_role("button", name="Greit").click()
+    expect(page.locator("#shared")).to_be_hidden()
     expect(page.locator(".list-item", has_text="Lettmelk").locator(".qty span")).to_have_text("3")
     expect(page).to_have_url(re.compile(r"/handleliste\.html$"))
 
@@ -597,6 +603,7 @@ def test_shared_list_link(page, browser, site):
     # With a list of your own, you choose
     page.goto("/handleliste.html?v=Kj%C3%B8ttdeig")
     expect(page.locator("#shared")).to_be_visible()
+    expect(page.get_by_role("button", name="Behold min egen")).to_be_visible()
     expect(page.locator("#shared-text")).to_contain_text("1 vare")
     page.get_by_role("button", name="Legg til i min liste").click()
     expect(page.locator("#shared")).to_be_hidden()
@@ -799,8 +806,13 @@ def test_an_offer_seen_on_a_receipt_says_so(page):
 def test_list_explanation_shrinks_once_there_is_a_list(page):
     page.goto("/handleliste.html")
     expect(page.locator("#intro .lede")).to_be_visible()
+    # A list from a link keeps it until its notice has been read
     page.goto("/handleliste.html?v=Lettmelk")
+    expect(page.locator("#intro .lede")).to_be_visible()
+    page.get_by_role("button", name="Greit").click()
     expect(page.locator("#intro")).to_have_class(re.compile("compact"))
+    expect(page.locator("#intro .lede")).to_be_hidden()
+    page.reload()
     expect(page.locator("#intro .lede")).to_be_hidden()
 
 
@@ -1017,3 +1029,42 @@ def test_list_prices_say_what_size_they_are_for(page):
     expect(page.locator(".list-item .hint")).to_contain_text("22,90 kr for 1 l")
     page.locator(".rank-row").first.click()
     expect(page.locator(".rank-detail tbody tr").first).to_contain_text("Lettmelk Q for 1 l")
+
+
+def test_enter_adds_what_was_typed_not_a_longer_name(page):
+    # The real case: "melk" + Enter put Melkeglede (sweets) on the list
+    names = [{"canonical_name": n, "brand": None, "store_count": c, "store_chain": "Kiwi"}
+             for n, c in [("Melkeglede", 1), ("Kokosmelk", 1), ("Lettmelk", 2), ("Melkesjokolade", 3), ("Smør og olivenolje", 1)]]
+    page.route("**/products", lambda route: route.fulfill(json=names))
+    page.goto("/handleliste.html")
+    add = page.get_by_role("combobox", name="Legg til vare")
+    add.fill("melk")
+    # A kind of milk before milk chocolate, the commoner first
+    expect(page.get_by_role("option")).to_have_text([
+        re.compile("^Lettmelk"), re.compile("^Kokosmelk"), re.compile("^Melkesjokolade"), re.compile("^Melkeglede"),
+        re.compile("«melk»")])
+    expect(page.get_by_role("option").last).to_have_attribute("aria-selected", "true")
+    page.keyboard.press("Enter")
+    assert list_names(page) == ["Melk"]
+    # ... and then offers the names that have prices
+    expect(page.locator(".list-item .did-you-mean").first).to_have_text("Lettmelk")
+
+    # A name that is known is added as it is
+    add.fill("kokosmelk")
+    page.keyboard.press("Enter")
+    assert list_names(page) == ["Melk", "Kokosmelk"]
+    # A whole word in a name ranks above the start of one, but is still only a suggestion
+    add.fill("smør")
+    expect(page.get_by_role("option").first).to_have_text(re.compile("^Smør og olivenolje"))
+    page.keyboard.press("Enter")
+    assert list_names(page) == ["Melk", "Kokosmelk", "Smør"]
+
+
+def test_the_total_bar_goes_when_the_list_is_cleared(browser, site):
+    context = browser.new_context(base_url=site[0], viewport={"width": 390, "height": 700})
+    page = context.new_page()
+    page.goto("/handleliste.html?v=Lettmelk&v=Kj%C3%B8ttdeig&v=Agurk&v=Seigmenn")
+    expect(page.locator("#sticky")).to_be_visible()
+    page.get_by_role("button", name="Tøm listen").click()
+    expect(page.locator("#sticky")).to_be_hidden()
+    context.close()
