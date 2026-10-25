@@ -237,6 +237,14 @@ def test_the_about_page_has_all_the_films(client):
         assert captions.status_code == 200 and captions.text.startswith("WEBVTT")
 
 
+def test_uploaders_are_told_google_may_train_on_what_they_send(client):
+    # Sjekka is on Gemini's free tier, so the notice and the upload page must say so
+    notice, upload = client.get("/personvern.html").text, client.get("/upload.html").text
+    assert "gratisnivå" in notice and "trene" in notice and "ansatte kan lese" in notice
+    assert "gratisnivå" in upload and "trene" in upload
+    assert "bruker det ikke til å forbedre" not in notice
+
+
 def test_pages_load_nothing_from_google(client):
     # The privacy page says visiting sends nothing to Google; only uploads do
     for path in PAGES + ["/style.css"]:

@@ -323,17 +323,17 @@ t = hLine.end + GAP;
 // ---------- 10. Privacy ----------
 const pLine = film.say("privacy", t);
 const pv = scene(film, stage, t - 0.1, pLine.end + 0.5);
-const ptext = words(pv, "No accounts. <br>No cookies. <br>No photos kept. <br>*Just prices.*", "abs");
-ptext.style.cssText += "font-size:132px;font-weight:700;letter-spacing:-.035em;line-height:1.06";
+const ptext = words(pv, "No accounts. <br>No cookies. <br>No photos kept <br>on our server. <br>*Just prices.*", "abs");
+ptext.style.cssText += "font-size:118px;font-weight:700;letter-spacing:-.035em;line-height:1.06";
 place(ptext, 120, 0);
-middle(ptext, H / 2 - 30);
-const pw = pLine.words;
-const idxs = [0, 2, 4, 7];
-ptext.spans.forEach((s, i) => {
-  const ln = i < 2 ? 0 : i < 4 ? 1 : i < 7 ? 2 : 3;
-  const at = [pLine.start, pLine.at("No", 2) , pLine.at("photos") - 0.3, pLine.at("just") - 0.1][ln];
-  tl.fromTo(s, { yPercent: 115 }, { yPercent: 0, duration: 0.7, ease: "expo.out" }, at + (i - [0, 0, 2, 2, 4, 4, 4, 7, 7][i]) * 0.07);
-});
+middle(ptext, H / 2 - 50);
+// Four lines come in as they're spoken: accounts, cookies, "photos kept on our server", "just prices"
+const lineOf = [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3];
+const lineAt = [pLine.start, pLine.at("No", 2), pLine.at("photos") - 0.3, pLine.at("just") - 0.1];
+ptext.spans.forEach((sp, i) => tl.fromTo(sp, { yPercent: 115 }, { yPercent: 0, duration: 0.7, ease: "expo.out" }, lineAt[lineOf[i]] + (i % 3) * 0.05));
+const fine = h("div", "abs soft", pv, "Photos are read by Google's Gemini, on the free tier: Google may train on them.");
+fine.style.cssText += `left:120px;top:${H - 250}px;font-size:28px`;
+tl.fromTo(fine, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6 }, pLine.at("photos"));
 film.fx("hit", pLine.start, 0.4);
 film.fx("hit", pLine.at("just"), 0.5);
 subs(film, pLine, pv);

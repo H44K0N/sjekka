@@ -29,7 +29,7 @@ Weekly flyers ──► Gemini names each offer ──► offers ─────
 
 ## Privacy, in short
 
-Receipt photos go to Google's Gemini to be read, then are deleted from the server. What's kept is what's printed on the receipt (store, date, items, prices), never who uploaded it. The pages load nothing from other sites and set no cookies of their own (Cloudflare, which protects the site, may set one). The full notice is on [personvern](https://sjekka.tischbein.dev/personvern.html) (`static/personvern.html`).
+Receipt photos go to Google's Gemini (free tier: Google may train on them) to be read, then are deleted from the server. What's kept is what's printed on the receipt (store, date, items, prices), never who uploaded it. The pages load nothing from other sites and set no cookies of their own (Cloudflare, which protects the site, may set one). The full notice is on [personvern](https://sjekka.tischbein.dev/personvern.html) (`static/personvern.html`).
 
 ## Where it stands
 
@@ -166,7 +166,7 @@ docker compose start app
 <summary>Security and data handling</summary>
 
 - **Receipt files** (PDF, CSV, JSON) are kept for `KEEP_FILES_DAYS` (12 months) in `DATA_DIR/originals`, so the reading of real exports can be improved; they may hold names or member numbers, and are never served. A file holding a purchase history is split into parts of about 30 KB or 4 pages (`app/receipt_files.py`), each one Gemini reading.
-- **Photos** go to Google's Gemini API, so Google's API terms apply (on the free tier Google may use them to improve its products; on the paid tier it says it doesn't). The server never serves them, deletes each one once read, and deletes photos of failed jobs after 30 days. The thank-you page shows a small copy kept only in the uploader's browser tab.
+- **Photos** go to Google's Gemini API, so Google's API terms apply (Sjekka is on the free tier, where Google may use them to train and improve its products and its staff may read them; on the paid tier Google says it doesn't, so moving there is how to stop it). The server never serves them, deletes each one once read, and deletes photos of failed jobs after 30 days. The thank-you page shows a small copy kept only in the uploader's browser tab.
 - **Gemini's raw answers** are kept (`jobs.raw_response`, `jobs.model`), so readings can be reworked later without the photos. `util/export_extractions.py` exports them.
 - **Uploads** need no login, so they're rate-limited (see Settings). A Cloudflare rate-limit rule in front would stop floods earlier.
 - **The privacy notice** (`static/personvern.html`) must stay in step with the code: what's kept, for how long, and who receives what (Google, Cloudflare, the VPS host).

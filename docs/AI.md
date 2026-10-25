@@ -101,7 +101,7 @@ Gemini is treated as an unreliable component: its output is constrained, checked
 - **Duplicates.** A receipt with the same store, date and lines as one already saved isn't stored twice.
 - **Failures.** Rate limits and outages are retried with backoff; anything else fails the job with the error saved.
 - **Cost and abuse.** Every upload costs a call, so uploads are rate-limited per client and per day.
-- **Privacy.** The upload page says photos go to Google. The server never serves them and deletes each once read; Gemini's raw answer is kept so the data can be reprocessed without the photo.
+- **Privacy.** The upload page says photos go to Google, and that it's the free tier, where Google may train on them and staff may read them (the paid tier says it doesn't). The server never serves them and deletes each once read; Gemini's raw answer is kept so the data can be reprocessed without the photo.
 
 **Naming flyer offers.** Every six hours the app fetches new flyers from eTilbudsavis (`app/tjek.py`). Prices, sizes and pack counts come from the flyer data; Gemini gets one text-only call per flyer to give each offer a receipt-style name and brand, and to flag what isn't groceries (those are skipped). The same schema checks apply, and the raw answer is kept on the flyer.
 
@@ -120,7 +120,7 @@ Add a line here for each AI-assisted change.
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
 | 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
-| 24–25 Oct 2026 | #55–#75: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
+| 24–25 Oct 2026 | #55–#76: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -194,3 +194,4 @@ Add a line here for each AI-assisted change.
 | #73 | Product cards and the product page show the same choice as the shopping list, and a pack given by weight whose name says how many pieces it holds counts as pieces when the product is counted in pieces (Coop's "12 PK … 816 g" eggs) | Searching "grandiosa" showed a 1 kg pizza at 169 kr. The user asked for these two after #72 |
 | #74 | Tests run on every core and the image is built alongside them; CI went from about 3 minutes to under 2 | Haakon asked how long CI takes, then "if they don't sacrifice quality, do it" |
 | #75 | The films reworked: a marketing story that picks the desktop or phone version, a film on how the app works and one on how it was built with AI; all made from code (real app captures moved by a timeline, a new voice with the best of five takes, sound design, captions) | Haakon: "rework the videos, let's try to make them studio grade like from a tier 1 marketing team", and after the first draft: "the offer signs look a little cheap and AI generated, could we clip some real world Norwegian style offers?" |
+| #76 | The privacy page and the upload page say that Sjekka uses Gemini's free tier, where Google may train on uploads | Haakon: update the privacy policy to reflect that we use Gemini's cheaper tier, which lets Google train on them. The page had said the opposite |
