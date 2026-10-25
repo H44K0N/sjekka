@@ -86,7 +86,9 @@
         // An offer is only worth flagging on the card when it beats the price
         // shown there, per 100 g/ml where both have one, else per item
         function beats(o, p) {
-            const sized = (p.unit === "g" || p.unit === "ml") && o.unit === p.unit && o.per_unit != null && p.price_per_unit != null;
+            // A pack counted in pieces (12 eggs) compares per piece, if both say how many
+            const sized = (p.unit === "g" || p.unit === "ml" || (p.unit === "stk" && p.quantity > 1 && o.quantity > 1)) &&
+                o.unit === p.unit && o.per_unit != null && p.price_per_unit != null;
             if (sized) return o.per_unit < p.price_per_unit - 0.005;
             const each = p.pack_size > 1 ? p.total_price / p.pack_size : p.total_price;
             return each != null && o.each < each - 0.005;

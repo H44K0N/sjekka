@@ -209,6 +209,15 @@ def test_small_or_no_discount(clean, db, price, kind):
     assert judged(db, "Kaffe", "Kiwi", price)["kind"] == kind
 
 
+def test_eggs_are_judged_per_egg(clean, db):
+    add_receipt_price(db, "Egg", "Kiwi", 29.9, days_ago=10, unit="stk", quantity=6)   # 4,98 an egg
+    v = judged(db, "Egg", "Kiwi", 49.9, unit="stk", quantity=12)                         # 4,16 an egg
+    assert (v["kind"], v["per"], v["usual"]) == ("real", "stk", 4.98)
+    # A pack whose eggs weren't counted can't be held against a counted one
+    add_receipt_price(db, "Egg", "Meny", 30.0, days_ago=5, unit="stk")
+    assert judged(db, "Egg", "Kiwi", 49.9, unit="stk", quantity=12)["cheaper_chain"] is None
+
+
 def test_cheaper_elsewhere_without_an_offer(clean, db):
     add_receipt_price(db, "Kaffe", "Kiwi", 100, days_ago=10)
     add_receipt_price(db, "Kaffe", "Rema 1000", 60, days_ago=30)

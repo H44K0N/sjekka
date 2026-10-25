@@ -150,12 +150,12 @@
             // Stores selling different sizes are ranked per 100 g/ml, so lead
             // with that: "29,90 kr" for 1,75 l is cheaper than 21,90 kr for 1 l
             const sizes = new Set(stores.map(st => `${st.latest.quantity} ${st.latest.unit}`));
-            const perUnit = !weighed && sizes.size > 1 && cheapest.price_per_unit != null && cheapest.unit !== "stk";
+            const perUnit = !weighed && sizes.size > 1 && cheapest.price_per_unit != null && (cheapest.unit !== "stk" || cheapest.quantity > 1);
             $("best-price").textContent = perUnit ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : amount(cheapest);
             const unit = weighed && cheapest.by_weight ? `${packSize(cheapest)} for ${kr.format(cheapest.total_price)} kr`
                 : perUnit ? `${amount(cheapest)} for ${packSize(cheapest)}`
                 // Not "24,90 kr / stk" under 24,90 kr
-                : cheapest.price_per_unit != null && unitLabel(cheapest) !== "kr / stk" ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : "";
+                : cheapest.price_per_unit != null && Math.abs(comparable(cheapest) - each(cheapest)) > 0.005 ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : "";
             $("best-unit").textContent = [unit, cheapest.purchase_date && daysAgo(cheapest.purchase_date)].filter(Boolean).join(" · ");
 
             // Shared axes for every store's timeline, so the rows compare directly

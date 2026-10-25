@@ -168,9 +168,16 @@ def test_cards_say_how_big_the_package_is(page):
         describe({brand: "Tine", quantity: 1500, unit: "ml"}),
         describe({brand: null, variant: "Løsvekt", quantity: 1570, unit: "g"}),
         describe({brand: "Farris", variant: "Lime 0,5 l", quantity: 500, unit: "ml"}),
-        describe({brand: "Gilde", quantity: 6, unit: "stk"}),
+        describe({brand: "Prior", quantity: 12, unit: "stk"}),
+        describe({brand: "Prior", variant: "6PK", quantity: 6, unit: "stk"}),
+        describe({brand: "Gilde", unit: "stk"}),
     ]""")
-    assert described == ["Grandiosa · Hjemmelaget · 1 kg", "Tine · 1,5 l", "Løsvekt · 1,57 kg", "Farris · Lime 0,5 l", "Gilde"]
+    # A pack counted in pieces says how many, once
+    assert described == ["Grandiosa · Hjemmelaget · 1 kg", "Tine · 1,5 l", "Løsvekt · 1,57 kg", "Farris · Lime 0,5 l",
+                         "Prior · 12 stk", "Prior · 6PK", "Gilde"]
+    # and what one piece costs
+    assert page.evaluate("prices({unit: 'stk', quantity: 12, total_price: 56.4, pack_size: 1})") == \
+        {"each": "56,40 kr", "unit": "4,70 kr / stk"}
 
 
 def test_product_page_says_the_size_of_each_price(page):

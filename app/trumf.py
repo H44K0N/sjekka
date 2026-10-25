@@ -72,7 +72,7 @@ you would reading a receipt.
 
 {definitions}
 **unit**: "g", "ml" or "stk"; quantity in that unit, for one item, from the text
-("275ML" → 275 ml, "1KG" → 1000 g). No size in the text → quantity null.
+("275ML" → 275 ml, "1KG" → 1000 g, "EGG 12STK" → 12 stk). No size in the text → quantity null.
 
 **product**: false for lines that aren't a product bought: bags, deposits (pant),
 gift wrapping, cards and fees.

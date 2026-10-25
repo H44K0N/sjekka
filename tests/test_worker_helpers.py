@@ -36,9 +36,26 @@ def test_normalize_name(raw, expected):
     (dict(unit=None, total_price=10.0), None),
     (dict(unit="g", quantity=100, total_price=None), None),
     (dict(unit="stk", pack_size=0, total_price=10.0), 10.0),  # bad pack size counts as one
+    (dict(unit="stk", quantity=12, total_price=56.4), 4.7),     # a 12-pack of eggs: per egg
 ])
 def test_unit_price(fields, expected):
     assert worker.unit_price(item(**fields)) == expected
+
+
+@pytest.mark.parametrize("raw, quantity, unit, pack, expected", [
+    ("FROKOSTEGG FRITTGÅENDE L 12STK PRIOR", None, "stk", 1, (12, "stk")),
+    ("EGG FRITTGÅENDE M/L 6PK PRIOR", None, None, 1, (6, "stk")),
+    ("COOP FROKOSTEGG 12 PK Fra frittgående høner", None, "stk", 1, (12, "stk")),
+    ("DEN STOLTE HANE GÅRDSEGG PARTIKJØP 12 store egg", None, "stk", 1, (12, "stk")),
+    ("EGG 18 stk. 1,062 kg, First Price", None, "stk", 1, (18, "stk")),
+    ("EGG 18STK", 18, "stk", 1, (18, "stk")),               # Gemini had it already
+    ("TORTILLA 8 STK 320G", 320, "g", 1, (320, "g")),       # a weight wins
+    ("AGURK 2 STK", None, "stk", 2, (None, "stk")),         # bought as two: maybe that
+    ("AGURK 1 STK", None, "stk", 1, (None, "stk")),         # one is one
+    ("Coop Frokostegg Ikke medlem? 68,90", None, "stk", 1, (None, "stk")),
+])
+def test_piece_count(raw, quantity, unit, pack, expected):
+    assert worker.piece_count(raw, quantity, unit, pack) == expected
 
 
 @pytest.mark.parametrize("raw, quantity, unit, pack, expected", [

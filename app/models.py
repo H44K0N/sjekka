@@ -47,11 +47,11 @@ class ReceiptItem(Base):
     raw_name = Column(String)       # "GILDE KJØTTDEIG 400G" — what receipt actually said
     canonical_name = Column(String) # "chicken mince" — normalized
     category = Column(String, nullable=True)  # "Godteri", "Kjøtt", "Meieri" etc
-    quantity = Column(Float)
+    quantity = Column(Float)        # one item's size; for stk, its pieces (12 eggs), None for one
     unit = Column(String)           # "g", "ml", "stk"
     pack_size = Column(Integer, default=1)
     total_price = Column(Float, nullable=True)
-    price_per_unit = Column(Float, nullable=True)
+    price_per_unit = Column(Float, nullable=True)  # per 100 g/ml, or per piece
     is_member_price = Column(Integer, default=0)  # boolean
     receipt = relationship("Receipt", back_populates="items")
     product = relationship("Product", back_populates="items")

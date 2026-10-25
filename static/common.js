@@ -48,6 +48,9 @@ function prices(p) {
     let unit = "";
     if (p.price_per_unit && (p.unit === "g" || p.unit === "ml")) {
         unit = `${kr.format(p.price_per_unit)} kr / 100 ${p.unit}`;
+    } else if (p.unit === "stk" && p.quantity > 1) {
+        // A 12-pack of eggs: what one egg costs
+        unit = `${kr.format(each / p.quantity)} kr / stk`;
     } else if (p.unit === "stk" && p.pack_size > 1) {
         unit = `${kr.format(each)} kr / stk`;
     } else if (p.quantity) {
@@ -56,9 +59,10 @@ function prices(p) {
     return { each: each != null ? `${kr.format(each)} kr` : "–", unit };
 }
 
-// A package's size, "600 g", "1 kg" or "1,5 l", so a family pizza isn't
-// mistaken for a small one at a big price
+// A package's size, "600 g", "1 kg", "1,5 l" or "12 stk", so a family
+// pizza isn't mistaken for a small one at a big price
 function packSize(p) {
+    if (p.unit === "stk" && p.quantity > 1) return `${whole.format(p.quantity)} stk`;
     if (!p.quantity || (p.unit !== "g" && p.unit !== "ml")) return "";
     if (p.quantity < 1000) return `${whole.format(p.quantity)} ${p.unit}`;
     return `${whole.format(p.quantity / 1000)} ${p.unit === "g" ? "kg" : "l"}`;
@@ -68,7 +72,7 @@ function packSize(p) {
 // already says it
 function describe(p) {
     // Nor for loose produce, whose weight is just what one shopper took
-    const size = p.by_weight || /\d\s*(kg|g|ml|cl|dl|l)\b/i.test(p.variant || "") ? "" : packSize(p);
+    const size = p.by_weight || /\d\s*(kg|g|ml|cl|dl|l|stk|pk)\b/i.test(p.variant || "") ? "" : packSize(p);
     return [p.brand, p.variant, size].filter(Boolean).join(" · ");
 }
 

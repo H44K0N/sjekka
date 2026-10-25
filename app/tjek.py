@@ -25,7 +25,7 @@ from app.database import SessionLocal
 from app.extractor import DEFINITIONS, client, json_answer, known_names
 from app.names import Names, normalize_name
 from app.schema import Category
-from app.worker import known_product_names, pieces_are_one_pack
+from app.worker import known_product_names, piece_count, pieces_are_one_pack, price_per
 
 logger = logging.getLogger("sjekka.flyers")
 
@@ -185,7 +185,9 @@ def import_catalog(db: Session, catalog: dict, offers: list[dict], namer) -> mod
         quantity, unit, pack = size_of(o)
         # A 4-pack is one thing bought, of four times the size, not "4 for 20"
         if pieces_are_one_pack(text_of(o), pack):
-            quantity, pack = quantity * pack if quantity else None, 1
+            # Counted in pieces, the pack's pieces are its size
+            quantity, pack = quantity * pack if quantity else pack if unit == "stk" else None, 1
+        quantity, unit = piece_count(text_of(o), quantity, unit, pack)
         price = o["pricing"]["price"]
         each = price / pack
         tidied = in_use.tidy(name.canonical_name, name.brand, name.variant)
@@ -193,7 +195,7 @@ def import_catalog(db: Session, catalog: dict, offers: list[dict], namer) -> mod
             raw_name=text_of(o)[:300],
             canonical_name=tidied[0], brand=tidied[1], variant=tidied[2], category=name.category,
             quantity=quantity, unit=unit, pack_size=pack, total_price=price,
-            price_per_unit=round(each / quantity * 100, 2) if quantity else round(each, 2),
+            price_per_unit=price_per(each, quantity, unit),
             pre_price=before_price(o),
             deal=f"{pack} for {price:g}" if pack > 1 else None,
         ))

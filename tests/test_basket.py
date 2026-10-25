@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app import basket, models
+from app import basket, models, worker
 
 TODAY = date(2026, 10, 24)
 
@@ -12,7 +12,7 @@ TODAY = date(2026, 10, 24)
 def row(name, chain, price, *, unit=None, quantity=None, pack=1, days=0, brand=None):
     """A (ReceiptItem, Receipt) pair as the query returns them."""
     each = price / pack if price is not None else None
-    per_unit = round(each / quantity * 100, 2) if unit in ("g", "ml") and quantity and each else None
+    per_unit = worker.price_per(each, quantity, unit) if each else None
     item = SimpleNamespace(canonical_name=name, total_price=price, pack_size=pack, unit=unit,
                            quantity=quantity, price_per_unit=per_unit, brand=brand)
     receipt = SimpleNamespace(store_chain=chain, purchase_date=TODAY - timedelta(days=days))
@@ -264,6 +264,16 @@ def test_a_chain_is_priced_by_the_cheapest_brand_it_has_now():
 def test_a_chain_without_sizes_is_priced_by_its_cheapest_brand_too():
     rows = [row("Egg", "Kiwi", 34.9, brand="Prior"), row("Egg", "Kiwi", 29.9, brand="First Price", days=10)]
     assert priced([("Egg", 1)], rows)["items"][0]["prices"]["Kiwi"]["price"] == 29.9
+
+
+def test_packs_counted_in_pieces_are_compared_per_piece():
+    # A 6-pack at Meny was "cheapest" against Kiwi's 12-pack
+    rows = [row("Egg", "Kiwi", 56.4, unit="stk", quantity=12), row("Egg", "Kiwi", 54.9, unit="stk", quantity=12, days=20),
+            row("Egg", "Meny", 29.1, unit="stk", quantity=6), row("Egg", "Rema 1000", 61.4, unit="stk", quantity=18)]
+    item = priced([("Egg", 1)], rows)["items"][0]
+    assert item["size"] == "12 stk"
+    assert {c: p["price"] for c, p in item["prices"].items()} == {"Kiwi": 56.4, "Meny": 58.2, "Rema 1000": 40.93}
+    assert item["cheapest"] == "Rema 1000"
 
 
 def test_a_split_never_sends_you_to_a_store_on_a_guess():
