@@ -223,7 +223,7 @@
                 const hint = el("span", "hint");
                 if (line) {
                     const best = line.prices[line.cheapest];
-                    hint.append("billigst hos ", chainBadge(line.cheapest), el("span", "each", money(best.price / line.count)));
+                    hint.append("billigst hos ", chainBadge(line.cheapest), el("span", "each", money(best.price / line.count) + forSize(line)));
                     if (best.offer_until) {
                         const tag = el("span", "offer-tag", "tilbud");
                         tag.title = until(best.offer_until);
@@ -290,13 +290,23 @@
         // ---- the result ----
 
         const money = v => `${kr.format(v)} kr`;
+        // Prices of different pack sizes are compared at one size, so say
+        // which: "17,09 kr for 1 l", not a price no shelf has
+        function forSize(line) {
+            if (!line.size) return "";
+            const [quantity, unit] = line.size.split(" ");
+            return ` for ${packSize({ quantity: +quantity, unit })}`;
+        }
         // A total that is mostly estimates is shown rounded ("≈ 163 kr"), and
         // a near tie that rests on estimates isn't called a win: øre-precise
         // sums of guesses would claim more than we know
         const rough = s => s.estimated > s.known;
         const total = s => rough(s) ? `≈ ${kr.format(Math.round(s.total))} kr` : money(s.total);
         const gap = (a, b) => rough(a) || rough(b) ? `${kr.format(Math.round(b.total - a.total))} kr` : money(b.total - a.total);
-        const tooClose = (a, b) => (rough(a) || rough(b)) && b.total - a.total < Math.max(5, a.total * 0.03);
+        // With any estimate in either total, a few kroner either way is within
+        // the guess; under a krone isn't a difference at all
+        const tooClose = (a, b) => b.total - a.total < 1 ||
+            ((a.estimated || b.estimated) > 0 && b.total - a.total < Math.max(5, a.total * 0.03));
 
         function renderResult() {
             const items = ShoppingList.read();
@@ -319,7 +329,8 @@
             const best = stores[0], worst = stores[stores.length - 1];
             $("sticky-chain").replaceChildren(chainBadge(best.chain));
             $("sticky-total").textContent = total(best);
-            $("verdict").querySelector(".label").textContent = rough(best) ? "Trolig billigst for hele listen" : "Billigst for hele listen";
+            $("verdict").querySelector(".label").textContent = rough(best) || (stores.length > 1 && tooClose(best, stores[1]))
+                ? "Trolig billigst for hele listen" : "Billigst for hele listen";
             $("verdict-chain").replaceChildren(chainBadge(best.chain));
             $("verdict-total").textContent = total(best);
             const notes = [];
@@ -341,8 +352,11 @@
                 const chains = el("span", "pair");
                 chains.append(chainBadge(s.chains[0]), el("span", "plus", "+"), chainBadge(s.chains[1]));
                 $("split-chains").replaceChildren(chains);
-                $("split-total").textContent = money(s.total);
-                $("split-save").textContent = `spar ${money(s.saving)} ekstra`;
+                // Rounded like the totals when a price in it is an estimate
+                const guessed = Object.entries(s.plan).some(([name, chain]) =>
+                    result.items.find(i => i.name === name)?.prices[chain]?.estimated);
+                $("split-total").textContent = guessed ? `≈ ${kr.format(Math.round(s.total))} kr` : money(s.total);
+                $("split-save").textContent = `spar ${guessed ? `rundt ${kr.format(Math.round(s.saving))} kr` : money(s.saving)} ekstra`;
                 $("split-plan").replaceChildren(...s.chains.map(chain => {
                     const li = el("li");
                     const names = Object.entries(s.plan).filter(([, c]) => c === chain).map(([n]) => n);
@@ -393,6 +407,7 @@
                     const what = el("td", "", line.count > 1 ? `${line.count} × ${line.name}` : line.name);
                     // Products are grouped by name, so say which brand the price is for
                     if (p.brand) what.append(el("span", "brand", ` ${p.brand}`));
+                    if (line.size) what.append(el("span", "brand", forSize(line)));
                     tr.append(
                         what,
                         el("td", "", money(p.price)),
