@@ -176,6 +176,8 @@ h1 {
 
 .listbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; margin: 32px 0 12px; }
 .listbar .count { margin: 0; }
+.listbar-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.chips:not([hidden]) { margin: 0 0 16px; }
 /* sort: a pill that unfolds a small menu */
 .sort { position: relative; }
 .sort-toggle {
@@ -659,23 +661,22 @@ main.planner-page { max-width: 1040px; }
 .rank-detail td:nth-child(3) { font-size: 13px; color: var(--soft); text-align: right; white-space: nowrap; }
 .rank-detail .brand { color: var(--soft); }
 .rank-detail tr.estimated td:nth-child(2) { color: var(--soft); font-style: italic; }
-.sticky-total {
-  position: fixed;
-  left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom));
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
-  background: #1c1a18;
-  border: 1px solid var(--hover);
-  border-radius: 999px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-  animation: rise 300ms cubic-bezier(.2, .8, .2, 1) backwards;
+/* The answer, kept in view on phones: it sits under the heading and stays at the top of the screen as the page scrolls */
+.result-bar { display: none; }
+#verdict { scroll-margin-top: 84px; }
+@media (max-width: 860px) {
+  .result-bar:not([hidden]) {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 -24px 8px; padding: 10px 24px;
+    background: rgba(13, 12, 11, 0.94); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .result-bar .bar-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+  .result-bar b { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .result-bar small { font-size: 13px; color: var(--soft); }
+  .result-bar .arrow { margin-left: auto; color: var(--soft); }
 }
-.sticky-total .label { margin: 0; }
-.sticky-total b { margin-left: auto; font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.sticky-total .arrow { color: var(--soft); }
 .unknown { margin: 24px 0 0; font-size: 15px; color: var(--soft); }
 .planner .note { margin-top: 24px; }
 .planner .note a, .planner .notice a { color: var(--text); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
@@ -894,9 +895,6 @@ main > section:nth-child(3) { animation-delay: 160ms; }
 .intro.compact h1 { margin-bottom: 0; font-size: clamp(28px, 5vw, 40px); }
 .intro.compact .actions { display: none; }
 .intro.compact .stats { margin-top: 16px; }
-
-/* Room below the list for the floating total, so it never hides the last line */
-body.has-sticky main { padding-bottom: 88px; }
 
 /* Upload: a camera button on phones, where it opens the camera directly */
 .camera { display: none; margin-top: 12px; cursor: pointer; }

@@ -47,9 +47,12 @@
         <section class="explore" aria-labelledby="products-heading">
             <h2 class="visually-hidden" id="products-heading">Produkter</h2>
             <input class="search" type="search" id="search" placeholder="Søk etter produkt eller merke" aria-label="Søk etter produkt" autocomplete="off">
-            <ul class="chips" id="categories"></ul>
             <div class="listbar">
                 <p class="count" id="count" aria-live="polite"></p>
+                <div class="listbar-tools">
+                <button type="button" class="sort-toggle" id="category-toggle" aria-expanded="false" aria-controls="categories" hidden>
+                    <span class="sort-label">Kategori:</span> <span id="category-current">alle</span> <span class="caret" aria-hidden="true"></span>
+                </button>
                 <div class="sort">
                     <button type="button" class="sort-toggle" id="sort-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="sort-menu">
                         <span class="sort-label">Sorter:</span> <span id="sort-current">navn</span> <span class="caret" aria-hidden="true"></span>
@@ -60,7 +63,9 @@
                         <button type="button" role="menuitemradio" data-sort="nyest"><b>Nyest</b><span>sist registrert</span></button>
                     </div>
                 </div>
+                </div>
             </div>
+            <ul class="chips" id="categories" aria-label="Kategorier" hidden></ul>
             <a class="offer-hits" id="offer-hits" hidden></a>
             <div class="grid" id="grid"></div>
             <div class="more" id="more" hidden><button type="button" class="button" id="more-button">Vis flere</button></div>
@@ -122,16 +127,30 @@
             history.replaceState(null, "", next.size ? `?${next}` : location.pathname);
         }
 
+        // The categories are folded away until asked for: a row of them takes
+        // a lot of a phone's screen. Picking one folds them away again.
+        const categoryToggle = document.getElementById("category-toggle");
+        const categoryList = document.getElementById("categories");
+        function setCategoriesOpen(open, returnFocus = false) {
+            categoryList.hidden = !open;
+            categoryToggle.setAttribute("aria-expanded", String(open));
+            if (returnFocus) categoryToggle.focus();
+        }
+        categoryToggle.addEventListener("click", () => setCategoriesOpen(categoryList.hidden));
+        document.addEventListener("keydown", e => { if (e.key === "Escape" && !categoryList.hidden) setCategoriesOpen(false, true); });
+
         function renderCategories() {
             const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "nb"));
-            const list = document.getElementById("categories");
+            const list = categoryList;
             list.replaceChildren();
+            categoryToggle.hidden = categories.length === 0;
+            document.getElementById("category-current").textContent = activeCategory ?? "alle";
 
             for (const cat of [null, ...categories]) {
                 const btn = el("button", "", cat ?? "Alle");
                 btn.type = "button";
                 btn.setAttribute("aria-pressed", String(activeCategory === cat));
-                btn.addEventListener("click", () => { activeCategory = cat; showing = PAGE; renderCategories(); renderGrid(); });
+                btn.addEventListener("click", () => { activeCategory = cat; showing = PAGE; renderCategories(); renderGrid(); setCategoriesOpen(false, true); });
                 const item = el("li");
                 item.append(btn);
                 list.append(item);
