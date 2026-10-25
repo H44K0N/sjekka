@@ -16,7 +16,7 @@ from app.database import SessionLocal
 from app import models
 from app.extractor import extract_receipt, extract_receipts
 from app import names, receipt_files, trumf
-from app.basket import chain_name
+from app.basket import chain_name, pieces_named
 from app.schema import ExtractedItem, ExtractedReceipt, ExtractedReceipts
 from app.config import GEMINI_MODEL, KEEP_FILES_DAYS, LOG_DIR, ORIGINALS_DIR, UPLOAD_DIR
 
@@ -66,11 +66,6 @@ def unit_price(item: ExtractedItem) -> float | None:
     return price_per(item.total_price / max(item.pack_size, 1), item.quantity, item.unit)
 
 
-# "EGG FRITTGÅENDE 18STK", "6PK", "12 store egg": the pieces in one pack
-PIECES = re.compile(r"(?<![\d,.x×])(\d{1,3})\s*-?\s*(?:stk|pk|pakk\w*|pack)\b|(?<![\d,.])(\d{1,3})\s+(?:\w+\s+)?egg\b",
-                    re.IGNORECASE)
-
-
 def piece_count(raw_name: str | None, quantity: float | None, unit: str | None,
                 pack_size: int | None) -> tuple[float | None, str | None]:
     """(quantity, unit) with the pieces in a pack, for a line counted in
@@ -79,9 +74,8 @@ def piece_count(raw_name: str | None, quantity: float | None, unit: str | None,
     bought as several (pack_size > 1) is left alone: "2 STK" may be that."""
     if unit not in ("stk", None) or quantity or (pack_size or 1) != 1:
         return quantity, unit
-    match = PIECES.search(raw_name or "")
-    count = int(match[1] or match[2]) if match else 0
-    return (float(count), "stk") if count >= 2 else (quantity, unit)
+    count = pieces_named(raw_name)
+    return (count, "stk") if count else (quantity, unit)
 
 
 # "Yoghurt kokos 4x150g": several of something sold as one package

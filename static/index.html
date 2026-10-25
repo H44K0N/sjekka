@@ -106,7 +106,7 @@
             navn: (a, b) => a.canonical_name.localeCompare(b.canonical_name, "nb"),
             // The price of one item: per-unit prices can't be compared across g, ml and stk
             pris: (a, b) => (unitPrice(a) ?? Infinity) - (unitPrice(b) ?? Infinity),
-            nyest: (a, b) => (b.purchase_date || "").localeCompare(a.purchase_date || ""),
+            nyest: (a, b) => (b.latest_date || "").localeCompare(a.latest_date || ""),
         };
         function unitPrice(p) {
             if (p.by_weight && p.price_per_unit) return p.price_per_unit * 10;  // the kilo price shown on the card
@@ -142,7 +142,7 @@
             const query = document.getElementById("search").value.toLowerCase().trim();
             const filtered = allProducts.filter(p =>
                 (activeCategory === null || p.category === activeCategory) &&
-                (!query || p.canonical_name.toLowerCase().includes(query) || (p.brand || "").toLowerCase().includes(query))
+                (!query || p.canonical_name.toLowerCase().includes(query) || (p.brands || []).some(b => b.toLowerCase().includes(query)))
             ).sort((a, b) => SORTS[sortBy](a, b) || SORTS.navn(a, b));
             for (const item of document.querySelectorAll("[data-sort]")) {
                 item.setAttribute("aria-checked", String(item.dataset.sort === sortBy));

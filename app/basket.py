@@ -51,6 +51,18 @@ def chain_name(raw: str | None) -> str | None:
     return " ".join(raw.split()).title()
 
 
+# "EGG FRITTGÅENDE 18STK", "6PK", "12 store egg": the pieces in one pack
+PIECES = re.compile(r"(?<![\d,.x×])(\d{1,3})\s*-?\s*(?:stk|pk|pakk\w*|pack)\b|(?<![\d,.])(\d{1,3})\s+(?:\w+\s+)?egg\b",
+                    re.IGNORECASE)
+
+
+def pieces_named(raw_name: str | None) -> float | None:
+    """The pieces in one pack, when the name says two or more."""
+    match = PIECES.search(raw_name or "")
+    count = int(match[1] or match[2]) if match else 0
+    return float(count) if count >= 2 else None
+
+
 @dataclass
 class Offer:
     """One product's latest known price at one chain."""
@@ -64,6 +76,12 @@ class Offer:
     date: date | None
     until: date | None = None   # set for flyer offers: the last day they apply
     deal: str | None = None
+    # The pieces the name says a pack of something weighed holds: a flyer
+    # gives "COOP FROKOSTEGG 12 PK … 816 g" by weight, other eggs by count
+    pieces: float | None = None
+    # The receipt line or flyer offer this is, and its receipt or flyer
+    line: object = None
+    source: object = None
     # Every priced line of the product at the chain, newest first (this one
     # among them): a product's typical size is judged from all it was bought
     # in, and a chain whose latest is a multipack still has a price for one
@@ -85,6 +103,7 @@ def latest_offers(rows) -> dict[tuple[str, str], Offer]:
             each=item.total_price / max(item.pack_size or 1, 1),
             per_unit=item.price_per_unit if sized else None,
             unit=item.unit, quantity=item.quantity, brand=item.brand, date=receipt.purchase_date,
+            pieces=pieces_named(item.raw_name) if item.unit != "stk" else None, line=item, source=receipt,
         ))
     offers = {}
     for key, history in lines.items():
@@ -126,23 +145,30 @@ def scale(offers: list[Offer]) -> tuple[Callable[[Offer], float], str | None, Ca
     6-pack of apples against apples by the kilo. Nor is a price scaled down
     from a pack much bigger than that: a 9-litre multipack says little about
     a half-litre bottle, and would make its store look cheap. (Smaller is
-    fine: one weighed apple is a price by the kilo.) A chain with no line
-    that fits has no price. Otherwise the price of one item is used.
+    fine: one weighed apple is a price by the kilo.) A product counted in
+    pieces also fits a pack sold by weight whose name says how many it
+    holds. A chain with no line that fits has no price. Otherwise the price of one item is used.
     Returns the pricing function, the size it prices, if any, and the line
     to price an offer by (see cheapest_choice; None: none fits)."""
     sized = [o for o in offers if o.unit in SIZED and o.quantity and o.per_unit]
     if sized:
         unit, n = Counter(o.unit for o in sized).most_common(1)[0]
         if n * 2 > len(offers):
+            def size_of(o: Offer) -> float | None:
+                """The line's size in the unit, or its pieces when the
+                product is counted and this pack was weighed."""
+                if o.unit == unit and o.quantity and o.per_unit:
+                    return o.quantity
+                return o.pieces if unit == "stk" else None
             # A flyer offer has only its own size
-            size = typical_size([h.quantity for o in sized for h in o.history or [o] if h.unit == unit and h.quantity])
+            size = typical_size([q for o in offers for h in o.history or [o] if (q := size_of(h))])
 
             def fits(o: Offer) -> bool:
-                return o.unit == unit and bool(o.quantity and o.per_unit) and o.quantity <= size * SIZE_RATIO
+                return bool(q := size_of(o)) and q <= size * SIZE_RATIO
             # From the price paid, not the rounded per_unit, so a store selling
             # exactly this size shows exactly what it charged
             def price_of(o: Offer) -> float:
-                return o.each / o.quantity * size
+                return o.each / size_of(o) * size
             return price_of, f"{size:g} {unit}", (lambda o: cheapest_choice(o, fits, price_of))
     return (lambda o: o.each), None, (lambda o: cheapest_choice(o, lambda h: True, lambda h: h.each))
 
@@ -169,10 +195,17 @@ def cheapest_choice(offer: Offer, fits: Callable[[Offer], bool], price_of: Calla
     return min(latest.values(), key=price_of)
 
 
+def choices(chains: dict[str, Offer]) -> tuple[Callable[[Offer], float], str | None, dict[str, Offer]]:
+    """The line each chain is priced by (see scale and cheapest_choice),
+    with the pricing function and size."""
+    price, size, pick = scale(list(chains.values()))
+    return price, size, {c: line for c, o in chains.items() if (line := pick(o))}
+
+
 def line_prices(chains: dict[str, Offer]) -> tuple[dict[str, float], str | None]:
     """What one product costs at each chain, made comparable (see scale)."""
-    price, size, pick = scale(list(chains.values()))
-    return {c: price(line) for c, o in chains.items() if (line := pick(o))}, size
+    price, size, lines = choices(chains)
+    return {c: price(line) for c, line in lines.items()}, size
 
 
 def flyer_deals(rows) -> dict[tuple[str, str], Offer]:
@@ -189,6 +222,7 @@ def flyer_deals(rows) -> dict[tuple[str, str], Offer]:
             per_unit=item.price_per_unit if sized else None,
             unit=item.unit, quantity=item.quantity, brand=item.brand, date=flyer.valid_from,
             until=flyer.valid_to, deal=item.deal,
+            pieces=pieces_named(item.raw_name) if item.unit != "stk" else None, line=item, source=flyer,
         )
         key = (offer.product, offer.chain)
         if key not in deals or offer.each < deals[key].each:

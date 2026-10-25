@@ -130,9 +130,14 @@
                 if (!byStore.has(key)) byStore.set(key, []);
                 byStore.get(key).push(p);
             }
-            // Latest price per store, cheapest first
-            const stores = [...byStore].map(([chain, list]) => ({ chain, list, latest: list[list.length - 1] }))
-                .sort((a, b) => comparable(a.latest) - comparable(b.latest));
+            // Each store's price is the line the shopping list prices it by:
+            // the cheapest brand it has now, at a size like the usual one
+            // (`compared`: that price at the usual size), else its latest.
+            // Cheapest first, by the usual size where there is one.
+            const ranked = prices.some(p => p.compared != null);
+            const rank = p => ranked ? p.compared ?? Infinity : comparable(p);
+            const stores = [...byStore].map(([chain, list]) => ({ chain, list, latest: list.findLast(p => p.compared != null) ?? list[list.length - 1] }))
+                .sort((a, b) => rank(a.latest) - rank(b.latest));
 
             const n = prices.length, s = stores.length;
             $("summary").textContent = `${n} ${n === 1 ? "registrert pris" : "registrerte priser"} fra ${s} ${s === 1 ? "butikk" : "butikker"}.`;
@@ -183,9 +188,13 @@
                 if (about) who.append(el("span", "brand", about));
                 const price = el("div", "amount");
                 price.append(el("b", "", amount(p)));
-                const diff = comparable(p) - comparable(cheapest);
+                // Per 100 g or per piece, or for the usual size when the two
+                // are counted differently (eggs by weight and by the piece)
+                const same = unitLabel(p) === unitLabel(cheapest);
+                const diff = same ? comparable(p) - comparable(cheapest) : p.compared - cheapest.compared;
+                const per = same ? unitLabel(p) : product.size ? `kr for ${product.size}` : "kr";
                 // With one store there's nothing to be cheapest of
-                price.append(el("span", "", stores.length === 1 ? "" : i === 0 ? "billigst" : diff < 0.005 ? "samme pris" : `+${kr.format(diff)} ${unitLabel(p)}`));
+                price.append(el("span", "", stores.length === 1 || Number.isNaN(diff) ? "" : i === 0 ? "billigst" : diff < 0.005 ? "samme pris" : `+${kr.format(diff)} ${per}`));
                 row.append(who, price, trend ? timeline(store.list, [t0, t1], [v0, v1]) : el("span"), el("span", "when", daysAgo(p.purchase_date)));
                 return row;
             }));

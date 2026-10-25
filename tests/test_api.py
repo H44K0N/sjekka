@@ -28,13 +28,29 @@ def test_stats(client, db):
     assert client.get("/stats").json() == {"total_receipts": 1, "total_items": 1, "pending_jobs": 1}
 
 
-def test_products_returns_latest_price(client, db):
+def test_a_card_shows_the_cheapest_choice_not_the_latest_line(client, db):
     add_item(db, "Lettmelk", 22.90, date(2026, 9, 1), store="Rema 1000")
     add_item(db, "Lettmelk", 24.90, date(2026, 10, 1), store="Kiwi")
-    products = client.get("/products").json()
-    assert len(products) == 1
-    assert products[0]["total_price"] == 24.90
-    assert products[0]["store_chain"] == "Kiwi"
+    product, = client.get("/products").json()
+    assert (product["total_price"], product["store_chain"], product["purchase_date"]) == (22.90, "Rema 1000", "2026-09-01")
+    assert (product["latest_date"], product["store_count"]) == ("2026-10-01", 2)
+
+
+def test_a_card_is_not_led_by_a_family_pack(client, db):
+    # The latest pizza bought was a 1 kg family pizza; the usual is 570 g
+    for price, grams, day, store in [(41.3, 570, 1, "Bunnpris"), (59.9, 570, 2, "Kiwi"), (169.0, 1000, 20, "Meny"),
+                                     (62.9, 570, 3, "Meny")]:
+        add_item(db, "Pizza", price, date(2026, 10, day), store=store)
+        item = db.query(models.ReceiptItem).order_by(models.ReceiptItem.id.desc()).first()
+        item.unit, item.quantity, item.price_per_unit = "g", grams, round(price / grams * 100, 2)
+    db.commit()
+    product, = client.get("/products").json()
+    assert (product["total_price"], product["store_chain"]) == (41.3, "Bunnpris")
+    # The product page ranks each store by the same choice, at the usual size
+    page = client.get("/products/Pizza").json()
+    assert page["size"] == "570 g"
+    assert {(p["store_chain"], p["total_price"]): p["compared"] for p in page["prices"]} == {
+        ("Bunnpris", 41.3): 41.3, ("Kiwi", 59.9): 59.9, ("Meny", 169.0): 96.33, ("Meny", 62.9): None}
 
 
 def test_products_say_what_is_sold_by_weight(client, db):
