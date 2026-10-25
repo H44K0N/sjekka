@@ -63,6 +63,7 @@
             </div>
             <a class="offer-hits" id="offer-hits" hidden></a>
             <div class="grid" id="grid"></div>
+            <div class="more" id="more" hidden><button type="button" class="button" id="more-button">Vis flere</button></div>
             <p class="notice" id="notice">Henter priser …</p>
         </section>
     </main>
@@ -94,6 +95,9 @@
         const params = new URLSearchParams(location.search);
         let activeCategory = params.get("kategori");
         let sortBy = ["navn", "pris", "nyest"].includes(params.get("sorter")) ? params.get("sorter") : "navn";
+        // Cards shown, a page at a time (see renderGrid)
+        const PAGE = 48;
+        let showing = PAGE;
         document.getElementById("search").value = params.get("q") || "";
 
         const SORTS = {
@@ -125,7 +129,7 @@
                 const btn = el("button", "", cat ?? "Alle");
                 btn.type = "button";
                 btn.setAttribute("aria-pressed", String(activeCategory === cat));
-                btn.addEventListener("click", () => { activeCategory = cat; renderCategories(); renderGrid(); });
+                btn.addEventListener("click", () => { activeCategory = cat; showing = PAGE; renderCategories(); renderGrid(); });
                 const item = el("li");
                 item.append(btn);
                 list.append(item);
@@ -159,7 +163,12 @@
             link.textContent = `${hits} ${hits === 1 ? "vare" : "varer"} på tilbud denne uka passer «${query}» →`;
             link.href = `/tilbud.html?q=${encodeURIComponent(query)}`;
 
-            document.getElementById("grid").replaceChildren(...filtered.map(p => {
+            // A page at a time: hundreds of cards make a page no one scrolls through
+            const shown = filtered.slice(0, showing);
+            document.getElementById("more").hidden = filtered.length <= showing;
+            document.getElementById("more-button").textContent = `Vis flere (${filtered.length - shown.length} til)`;
+
+            document.getElementById("grid").replaceChildren(...shown.map(p => {
                 const { each, unit } = prices(p);
                 const body = el("div", "body");
                 // The name is the link, stretched over the whole card, so the
@@ -228,7 +237,10 @@
             } catch { /* the cards work without */ }
         }
 
-        document.getElementById("search").addEventListener("input", renderGrid);
+        // A new search, category or order starts from the first page
+        const fresh = () => { showing = PAGE; renderGrid(); };
+        document.getElementById("search").addEventListener("input", fresh);
+        document.getElementById("more-button").addEventListener("click", () => { showing += PAGE; renderGrid(); });
         // The sort menu: tap to reveal, pick one, it folds away again
         const SORT_NAMES = { navn: "navn", pris: "lavest pris", nyest: "nyest" };
         const toggle = document.getElementById("sort-toggle");
@@ -249,7 +261,7 @@
             if (returnFocus) toggle.focus();
         }
         toggle.addEventListener("click", () => menu.hidden ? openMenu(false) : closeMenu(false));
-        function choose(item) { sortBy = item.dataset.sort; renderGrid(); closeMenu(); }
+        function choose(item) { sortBy = item.dataset.sort; showing = PAGE; renderGrid(); closeMenu(); }
         for (const item of items) item.addEventListener("click", () => choose(item));
         menu.addEventListener("keydown", e => {
             const i = items.indexOf(document.activeElement);
@@ -264,6 +276,7 @@
         // Escape closes it wherever focus is (a tap leaves focus on the toggle)
         document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenu(); });
 
+        foldIntroOnReturn();
         load();
     </script>
 </body>

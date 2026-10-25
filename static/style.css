@@ -890,6 +890,8 @@ main > section:nth-child(3) { animation-delay: 160ms; }
 /* A list in progress: the page's explanation shrinks to its heading */
 .intro.compact .meta, .intro.compact .lede { display: none; }
 .intro.compact h1 { margin-bottom: 0; font-size: clamp(28px, 5vw, 40px); }
+.intro.compact .actions { display: none; }
+.intro.compact .stats { margin-top: 16px; }
 
 /* Room below the list for the floating total, so it never hides the last line */
 body.has-sticky main { padding-bottom: 88px; }
