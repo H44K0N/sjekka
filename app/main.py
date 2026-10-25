@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -8,6 +8,8 @@ from pillow_heif import register_heif_opener
 from sqlalchemy.orm import Session
 from collections import Counter, defaultdict, deque
 from contextlib import asynccontextmanager
+from functools import lru_cache
+from pathlib import Path
 from datetime import date, timedelta
 import hashlib
 import io
@@ -60,47 +62,77 @@ app = FastAPI(lifespan=lifespan)
 # A week of flyers is a lot of JSON
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Fonts, logos and images rarely change, so browsers (and Cloudflare) may keep
-# them for a week.
-LONG_CACHE = ("/fonts/", "/chains/", "/favicon.svg", "/og.png")
+# Cloudflare keeps files for hours but always fetches pages fresh, so a deploy
+# could pair new pages with old scripts, or show an old film under a new
+# page. Everything a page, stylesheet or script points at by its absolute path
+# (scripts, styles, fonts, logos, films, captions, posters) is therefore
+# linked as /name?v=<hash>: a changed file gets a new address, and an
+# addressed version never changes, so it's kept for a year. A stylesheet's
+# hash covers what it points at too, so a new font can't hide behind an old
+# stylesheet. Pages and scripts are rewritten as they're served; a request
+# without the right hash is checked again every time.
+STATIC = Path("static")
+ASSET_EXTENSIONS = "js|css|png|jpg|jpeg|webp|svg|ico|woff2|mp4|vtt"
+ASSET_REF = re.compile(rf'(["\'(])(/[\w./-]+\.(?:{ASSET_EXTENSIONS}))(?=["\')])')
 
-# Cloudflare keeps CSS and JS for hours but always fetches pages fresh, so a
-# deploy could pair new pages with old scripts. Pages therefore link each
-# stylesheet and script as /name?v=<hash of its contents>: a changed file gets a
-# new address, and an addressed version never changes, so it may be kept long.
-ASSET_LINK = re.compile(r'((?:src|href)="/)([\w.-]+\.(?:js|css))"')
+
+def asset_path(url_path: str) -> Path | None:
+    """The file in static/ a path names, if there is one."""
+    path = (STATIC / url_path.lstrip("/")).resolve()
+    if path.is_file() and path.is_relative_to(STATIC.resolve()) and path.suffix.lstrip(".") in ASSET_EXTENSIONS.split("|"):
+        return path
+    return None
 
 
-def asset_version(name: str) -> str:
-    with open(f"static/{name}", "rb") as f:
+@lru_cache(maxsize=None)
+def file_hash(path: str, mtime_ns: int, size: int) -> str:
+    """A file's contents hash, kept while the file is as it was."""
+    with open(path, "rb") as f:
         return hashlib.sha256(f.read()).hexdigest()[:10]
 
 
-def link_versioned_assets(html: str) -> str:
-    return ASSET_LINK.sub(lambda m: f'{m[1]}{m[2]}?v={asset_version(m[2])}"', html)
+def asset_version(url_path: str) -> str:
+    path = asset_path(url_path)
+    if path.suffix in (".css", ".js"):
+        return hashlib.sha256(link_versioned_assets(path.read_text(encoding="utf-8"), url_path).encode()).hexdigest()[:10]
+    stat = path.stat()
+    return file_hash(str(path), stat.st_mtime_ns, stat.st_size)
+
+
+def link_versioned_assets(text: str, own_path: str = "") -> str:
+    """The text with every file it points at given its version."""
+    def link(m):
+        if m[2] == own_path or not asset_path(m[2]):
+            return m[0]
+        return f"{m[1]}{m[2]}?v={asset_version(m[2])}"
+    return ASSET_REF.sub(link, text)
 
 
 class Pages(StaticFiles):
     async def get_response(self, path, scope):
         response = await super().get_response(path, scope)
-        if isinstance(response, FileResponse) and str(response.path).endswith(".html"):
+        if not isinstance(response, FileResponse):
+            return response
+        url_path = "/" + str(path).lstrip("/")
+        if str(response.path).endswith(".html"):
             with open(response.path, encoding="utf-8") as f:
                 html = link_versioned_assets(f.read())
             return HTMLResponse(html, status_code=response.status_code, headers={"Cache-Control": "no-cache"})
+        if str(response.path).endswith((".css", ".js")) and asset_path(url_path):
+            with open(response.path, encoding="utf-8") as f:
+                text = link_versioned_assets(f.read(), url_path)
+            return Response(text, status_code=response.status_code, media_type=response.media_type)
         return response
 
 
 @app.middleware("http")
 async def cache_static_assets(request: Request, call_next):
     response = await call_next(request)
-    if response.status_code != 200:
+    # A partial answer (206) is what browsers ask for when they play a film
+    if response.status_code not in (200, 206) or not asset_path(request.url.path):
         return response
-    path = request.url.path
-    if path.startswith(LONG_CACHE):
-        response.headers["Cache-Control"] = "public, max-age=604800"
-    elif path.endswith((".js", ".css")):
-        versioned = request.query_params.get("v") == asset_version(path.lstrip("/"))
-        response.headers["Cache-Control"] = "public, max-age=31536000, immutable" if versioned else "no-cache"
+    versioned = request.query_params.get("v") == asset_version(request.url.path)
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable" if versioned else "no-cache"
     return response
 
 # Every upload costs a Gemini call, so uploads are limited per client and per

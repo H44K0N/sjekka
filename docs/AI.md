@@ -120,7 +120,7 @@ Add a line here for each AI-assisted change.
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
 | 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
-| 24–25 Oct 2026 | #55–#76: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
+| 24–25 Oct 2026 | #55–#77: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -195,3 +195,4 @@ Add a line here for each AI-assisted change.
 | #74 | Tests run on every core and the image is built alongside them; CI went from about 3 minutes to under 2 | Haakon asked how long CI takes, then "if they don't sacrifice quality, do it" |
 | #75 | The films reworked: a marketing story that picks the desktop or phone version, a film on how the app works and one on how it was built with AI; all made from code (real app captures moved by a timeline, a new voice with the best of five takes, sound design, captions) | Haakon: "rework the videos, let's try to make them studio grade like from a tier 1 marketing team", and after the first draft: "the offer signs look a little cheap and AI generated, could we clip some real world Norwegian style offers?" |
 | #76 | The privacy page and the upload page say that Sjekka uses Gemini's free tier, where Google may train on uploads | Haakon: update the privacy policy to reflect that we use Gemini's cheaper tier, which lets Google train on them. The page had said the opposite |
+| #77 | Every file a page points at (films, captions, posters, fonts, logos, scripts, styles) is linked by a hash of its contents and kept for a year; a stylesheet's hash covers its fonts | Haakon, after Cloudflare kept an old film under the same name: "change the video names so the cache updates instantly. We should probably handle this automatically for all media. And other cached items" |

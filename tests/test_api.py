@@ -1,9 +1,8 @@
-import hashlib
 import re
 from pathlib import Path
 from datetime import date
 
-from app import models
+from app import main, models
 
 
 def add_item(db, name, price, purchase_date, store="Kiwi"):
@@ -168,34 +167,66 @@ def test_products_count_the_stores_each_product_was_seen_at(client, db):
     assert counts == {"Lettmelk": 2, "Smør": 1}
 
 
-def test_fonts_and_logos_are_cached_for_a_week(client):
-    for path in ["/fonts/Libron-Regular.woff2", "/chains/kiwi.png", "/favicon.svg", "/og.png"]:
-        res = client.get(path)
-        assert res.status_code == 200, path
-        assert res.headers["cache-control"] == "public, max-age=604800", path
-
-
 def test_pages_and_scripts_are_not_long_cached(client):
     for path in ["/", "/style.css", "/common.js", "/health"]:
         assert "max-age" not in client.get(path).headers.get("cache-control", ""), path
 
 
-def test_pages_link_scripts_and_styles_by_content(client):
-    # Cloudflare keeps JS and CSS for hours but not pages. A page from a new
-    # deploy once ran against the old common.js and showed no offers at all.
-    pages = ["/"] + [f"/{p.name}" for p in Path("static").glob("*.html")]
-    for page in pages:
-        html = client.get(page).text
-        assert not re.search(r'(?:src|href)="/[\w.-]+\.(?:js|css)"', html), f"{page} links an unversioned asset"
-        for name, version in re.findall(r'(?:src|href)="/([\w.-]+\.(?:js|css))\?v=(\w+)"', html):
-            assert version == hashlib.sha256(Path("static", name).read_bytes()).hexdigest()[:10], (page, name)
-            res = client.get(f"/{name}?v={version}")
-            assert res.status_code == 200, (page, name)
-            assert res.headers["cache-control"] == "public, max-age=31536000, immutable", (page, name)
+BARE_REFERENCE = re.compile(rf'["\'(](/[\w./-]+\.(?:{main.ASSET_EXTENSIONS}))["\')]')
+VERSIONED_REFERENCE = re.compile(rf'["\'(](/[\w./-]+\.(?:{main.ASSET_EXTENSIONS}))\?v=(\w+)["\')]')
 
 
-def test_an_old_script_version_is_not_kept(client):
-    assert client.get("/common.js?v=0000000000").headers["cache-control"] == "no-cache"
+def served_texts(client):
+    """Every page, stylesheet and script as a visitor gets it."""
+    names = ["/"] + [f"/{p.name}" for p in Path("static").glob("*") if p.suffix in (".html", ".css", ".js")]
+    return {name: client.get(name).text for name in names}
+
+
+def test_everything_a_page_points_at_is_linked_by_content(client):
+    # Cloudflare keeps files for hours but not pages. A page from a new deploy
+    # once ran against the old common.js and showed no offers at all; a film
+    # re-rendered under the same name would show the old one just the same.
+    seen = set()
+    for name, text in served_texts(client).items():
+        for path in BARE_REFERENCE.findall(text):
+            assert not main.asset_path(path), f"{name} links {path} without its version"
+        for path, version in VERSIONED_REFERENCE.findall(text):
+            assert version == main.asset_version(path), (name, path)
+            seen.add((path, version))
+    kinds = {Path(path).suffix for path, _ in seen}
+    assert {".js", ".css", ".woff2", ".svg", ".png", ".mp4", ".vtt", ".jpg"} <= kinds, kinds
+    for path, version in sorted(seen):
+        # A film is fetched in pieces, and each piece must be kept as well
+        res = client.get(f"{path}?v={version}", headers={"Range": "bytes=0-99"} if path.endswith(".mp4") else {})
+        assert res.status_code in (200, 206), path
+        assert res.headers["cache-control"] == "public, max-age=31536000, immutable", path
+
+
+def test_a_file_without_its_current_version_is_checked_every_time(client):
+    for url in ["/common.js", "/common.js?v=0000000000", "/video/sjekka-slik-bygget.mp4", "/fonts/Libron-Bold.woff2?v=0",
+                "/chains/kiwi.png?v=old", "/og.png"]:
+        assert client.get(url, headers={"Range": "bytes=0-9"}).headers["cache-control"] == "no-cache", url
+
+
+def test_only_files_in_static_are_assets(client):
+    assert main.asset_path("/common.js") and main.asset_path("/video/sjekka-promo-desktop.mp4")
+    for path in ["/index.html", "/nope.png", "/../app/main.py", "/video/../../app/main.py", "/video", "/fonts/OFL.txt"]:
+        assert main.asset_path(path) is None, path
+    assert "cache-control" not in client.get("/health").headers or "immutable" not in client.get("/health").headers["cache-control"]
+
+
+def test_a_stylesheet_changes_version_when_a_font_it_points_at_does(monkeypatch, tmp_path):
+    (tmp_path / "fonts").mkdir()
+    (tmp_path / "fonts" / "f.woff2").write_bytes(b"first font")
+    (tmp_path / "style.css").write_text('@font-face { src: url("/fonts/f.woff2"); }')
+    monkeypatch.setattr(main, "STATIC", tmp_path)
+    before = main.asset_version("/style.css")
+    assert f"/fonts/f.woff2?v={main.asset_version('/fonts/f.woff2')}" in main.link_versioned_assets(
+        (tmp_path / "style.css").read_text(), "/style.css")
+    (tmp_path / "fonts" / "f.woff2").write_bytes(b"a second, longer font")
+    assert main.asset_version("/style.css") != before
+
+
 
 
 def test_missing_pages_get_the_404_page(client):
@@ -227,7 +258,7 @@ def test_the_about_page_has_all_the_films(client):
     # The phone's promo is swapped in by the page's script, the rest are in the markup
     assert "sjekka-promo-mobil" in html
     for name in ["sjekka-promo-desktop", "sjekka-slik-fungerer", "sjekka-slik-bygget"]:
-        assert f'/video/{name}.mp4"' in html and f'/video/{name}.jpg"' in html
+        assert f'/video/{name}.mp4?v=' in html and f'/video/{name}.jpg?v=' in html
     for name in ["sjekka-promo-desktop", "sjekka-promo-mobil", "sjekka-slik-fungerer", "sjekka-slik-bygget"]:
         video = client.get(f"/video/{name}.mp4")
         assert video.status_code == 200 and video.headers["content-type"] == "video/mp4"
