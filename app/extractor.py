@@ -19,7 +19,12 @@ DEFINITIONS = """## DEFINITIONS
   - "AASS PREMIUM FATØL 0,5L" → "Øl" (brand "Aass", variant "Premium Fatøl")
   - "BIG ONE PIZZA CLASSIC" → "Pizza" (brand "Big One", variant "Classic")
   - "BALLERINA KJEKS BROWNIE" → "Kjeks" (brand "Ballerina", variant "Brownie")
-  - Always Title Case. Always generic. Never include brand or size. Norwegian
+  - "GRANDIOSA ORIGINAL" → "Pizza" (brand "Grandiosa", variant "Original")
+  - "COCA-COLA 1,5L" → "Brus" (brand "Coca-Cola")
+  - "PRIOR FROKOSTEGG 12STK" → "Egg" (brand "Prior", variant "Frokostegg")
+  - Always Title Case. Always generic. Never include brand or size, and never
+    use the brand as the name, even for a product known by it. Singular or
+    plural as the product is usually called ("Bananer", "Agurk"). Norwegian
     spelling ("Avokado", not "Avocado").
 
 **brand**: The brand name only, or null if unknown/store brand.

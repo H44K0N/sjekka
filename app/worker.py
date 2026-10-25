@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app import models
 from app.extractor import extract_receipt, extract_receipts
-from app import receipt_files, trumf
+from app import names, receipt_files, trumf
 from app.basket import chain_name
 from app.schema import ExtractedItem, ExtractedReceipt, ExtractedReceipts
 from app.config import GEMINI_MODEL, KEEP_FILES_DAYS, LOG_DIR, ORIGINALS_DIR, UPLOAD_DIR
@@ -47,12 +47,6 @@ def is_retryable(e: Exception) -> bool:
 def retry_delay(attempts: int) -> timedelta:
     """30s, 1m, 2m, 4m ... capped at 30m: about an hour over all attempts."""
     return timedelta(seconds=min(30 * 2 ** (attempts - 1), 1800))
-
-
-def normalize_name(name: str) -> str:
-    """'KJØTTDEIG ' and 'kjøttdeig' become 'Kjøttdeig', so they group as one product."""
-    name = " ".join(name.split())
-    return name[:1].upper() + name[1:].lower()
 
 
 def unit_price(item: ExtractedItem) -> float | None:
@@ -333,14 +327,16 @@ def save_receipt(db: Session, job: models.Job, data: ExtractedReceipt) -> models
     db.add(receipt)
     db.flush()
 
+    in_use = names.Names(db)
     for item in data.items:
         item.quantity = multipack_quantity(item.raw_name, item.quantity, item.unit, item.pack_size)
+        name, brand, variant = in_use.tidy(item.canonical_name, item.brand, item.variant)
         db.add(models.ReceiptItem(
             receipt_id=receipt.id,
             raw_name=item.raw_name,
-            canonical_name=normalize_name(item.canonical_name),
-            brand=item.brand.strip() if item.brand else None,
-            variant=item.variant,
+            canonical_name=name,
+            brand=brand,
+            variant=variant,
             category=item.category,
             quantity=item.quantity,
             unit=item.unit,
@@ -482,6 +478,7 @@ async def run_worker():
     db.commit()
     repair_multipacks(db)
     repair_chain_names(db)
+    names.repair_product_names(db)
     fill_receipt_totals(db)
     repair_duplicates(db)
     reread_trumf_histories(db)

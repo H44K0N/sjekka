@@ -23,8 +23,9 @@ from app.basket import CHAINS, chain_name
 from app.config import FLYER_REFRESH_HOURS, GEMINI_MODEL
 from app.database import SessionLocal
 from app.extractor import DEFINITIONS, client, json_answer, known_names
+from app.names import Names, normalize_name
 from app.schema import Category
-from app.worker import known_product_names, normalize_name, pieces_are_one_pack
+from app.worker import known_product_names, pieces_are_one_pack
 
 logger = logging.getLogger("sjekka.flyers")
 
@@ -176,6 +177,7 @@ def import_catalog(db: Session, catalog: dict, offers: list[dict], namer) -> mod
         source=source, model=GEMINI_MODEL if namer is gemini_names else None,
         raw_response=json.dumps({"tjek": priced, "names": raw}, ensure_ascii=False),
     )
+    in_use = Names(db)
     for i, o in enumerate(priced):
         name = names.get(i)
         if not name or not name.grocery:
@@ -186,10 +188,10 @@ def import_catalog(db: Session, catalog: dict, offers: list[dict], namer) -> mod
             quantity, pack = quantity * pack if quantity else None, 1
         price = o["pricing"]["price"]
         each = price / pack
+        tidied = in_use.tidy(name.canonical_name, name.brand, name.variant)
         flyer.offers.append(models.FlyerOffer(
             raw_name=text_of(o)[:300],
-            canonical_name=normalize_name(name.canonical_name),
-            brand=name.brand, variant=name.variant, category=name.category,
+            canonical_name=tidied[0], brand=tidied[1], variant=tidied[2], category=name.category,
             quantity=quantity, unit=unit, pack_size=pack, total_price=price,
             price_per_unit=round(each / quantity * 100, 2) if quantity else round(each, 2),
             pre_price=before_price(o),
