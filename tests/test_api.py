@@ -247,6 +247,17 @@ PAGES = ["/", "/upload.html", "/takk.html", "/produkt.html", "/personvern.html",
          "/handleliste.html", "/tilbud.html"]
 
 
+def test_every_page_has_the_logo_icons(client):
+    for path in PAGES:
+        html = client.get(path).text
+        assert re.search(r'rel="icon" type="image/svg\+xml" href="/favicon.svg(\?v=\w+)?"', html), path
+        assert re.search(r'rel="apple-touch-icon" href="/apple-touch-icon.png(\?v=\w+)?"', html), path
+    # A tab icon can't load the site's font, so the letter is drawn as a shape
+    icon = client.get("/favicon.svg").text
+    assert "<text" not in icon and "<path" in icon
+    assert client.get("/apple-touch-icon.png").headers["content-type"] == "image/png"
+
+
 def test_every_page_links_to_the_privacy_and_about_pages(client):
     for path in PAGES:
         footer = client.get(path).text.split("<footer>")[1]

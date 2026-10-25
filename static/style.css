@@ -67,7 +67,9 @@ main.narrow { max-width: 600px; }
   align-items: center;
   padding-top: 28px;
 }
-.mark { color: var(--text); }
+/* the logo: the name, bigger than the menu, with a champagne full stop */
+.mark { color: var(--text); font-size: 23px; font-weight: 700; line-height: 1; letter-spacing: -0.01em; }
+.mark::after { content: "." / ""; color: var(--accent); }
 .top nav { display: flex; gap: 20px; }
 .top nav a { transition: color 150ms; }
 .top nav a:hover, .top nav a[aria-current="page"] { color: var(--text); }
@@ -848,7 +850,7 @@ main > section:nth-child(3) { animation-delay: 160ms; }
      Five things in one row left no room to breathe or tap */
   .top { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; align-items: center; row-gap: 4px; }
   .top nav { display: contents; }
-  .mark { grid-row: 1; grid-column: 1 / 3; }
+  .mark { grid-row: 1; grid-column: 1 / 3; font-size: 21px; }
   .top nav a.cta { grid-row: 1; grid-column: 3 / 5; justify-self: end; padding: 4px 12px; }
   .top nav a:not(.cta) { grid-row: 2; padding: 12px 0; }
   .grid { grid-template-columns: 1fr; gap: 0; border-top: 1px solid var(--line); }
