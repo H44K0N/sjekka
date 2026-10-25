@@ -38,7 +38,7 @@ CI (`.github/workflows/pipeline.yml`) runs exactly this, requires the browser te
 - **Timestamps are naive UTC** via `models.utcnow()`, matching the stored data.
 - **User-facing text is Norwegian (bokmål)**, including API error messages shown in the UI. Code, comments and commits are English.
 - **Link scripts and styles as `/name.js` or `/name.css`** (root-relative, no query) so `Pages` can add the content hash; otherwise Cloudflare can serve an old file next to a new page. A test checks every page.
-- **Logos, fonts and films are cached for a week or more.** Give a changed file a new name (`oda-orange.svg`, `sjekka-film-*.mp4`) and update the links.
+- **Everything a page points at is linked by its contents.** Scripts, styles, fonts, logos, films, captions and posters are served as `/name?v=<hash>` and kept for a year; the server adds the hash to every quoted `/path.ext` in pages, stylesheets and scripts. A changed file needs no new name, but a path built in JavaScript (`` `/video/${name}.mp4` ``) can't be seen: write each one out in full.
 - **Chain names are matched by pattern** (`CHAINS` in `app/basket.py`, mirrored in `static/chains.js`). Anchor new patterns so other businesses don't match (Megaflis once became Coop Mega), and check them against `TJEK_BRANDS` in `tests/test_tjek.py`.
 - **Design mirrors tischbein.dev:** Libron everywhere (no second font), the colour tokens in `style.css`, hairline cards, pill buttons. No gradients, no emoji, no decorative fluff. Build DOM with `textContent`, never `innerHTML` with data.
 

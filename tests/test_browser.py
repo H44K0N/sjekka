@@ -942,9 +942,10 @@ def test_the_promo_film_is_the_one_for_the_screen_it_is_watched_on(browser, site
         screen = browser.new_page(viewport=size, base_url=site[0])
         screen.goto("/om.html")
         video = screen.locator("#promo video")
-        expect(video.locator("source")).to_have_attribute("src", f"/video/{film}.mp4")
-        expect(video.locator("track")).to_have_attribute("src", f"/video/{film}.vtt")
-        assert video.get_attribute("poster") == f"/video/{film}.jpg"
+        # Each file is addressed by its contents, so a new film is fetched at once
+        expect(video.locator("source")).to_have_attribute("src", re.compile(rf"^/video/{film}\.mp4\?v=\w+$"))
+        expect(video.locator("track")).to_have_attribute("src", re.compile(rf"^/video/{film}\.vtt\?v=\w+$"))
+        assert re.fullmatch(rf"/video/{film}\.jpg\?v=\w+", video.get_attribute("poster"))
         box = video.bounding_box()
         assert (box["height"] > box["width"]) is tall
         screen.close()
@@ -956,7 +957,7 @@ def test_a_promo_film_already_playing_is_not_swapped_when_the_screen_turns(brows
     # Pretend it has been playing: the page must leave its source alone
     screen.evaluate("Object.defineProperty(document.querySelector('#promo video'), 'currentTime', { value: 5 })")
     screen.set_viewport_size({"width": 390, "height": 844})
-    expect(screen.locator("#promo video source")).to_have_attribute("src", "/video/sjekka-promo-desktop.mp4")
+    expect(screen.locator("#promo video source")).to_have_attribute("src", re.compile(r"^/video/sjekka-promo-desktop\.mp4\?v=\w+$"))
     screen.close()
 
 

@@ -2,7 +2,7 @@
 
 > *Har du sjekka i dag?*
 
-**Sjekka tells you where your grocery list is cheapest**, using real prices from receipts people share and the offers in this week's flyers. Try it at **https://sjekka.tischbein.dev** (Norwegian), or watch the 45-second film on the [about page](https://sjekka.tischbein.dev/om.html).
+**Sjekka tells you where your grocery list is cheapest**, using real prices from receipts people share and the offers in this week's flyers. Try it at **https://sjekka.tischbein.dev** (Norwegian), or watch the films on the [about page](https://sjekka.tischbein.dev/om.html).
 
 ---
 
@@ -127,7 +127,7 @@ Data lives in `/opt/sjekka/data` and secrets in `/opt/sjekka/.env`; the pipeline
 
 Dependabot opens a PR every Monday for new versions of Python packages, the base image and GitHub Actions. Each runs the full pipeline and is deployed only once merged.
 
-Files the browser keeps: scripts and stylesheets are linked as `/name.js?v=<hash of the file>`, so a deploy can never pair a new page with an old script. Logos, fonts and the films are kept for a week or longer, so give them a new file name when they change.
+Files the browser keeps: everything a page, stylesheet or script points at (scripts, styles, fonts, logos, films, captions, posters) is linked as `/name?v=<hash of the file>`, added by the server as it serves them (`link_versioned_assets` in `app/main.py`). A changed file gets a new address, so a deploy can never pair a new page with an old script or show an old film, and a matching address is kept for a year. A stylesheet's hash covers the fonts it points at. A request without the right hash is checked again each time. JavaScript that builds a path from parts can't be seen by the server, so write such paths out in full.
 
 </details>
 

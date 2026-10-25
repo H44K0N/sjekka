@@ -101,13 +101,18 @@
             const video = document.querySelector("#promo video");
             const source = video.querySelector("source"), track = video.querySelector("track");
             const phone = matchMedia("(max-width: 700px), (pointer: coarse) and (orientation: portrait) and (max-width: 900px)");
+            // Written out in full, so the server can give each file its version
+            const FILMS = {
+                desktop: ["/video/sjekka-promo-desktop.mp4", "/video/sjekka-promo-desktop.vtt", "/video/sjekka-promo-desktop.jpg"],
+                phone: ["/video/sjekka-promo-mobil.mp4", "/video/sjekka-promo-mobil.vtt", "/video/sjekka-promo-mobil.jpg"],
+            };
             const choose = () => {
                 if (!video.paused || video.currentTime > 0) return;  // never swap one that's playing
-                const name = phone.matches ? "sjekka-promo-mobil" : "sjekka-promo-desktop";
-                if (source.getAttribute("src") === `/video/${name}.mp4`) return;
-                source.src = `/video/${name}.mp4`;
-                track.src = `/video/${name}.vtt`;
-                video.poster = `/video/${name}.jpg`;
+                const [mp4, vtt, poster] = FILMS[phone.matches ? "phone" : "desktop"];
+                if (source.getAttribute("src") === mp4) return;
+                source.src = mp4;
+                track.src = vtt;
+                video.poster = poster;
                 video.parentElement.classList.toggle("tall", phone.matches);
                 video.load();
             };
