@@ -289,7 +289,7 @@
                 // offer cost, so "not checked yet" would look like we ignored it
                 const seen = o.verdict.kind === "unknown" && receiptDuring(o);
                 const tag = seen ? el("span", "verdict-tag seen", "Samme pris som på kvittering") : verdictTag(o);
-                line.append(chainBadge(o.chain), el("b", "", offerPrice(o)), tag, el("span", "when", until(o.valid_to)));
+                line.append(chainBadge(o.chain), el("b", "", offerPrice(o)), ...[mustBuy(o)].filter(Boolean), tag, el("span", "when", until(o.valid_to)));
                 const details = [seen ? el("p", "deal-verdict", `En kvittering fra ${new Date(seen.purchase_date).toLocaleDateString("nb-NO", { day: "numeric", month: "long" })} viser samme pris. Om det er et godt tilbud, kan vi først si når vi har priser fra før tilbudet startet.`) : offerVerdict(o)];
                 if (o.brand || o.is_member_price) details.push(el("p", "raw", [o.brand, o.is_member_price ? "medlemspris" : ""].filter(Boolean).join(" · ")));
                 if (o.raw_name) details.push(el("p", "raw", `I kundeavisen: «${o.raw_name}»`));
@@ -306,7 +306,8 @@
                 $("best").querySelector(".label").textContent = "Billigst nå, på tilbud";
                 $("best-chain").replaceChildren(chainBadge(best.chain));
                 $("best-price").textContent = offerPrice(best);
-                $("best-unit").textContent = `${kr.format(offerValue)} ${offerPer} · ${until(best.valid_to)}`;
+                $("best-unit").textContent = [`${kr.format(offerValue)} ${offerPer}`,
+                    best.pack_size > 1 ? `bare når du kjøper ${best.pack_size}` : "", until(best.valid_to)].filter(Boolean).join(" · ");
                 $("best").hidden = false;
             }
         });

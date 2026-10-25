@@ -78,9 +78,19 @@ function describe(p) {
 
 const perLabel = per => per === "stk" ? "kr / stk" : `kr / ${per}`;
 
-// What a flyer offer costs: "44,90 kr", "3 for 50" for a multi-buy, or "29,90 kr / kg"
-const offerPrice = o => o.pack_size > 1 ? `${o.pack_size} for ${kr.format(o.total_price)}`
+// What a flyer offer costs: "44,90 kr", "3 for 50 kr" for a multi-buy, or "29,90 kr / kg"
+const offerPrice = o => o.pack_size > 1 ? `${o.pack_size} for ${kr.format(o.total_price)} kr`
     : o.by_weight ? `${kr.format(o.per_unit * 10)} kr / kg` : `${kr.format(o.each)} kr`;
+
+// A multi-buy is that price only for whoever takes them all: say so where the
+// price is, not only in the flyer's own words under "Detaljer"
+function mustBuy(o) {
+    if (!(o.pack_size > 1)) return null;
+    const tag = el("span", "must-buy", `Må kjøpe ${o.pack_size}`);
+    tag.append(el("span", "each", ` · ${kr.format(o.each)} kr stk`));
+    tag.title = `Prisen gjelder bare når du kjøper ${o.pack_size}: da koster hver ${kr.format(o.each)} kr`;
+    return tag;
+}
 
 // A flyer offer's verdict (see app/flyers.py) in a few words, for a tag
 function verdictTag(o) {

@@ -763,6 +763,42 @@ def test_shopping_list_uses_offers(page):
     expect(page.locator("#verdict-facts")).to_contain_text("1 vare på tilbud")
 
 
+MULTI_BUY = {"canonical_name": "Energidrikk", "raw_name": "BATTERY 8 FOR 100,- + pant", "brand": "Battery", "variant": None,
+             "category": "Drikke", "chain": "Obs", "quantity": 500.0, "unit": "ml", "pack_size": 8, "total_price": 100.0,
+             "each": 12.5, "per_unit": 2.5, "by_weight": False, "is_member_price": False, "deal": "8 for 100", "pre_price": None,
+             "valid_from": str(date.today()), "valid_to": str(date.today() + timedelta(days=5)),
+             "verdict": {"kind": "cheapest_known", "usual": None, "discount": None, "cheaper_chain": None, "cheaper_price": None, "per": "100 ml"}}
+
+
+def test_a_multi_buy_offer_says_how_many_you_must_buy(page):
+    page.route("**/offers*", lambda route: route.fulfill(json=[MULTI_BUY]))
+    page.goto("/tilbud.html")
+    card = page.locator("#grid .card").first
+    expect(card.locator(".price")).to_have_text("8 for 100 kr")
+    expect(card.locator(".must-buy")).to_have_text("Må kjøpe 8 · 12,50 kr stk")
+
+
+def test_the_shopping_list_offers_a_multi_buy_instead_of_pricing_one_by_it(page):
+    def answer(route):
+        count = route.request.post_data_json["items"][0].get("count", 1)
+        obs = 100.0 if count >= 8 else 30.0 * count
+        line = {"name": "Energidrikk", "count": count, "size": "500 ml", "cheapest": "Obs" if count >= 8 else "Kiwi",
+                "prices": {"Kiwi": {"price": 27.5 * count, "estimated": False, "date": None, "brand": None, "offer_until": None, "deal": None},
+                           "Obs": {"price": obs, "estimated": False, "date": None, "brand": None,
+                                   "offer_until": MULTI_BUY["valid_to"] if count >= 8 else None, "deal": None}},
+                "multi_buys": [] if count >= 8 else [{"chain": "Obs", "deal": "8 for 100", "needs": 8, "each": 12.5, "until": MULTI_BUY["valid_to"]}]}
+        stores = sorted([{"chain": c, "total": p["price"], "known": 1, "estimated": 0, "offers": 0, "index": 1.0}
+                         for c, p in line["prices"].items()], key=lambda s: s["total"])
+        route.fulfill(json={"items": [line], "unknown": [], "stores": stores, "split": None})
+    page.route("**/basket", answer)
+    page.goto("/handleliste.html?v=Energidrikk")
+    item = page.locator(".list-item", has_text="Energidrikk")
+    expect(item.locator(".multi-buy")).to_contain_text("8 for 100 kr: 12,50 kr stk hvis du tar 8")
+    item.get_by_role("button", name="Ta 8 Energidrikk for tilbudet hos Obs").click()
+    expect(item.locator(".multi-buy")).to_have_count(0)
+    assert page.evaluate("JSON.parse(localStorage.getItem('sjekka.handleliste'))") == [{"name": "Energidrikk", "count": 8}]
+
+
 def test_whole_prices_drop_the_decimals(page):
     page.goto("/")
     formatted = page.evaluate("() => [15, 15.001, 24.9, 0.5, 99.99].map(kr.format)")

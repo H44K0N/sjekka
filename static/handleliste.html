@@ -298,6 +298,18 @@
                         tag.title = until(best.offer_until);
                         hint.append(tag);
                     }
+                    // "8 for 100" only if you take eight: offer that, at the price per piece it gives
+                    const multi = [...line.multi_buys].sort((a, b) => a.each - b.each)[0];
+                    if (multi) {
+                        const more = el("span", "multi-buy");
+                        more.append(chainBadge(multi.chain), `${multi.deal} kr: ${money(multi.each)} stk hvis du tar ${multi.needs}`);
+                        const take = el("button", "did-you-mean", `Ta ${multi.needs}`);
+                        take.type = "button";
+                        take.setAttribute("aria-label", `Ta ${multi.needs} ${item.name} for tilbudet hos ${multi.chain}`);
+                        take.addEventListener("click", () => { ShoppingList.setCount(item.name, multi.needs); update(); });
+                        more.append(take);
+                        hint.append(more);
+                    }
                 } else if (unknown.has(item.name)) {
                     hint.append(el("span", "none", "ingen priser ennå"));
                     // Names match exactly, so "Melk" finds no prices while
