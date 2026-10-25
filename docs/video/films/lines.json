@@ -23,7 +23,7 @@
     "estimate": "Receipts never cover everything. When a chain has no price for something, it's estimated from how expensive that chain is on the products we can compare. And every estimate is marked.",
     "flyers": "Every six hours, Sjekka also reads the chains' new flyers. Each offer is held up against what receipts say it cost before the sale. Some are real deals. Others are the usual price, with a red sign.",
     "history": "You can also share a whole year at once. A loyalty card history is read straight from the file, with exact prices, and Gemini only names the products.",
-    "privacy": "No accounts. No cookies. No photos kept. Just prices.",
+    "privacy": "No accounts. No cookies. No photos kept on our server. Just prices.",
     "outro": "That's Sjekka. Real prices, from real receipts."
   },
   "built": {
