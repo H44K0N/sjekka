@@ -984,6 +984,10 @@ footer a[aria-current="page"] { color: var(--text); }
 .shopping small { flex: 1 0 100%; font-size: 13px; color: var(--soft); }
 .steps { list-style: decimal; padding-left: 22px; color: #d8d1c5; }
 .steps li { display: list-item; padding: 3px 0; border: 0; }
+.meal .where { white-space: normal; justify-content: flex-start; }
+.meal-compare { margin: 0; padding: 6px 0 10px; font-size: 13px; color: var(--soft); font-variant-numeric: tabular-nums; }
+.meal-compare strong { color: var(--text); font-weight: 600; }
+.plan-sub .meal-compare { padding: 4px 0 0; font-size: 14px; }
 .meal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 6px 18px 18px; }
 .meal-actions .status a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 

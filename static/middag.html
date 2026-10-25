@@ -86,7 +86,7 @@
 
             <details class="fold method" id="method" hidden>
                 <summary>Slik regner vi</summary>
-                <p class="note">Hver vare i middagen prises som resten av Sjekka: siste pris fra kvitteringene, og tilbud fra kundeavisene mens de gjelder. Mangler en butikk pris, anslår vi den og sier fra. Prisen per porsjon er det middagen bruker av hver pakke. Planen for uka velger middager som deler pakker, og regner det du faktisk må kjøpe, hele pakker, i den ene butikken som blir billigst. Olje, salt, krydder og andre skapvarer regnes ikke med.</p>
+                <p class="note">Hver vare i middagen prises som resten av Sjekka: siste pris fra kvitteringene, og tilbud fra kundeavisene mens de gjelder. Mangler en butikk pris, anslår vi den og sier fra. Prisen per porsjon er det middagen bruker av hver pakke. Planen for uka velger middager som deler pakker, og regner det du faktisk må kjøpe, hele pakker, i den ene butikken som blir billigst. Billigst betyr billigst av butikkene der de fleste varene har ekte priser. En sum som mest er anslått kan ikke vinne, og under hver middag ser du hva den koster i de butikkene. Olje, salt, krydder og andre skapvarer regnes ikke med.</p>
             </details>
             </div>
         </section>
@@ -121,6 +121,24 @@
 
         const rounded = v => `${kr.format(Math.round(v))} kr`;
         const about = rough => rough ? "ca. " : "";
+
+        // "Cheapest" is only among the chains with mostly real prices: say so, and show them
+        function cheapestOf(compared) {
+            if (compared >= 2) return `billigst av ${compared} butikker med nok priser`;
+            if (compared === 1) return "eneste butikk med nok priser";
+            return "billigst, men prisene er mest anslått";
+        }
+
+        function comparison(at, value) {
+            if (at.length < 2) return null;
+            const line = el("p", "meal-compare");
+            at.forEach((c, i) => {
+                if (i) line.append(" · ");
+                const part = el(i ? "span" : "strong", "", `${c.chain} ${rounded(c[value])}`);
+                line.append(part);
+            });
+            return line;
+        }
 
         function segment(box, choices, current, pick) {
             box.replaceChildren(...choices.map(([value, label]) => {
@@ -169,7 +187,9 @@
             const where = el("p", "where");
             const shop = el("span", "shop");
             shop.append(chainBadge(r.chain));
-            where.append(shop, el("span", "", "billigst hos"));
+            where.append(shop, el("span", "", cheapestOf(r.compared)));
+            const compared = comparison(r.compare, "per_portion");
+            if (compared) compared.append(el("small", "", " per porsjon"));
 
             const fold = el("details", "fold meal-recipe");
             fold.append(el("summary", "", "Ingredienser og fremgangsmåte"));
@@ -201,7 +221,7 @@
             });
             const actions = el("div", "meal-actions");
             actions.append(add, status);
-            card.append(body, where, fold, actions);
+            card.append(body, where, ...(compared ? [compared] : []), fold, actions);
             return card;
         }
 
@@ -240,7 +260,9 @@
             $("plan-title").textContent = `${n} ${n === 1 ? "middag" : "middager"} for ${about(plan.rough)}${rounded(plan.total)}`;
             const sub = $("plan-sub");
             sub.replaceChildren("Alt kjøpt hos ", chainBadge(plan.chain),
-                ` · ${plan.portions} ${plan.portions === 1 ? "porsjon" : "porsjoner"} hver kveld`);
+                `, ${cheapestOf(plan.compared)} · ${plan.portions} ${plan.portions === 1 ? "porsjon" : "porsjoner"} hver kveld`);
+            const planCompare = comparison(plan.compare, "total");
+            if (planCompare) sub.append(planCompare);
             // The packages are bought whole, so for one or two the trip costs far more than
             // the food it feeds. Say what the food uses, so the numbers don't look wrong
             const leftovers = plan.used_total < plan.total * 0.85;
