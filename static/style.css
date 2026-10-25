@@ -1018,6 +1018,7 @@ footer a[aria-current="page"] { color: var(--text); }
   .swap-list { padding-left: 0; }
   .grid.meals { grid-template-columns: 1fr; }
   .portions { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .portions #days-label { margin-left: 0; margin-top: 6px; }
 }
 #dinners-body { transition: opacity 150ms; }
 #dinners-body.busy { opacity: 0.45; pointer-events: none; }
@@ -1030,3 +1031,6 @@ footer a[aria-current="page"] { color: var(--text); }
   #kinds button { flex: 0 0 auto; }
   .all .listbar-tools { margin-left: 0; width: 100%; min-width: 0; }
 }
+.plan-used { display: block; margin-top: 2px; }
+.portions { flex-wrap: wrap; row-gap: 10px; column-gap: 14px; }
+.portions #days-label { margin-left: 18px; }

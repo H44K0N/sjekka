@@ -43,6 +43,8 @@
             <div class="portions" role="group" aria-label="Antall porsjoner">
                 <span class="label" id="portions-label">Porsjoner</span>
                 <div class="seg" id="portions"></div>
+                <span class="label" id="days-label">Middager i uka</span>
+                <div class="seg" id="days"></div>
             </div>
             <p class="notice" id="notice">Henter middager …</p>
             <div id="dinners-body" aria-live="polite">
@@ -105,8 +107,13 @@
         // Pork and sausages are meat to someone choosing dinner
         const KIND_GROUP = { svin: "kjøtt", pølse: "kjøtt" };
 
-        let portions = 2;
-        try { portions = Math.max(1, Math.min(8, +localStorage.getItem("sjekka.porsjoner") || 2)); } catch { /* the default */ }
+        const DAY_CHOICES = [3, 4, 5];
+        let portions = 2, days = 5;
+        try {
+            portions = Math.max(1, Math.min(8, +localStorage.getItem("sjekka.porsjoner") || 2));
+            days = DAY_CHOICES.includes(+localStorage.getItem("sjekka.middager")) ? +localStorage.getItem("sjekka.middager") : 5;
+        } catch { /* the defaults */ }
+        const keep = (key, value) => { try { localStorage.setItem(key, String(value)); } catch { /* not kept */ } };
         let data = null;
         let chosen = null;           // the dinners in the plan, once someone swaps one
         let kind = "alle";
@@ -127,8 +134,11 @@
 
         function drawControls() {
             segment($("portions"), PORTION_CHOICES.map(n => [n, String(n)]), portions, n => {
-                portions = n; chosen = null;
-                try { localStorage.setItem("sjekka.porsjoner", String(n)); } catch { /* not kept */ }
+                portions = n; chosen = null; keep("sjekka.porsjoner", n);
+                load();
+            });
+            segment($("days"), DAY_CHOICES.map(n => [n, String(n)]), days, n => {
+                days = n; chosen = null; keep("sjekka.middager", n);
                 load();
             });
             segment($("kinds"), KINDS, kind, k => { kind = k; drawControls(); drawAll(); });
@@ -229,14 +239,15 @@
             const n = plan.days.length;
             $("plan-title").textContent = `${n} ${n === 1 ? "middag" : "middager"} for ${about(plan.rough)}${rounded(plan.total)}`;
             const sub = $("plan-sub");
-            // The packages are bought whole, so a trip costs more than the food it feeds
-            // to a household of one or two: say both, so the two numbers don't clash
-            const leftovers = plan.used_total < plan.total * 0.85;
             sub.replaceChildren("Alt kjøpt hos ", chainBadge(plan.chain),
-                ` · ${plan.portions} ${plan.portions === 1 ? "porsjon" : "porsjoner"} hver kveld · ${about(plan.rough)}${rounded(plan.per_portion)} per porsjon`);
-            if (leftovers) {
-                sub.append(` med hele pakker. Selve maten bruker bare ${about(plan.rough)}${rounded(plan.used_per_portion)} per porsjon, resten er pakker som holder til senere.`);
-            }
+                ` · ${plan.portions} ${plan.portions === 1 ? "porsjon" : "porsjoner"} hver kveld`);
+            // The packages are bought whole, so for one or two the trip costs far more than
+            // the food it feeds. Say what the food uses, so the numbers don't look wrong
+            const leftovers = plan.used_total < plan.total * 0.85;
+            const used = el("span", "plan-used", leftovers
+                ? `Maten bruker ${about(plan.rough)}${rounded(plan.used_per_portion)} per porsjon. Resten av innkjøpet er pakker som holder til senere.`
+                : `${about(plan.rough)}${rounded(plan.per_portion)} per porsjon.`);
+            sub.append(used);
 
             $("plan-days").replaceChildren(...plan.days.map((day, index) => {
                 const li = el("li", "plan-day");
@@ -311,7 +322,7 @@
 
         async function loadPlan(focusDay) {
             const token = ++planToken;
-            const res = await fetch(`/meals?portions=${portions}&ids=${chosen.join(",")}`);
+            const res = await fetch(`/meals?portions=${portions}&days=${days}&ids=${chosen.join(",")}`);
             if (!res.ok || token !== planToken) return;
             data.plan = (await res.json()).plan;
             drawPlan();
@@ -326,7 +337,7 @@
             $("dinners-body").setAttribute("aria-busy", "true");
             const token = ++planToken;
             try {
-                const res = await fetch(`/meals?portions=${portions}`);
+                const res = await fetch(`/meals?portions=${portions}&days=${days}`);
                 if (!res.ok) throw new Error();
                 const fresh = await res.json();
                 if (token !== planToken) return;   // asked again meanwhile

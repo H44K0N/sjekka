@@ -1479,7 +1479,7 @@ def test_a_dinner_on_offer_says_when_the_offer_ends(dinners_page):
 
 def test_the_plan_says_what_the_food_uses_when_the_packages_bought_cost_more(dinners_page):
     # 240 kr of food in 300 kr of packages: the leftovers are explained, not left to look like a mistake
-    expect(dinners_page.locator("#plan-sub")).to_contain_text("hele pakker. Selve maten bruker bare 12 kr per porsjon")
+    expect(dinners_page.locator("#plan-sub")).to_contain_text("Maten bruker 12 kr per porsjon. Resten av innkjøpet er pakker som holder til senere")
     expect(dinners_page.locator("#plan-facts")).to_contain_text("lag hele oppskriften og ta med rester")  # for two
 
 
@@ -1492,7 +1492,18 @@ def test_guessed_prices_in_the_plan_invite_a_receipt(page):
     page.route("**/meals*", rough)
     page.goto("/middag.html")
     expect(page.locator("#plan-title")).to_contain_text("ca. 300 kr")
-    expect(page.locator("#plan-sub")).not_to_contain_text("Selve maten")
+    expect(page.locator("#plan-sub")).not_to_contain_text("Maten bruker")
     expect(page.locator("#plan-facts")).to_contain_text("anslått")
     expect(page.locator("#plan-facts").get_by_role("link", name="Last opp en kvittering")).to_have_attribute("href", "/upload.html")
     expect(page.locator("#plan-facts")).not_to_contain_text("ta med rester")  # for four
+
+
+def test_the_number_of_dinners_is_chosen_and_remembered(dinners_page):
+    page = dinners_page
+    expect(page.locator("#days button[aria-pressed=true]")).to_have_text("5")
+    page.locator("#days button", has_text="3").click()
+    expect(page.locator("#days button[aria-pressed=true]")).to_have_text("3")
+    assert "days=3" in page.asked[-1]
+    assert page.evaluate("localStorage.getItem('sjekka.middager')") == "3"
+    page.reload()
+    expect(page.locator("#days button[aria-pressed=true]")).to_have_text("3")

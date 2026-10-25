@@ -10,6 +10,7 @@
 
 - **Look up a price.** Search for a product and see what it cost in each store, from real receipts, with its price history.
 - **Price your whole shopping list.** Write down what you need and see what the list costs in every chain, cheapest first. Missing prices are estimated, and marked as estimates.
+- **Find a cheap dinner.** Whole dinners (about 25 ordinary Norwegian weekday meals) priced from the same prices, cheapest per portion first, with a plan for the week that picks dinners sharing ingredients and puts the whole trip on the shopping list.
 - **See if an offer is really an offer.** This week's flyer offers from ten chains, each checked against what the product cost before the sale.
 - **Share a receipt, or a whole year of them.** Take a photo, or upload a receipt file: a PDF, or a CSV or JSON export from a store app, bank or online shop. A file can be a full purchase history, such as a year of Trumf receipts. Sjekka reads the store, the items and the prices, and every receipt makes the prices better for everyone.
 
@@ -26,6 +27,7 @@ Weekly flyers ──► Gemini names each offer ──► offers ─────
 1. **Receipts.** A photo (shrunk first) or a receipt file is uploaded and put in a queue. Google's Gemini reads the store, date and each line into fixed fields. Sjekka checks the answer, works out comparable prices (per 100 g, per 100 ml or per item), and deletes the photo.
 2. **Flyers.** Every six hours Sjekka fetches new grocery flyers from eTilbudsavis. Prices and sizes come from the flyer; Gemini only gives each offer the same product name a receipt would use, so the two can be compared.
 3. **Comparing.** An offer is "real" when it's at least 15 % below what receipts show the chain usually charged. A shopping list is priced per chain from the latest receipts and current offers; where a chain has no price for a product, it's estimated from how expensive that chain is on products both sell.
+4. **Dinners.** `app/recipes.py` holds the dinners: each ingredient lists product names that will do ("Spaghetti" or "Pasta") and its share of a usual package. `app/meals.py` prices every ingredient once with the shopping list's machinery (estimates, usual sizes and offers behave the same), so a dinner is arithmetic on those prices. A chain is only named cheapest on prices that are mostly real. The week plan picks dinners greedily by what the whole trip costs in whole packages, so dinners sharing a bag of rice cost less than their sum, with at most one or two of a kind. A dinner is shown only when its main ingredients have a price; add one to `recipes.py` with product names that exist in the data. `GET /meals?portions=&days=&ids=` serves the page `static/middag.html`.
 
 ## Privacy, in short
 
@@ -97,6 +99,7 @@ About 350 tests, and none of them call Gemini: it's replaced with fakes, so they
 | `test_extractor.py` | The Gemini request and checking its answer |
 | `test_flyers.py`, `test_tjek.py` | Flyer import (files and eTilbudsavis), sizes and multi-buys, chain matching against real flyer brands, verdicts, duplicates, `/offers` |
 | `test_basket.py` | Pricing a shopping list: chain names, latest prices, size-adjusted comparison, estimates, the two-store split, `POST /basket` |
+| `test_meals.py` | Dinners: choosing the product to price, a dinner's share of each package, offers and savings, a chain only named on real prices, week plans sharing packages, `GET /meals` |
 | `test_migrations.py`, `test_export.py` | Adding columns to the live database; exporting Gemini's raw answers |
 | `test_deploy_scripts.py` | `deploy.sh` (checks, health check, rollback) with a fake `docker`, and `backup.sh` |
 | `test_browser.py` | Every page in Chromium: search, filters, product pages, the shopping list, offers, upload, the phone layout, and accessibility checks (axe-core, WCAG 2.1 AA) |
