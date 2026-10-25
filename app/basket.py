@@ -124,10 +124,10 @@ def scale(offers: list[Offer]) -> tuple[Callable[[Offer], float], str | None, Ca
     6-pack of apples against apples by the kilo. Nor is a price scaled down
     from a pack much bigger than that: a 9-litre multipack says little about
     a half-litre bottle, and would make its store look cheap. (Smaller is
-    fine: one weighed apple is a price by the kilo.) So at each chain the
-    newest line that fits is used, and a chain with none has no price.
-    Otherwise the price of one item is used. Returns the pricing function, the size it
-    prices, if any, and the line to price an offer by (None: none fits)."""
+    fine: one weighed apple is a price by the kilo.) A chain with no line
+    that fits has no price. Otherwise the price of one item is used.
+    Returns the pricing function, the size it prices, if any, and the line
+    to price an offer by (see cheapest_choice; None: none fits)."""
     sized = [o for o in offers if o.unit in ("g", "ml") and o.quantity and o.per_unit]
     if sized:
         unit, n = Counter(o.unit for o in sized).most_common(1)[0]
@@ -139,9 +139,32 @@ def scale(offers: list[Offer]) -> tuple[Callable[[Offer], float], str | None, Ca
                 return o.unit == unit and bool(o.quantity and o.per_unit) and o.quantity <= size * SIZE_RATIO
             # From the price paid, not the rounded per_unit, so a store selling
             # exactly this size shows exactly what it charged
-            return ((lambda o: o.each / o.quantity * size), f"{size:g} {unit}",
-                    (lambda o: next((h for h in o.history or [o] if fits(h)), None)))
-    return (lambda o: o.each), None, (lambda o: o)
+            def price_of(o: Offer) -> float:
+                return o.each / o.quantity * size
+            return price_of, f"{size:g} {unit}", (lambda o: cheapest_choice(o, fits, price_of))
+    return (lambda o: o.each), None, (lambda o: cheapest_choice(o, lambda h: True, lambda h: h.each))
+
+
+# How far back a chain's other brands count as still on its shelf
+CHOICE_DAYS = 180
+
+
+def cheapest_choice(offer: Offer, fits: Callable[[Offer], bool], price_of: Callable[[Offer], float]) -> Offer | None:
+    """The line to price a product at a chain by. A product is generic
+    ("Pizza") and a chain sells several brands of it, so it's the cheapest
+    a shopper could pick there: each brand's latest price, from the last
+    CHOICE_DAYS before the newest line, cheapest by the comparable price.
+    Lines that don't fit (see scale) aren't a choice."""
+    lines = [h for h in offer.history or [offer] if fits(h)]
+    if not lines:
+        return None
+    newest = lines[0].date
+    latest: dict[str, Offer] = {}
+    for line in lines:  # newest first, so the first per brand is its latest
+        if newest and line.date and (newest - line.date).days > CHOICE_DAYS:
+            continue
+        latest.setdefault((line.brand or "").lower(), line)
+    return min(latest.values(), key=price_of)
 
 
 def line_prices(chains: dict[str, Offer]) -> tuple[dict[str, float], str | None]:

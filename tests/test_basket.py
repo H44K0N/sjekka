@@ -248,6 +248,24 @@ def test_a_big_pack_is_not_scaled_down_to_a_small_one():
     assert item["cheapest"] == "Kiwi"
 
 
+def test_a_chain_is_priced_by_the_cheapest_brand_it_has_now():
+    # "Pizza" is any pizza: Kiwi's latest was a Peppes, but it sells
+    # Grandiosa cheaper. Each brand counts at its latest price, and only
+    # if seen in the last half year
+    rows = [row("Pizza", "Kiwi", 89.9, unit="g", quantity=570, brand="Peppes"),
+            row("Pizza", "Kiwi", 59.9, unit="g", quantity=570, brand="Grandiosa", days=30),
+            row("Pizza", "Kiwi", 49.9, unit="g", quantity=570, brand="Grandiosa", days=60),  # since gone up
+            row("Pizza", "Kiwi", 39.9, unit="g", quantity=570, brand="First Price", days=400),  # too long ago
+            row("Pizza", "Meny", 64.9, unit="g", quantity=570, brand="Grandiosa")]
+    kiwi = priced([("Pizza", 1)], rows)["items"][0]["prices"]["Kiwi"]
+    assert (kiwi["price"], kiwi["brand"], kiwi["date"]) == (59.9, "Grandiosa", str(TODAY - timedelta(days=30)))
+
+
+def test_a_chain_without_sizes_is_priced_by_its_cheapest_brand_too():
+    rows = [row("Egg", "Kiwi", 34.9, brand="Prior"), row("Egg", "Kiwi", 29.9, brand="First Price", days=10)]
+    assert priced([("Egg", 1)], rows)["items"][0]["prices"]["Kiwi"]["price"] == 29.9
+
+
 def test_a_split_never_sends_you_to_a_store_on_a_guess():
     # Rema has no coffee price; its estimate is cheap because Rema is cheap
     # on meat. The split buys coffee where its price is known.
