@@ -1019,3 +1019,14 @@ footer a[aria-current="page"] { color: var(--text); }
   .grid.meals { grid-template-columns: 1fr; }
   .portions { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
+#dinners-body { transition: opacity 150ms; }
+#dinners-body.busy { opacity: 0.45; pointer-events: none; }
+.meal .price, .meal .unit { text-align: left; }
+@media (pointer: coarse) { .seg button, .chip-button { min-height: 44px; } }
+@media (max-width: 700px) {
+  /* The kinds are one row to swipe, not a wrapped pile */
+  #kinds { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+  #kinds::-webkit-scrollbar { display: none; }
+  #kinds button { flex: 0 0 auto; }
+  .all .listbar-tools { margin-left: 0; width: 100%; min-width: 0; }
+}

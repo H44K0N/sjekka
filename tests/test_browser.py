@@ -1321,24 +1321,24 @@ def test_suggested_products_are_added_with_one_tap_and_the_page_stays(page):
 
 # Dinners (the page, with /meals answered by a fixed set)
 
-def a_dinner(id, name, kind="kjøtt", per=20.0, offers=0, saving=0.0, minutes=30, rough=False):
+def a_dinner(id, name, kind="kjøtt", per=20.0, offers=0, saving=0.0, minutes=30, rough=False, ends=None):
     return {"id": id, "name": name, "blurb": f"{name} er god.", "minutes": minutes, "kind": kind, "portions": 2, "chain": "Kiwi",
             "total": per * 2, "per_portion": per, "buy_total": per * 3, "saving": saving, "offers": offers, "rough": rough,
             "ingredients": [{"label": "400 g kjøttdeig", "product": "Kjøttdeig", "count": 1, "price": per, "estimated": False,
-                             "offer": bool(offers), "offer_until": None, "deal": None, "brand": None},
+                             "offer": bool(offers), "offer_until": ends, "deal": None, "brand": None},
                             {"label": "Ris", "product": "Ris", "count": 1, "price": per, "estimated": rough, "offer": False,
                              "offer_until": None, "deal": None, "brand": None}],
             "unpriced": [], "pantry": ["salt", "olje"], "steps": ["Stek det.", "Server det."]}
 
 
-DINNERS = [a_dinner("bolo", "Bolognese", per=18, offers=2, saving=12, minutes=35), a_dinner("pizza", "Pizza", "svin", per=24, minutes=25),
+DINNERS = [a_dinner("bolo", "Bolognese", per=18, offers=2, saving=12, minutes=35, ends=str(date.today() + timedelta(days=1))), a_dinner("pizza", "Pizza", "svin", per=24, minutes=25),
            a_dinner("laks", "Laks", "fisk", per=40, offers=1, saving=4), a_dinner("linser", "Linsegryte", "vegetar", per=11, minutes=20)]
 
 
 def plan_of(ids, portions=2):
     chosen = [d for d in DINNERS if d["id"] in ids]
     return {"portions": portions, "chain": "Kiwi", "total": 300.0, "per_portion": 15.0, "shared_saving": 41.0, "offer_saving": 12.0,
-            "rough": False, "days": [{"day": ["Mandag", "Tirsdag", "Onsdag"][i], "id": d["id"], "name": d["name"], "minutes": d["minutes"],
+            "rough": False, "used_total": 240.0, "used_per_portion": 12.0, "days": [{"day": ["Mandag", "Tirsdag", "Onsdag"][i], "id": d["id"], "name": d["name"], "minutes": d["minutes"],
                                       "kind": d["kind"], "per_portion": d["per_portion"], "offers": d["offers"],
                                       "alternatives": [x["id"] for x in DINNERS if x["id"] not in ids]} for i, d in enumerate(chosen)],
             "shopping": [{"product": "Kjøttdeig", "count": 2, "price": 120.0, "size": "400 g", "estimated": False, "offer": True,
@@ -1369,7 +1369,7 @@ def test_the_dinners_page_shows_a_plan_for_the_week_and_every_dinner_cheapest_fi
     expect(page.locator("#plan-title")).to_have_text("3 middager for 300 kr")
     expect(page.locator("#plan-days .plan-name")).to_have_text(["Bolognese", "Pizza", "Linsegryte"])
     expect(page.locator("#plan-days .plan-weekday")).to_have_text(["Mandag", "Tirsdag", "Onsdag"])
-    expect(page.locator("#plan-facts")).to_have_text("Delte pakker sparer 41 kr. Tilbud sparer 12 kr.")
+    expect(page.locator("#plan-facts")).to_contain_text("Delte pakker sparer 41 kr. Tilbud sparer 12 kr.")
     expect(page.locator("#grid .card h3")).to_have_text(["Bolognese", "Pizza", "Laks", "Linsegryte"])  # as the server ordered them
 
 
@@ -1470,3 +1470,29 @@ def test_the_dinners_page_is_in_every_menu(page):
     for path in ["/", "/tilbud.html", "/handleliste.html", "/om.html"]:
         page.goto(path)
         expect(page.get_by_role("navigation").get_by_role("link", name="middag")).to_be_visible()
+
+
+def test_a_dinner_on_offer_says_when_the_offer_ends(dinners_page):
+    expect(dinners_page.locator("#meal-bolo")).to_contain_text("Tilbud t.o.m. i morgen")
+    expect(dinners_page.locator("#meal-pizza")).not_to_contain_text("Tilbud t.o.m.")
+
+
+def test_the_plan_says_what_the_food_uses_when_the_packages_bought_cost_more(dinners_page):
+    # 240 kr of food in 300 kr of packages: the leftovers are explained, not left to look like a mistake
+    expect(dinners_page.locator("#plan-sub")).to_contain_text("hele pakker. Selve maten bruker bare 12 kr per porsjon")
+    expect(dinners_page.locator("#plan-facts")).to_contain_text("lag hele oppskriften og ta med rester")  # for two
+
+
+def test_guessed_prices_in_the_plan_invite_a_receipt(page):
+    def rough(route):
+        plan = plan_of(["bolo", "pizza"], portions=4)
+        plan["rough"] = True
+        plan["used_total"] = plan["total"]
+        route.fulfill(json={"portions": 4, "recipes": DINNERS, "plan": plan})
+    page.route("**/meals*", rough)
+    page.goto("/middag.html")
+    expect(page.locator("#plan-title")).to_contain_text("ca. 300 kr")
+    expect(page.locator("#plan-sub")).not_to_contain_text("Selve maten")
+    expect(page.locator("#plan-facts")).to_contain_text("anslått")
+    expect(page.locator("#plan-facts").get_by_role("link", name="Last opp en kvittering")).to_have_attribute("href", "/upload.html")
+    expect(page.locator("#plan-facts")).not_to_contain_text("ta med rester")  # for four
