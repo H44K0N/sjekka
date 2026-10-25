@@ -507,6 +507,18 @@ def test_product_page_button(page):
     assert list_names(page) == ["Kjøttdeig"]
 
 
+def test_a_saved_list_takes_a_products_new_name(page):
+    # Saved when the product was called otherwise; a line already there is added to
+    page.goto("/handleliste.html")
+    page.evaluate("""localStorage.setItem("sjekka.handleliste", JSON.stringify(
+        [{name: "Seig menn", count: 2}, {name: "Seigmenn", count: 1}, {name: "Lettmelk", count: 1}]))""")
+    page.reload()
+    expect(page.locator(".list-item")).to_have_count(2)
+    assert list_names(page) == ["Seigmenn", "Lettmelk"]
+    saved = page.evaluate("JSON.parse(localStorage.getItem('sjekka.handleliste'))")
+    assert saved == [{"name": "Seigmenn", "count": 3}, {"name": "Lettmelk", "count": 1}]
+
+
 def test_list_finds_the_cheapest_store_for_the_whole_list(page):
     page.goto("/handleliste.html")
     expect(page.locator("#empty")).to_be_visible()

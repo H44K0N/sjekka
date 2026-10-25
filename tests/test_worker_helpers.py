@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from app import worker
+from app import names, worker
 from app.schema import ExtractedItem
 from tests.helpers import api_error
 
@@ -23,7 +23,7 @@ def item(**fields):
     ("", ""),
 ])
 def test_normalize_name(raw, expected):
-    assert worker.normalize_name(raw) == expected
+    assert names.normalize_name(raw) == expected
 
 
 @pytest.mark.parametrize("fields, expected", [

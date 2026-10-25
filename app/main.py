@@ -27,6 +27,7 @@ from app import models
 from app import worker
 from app import basket
 from app import flyers
+from app import names
 from app import tjek
 from app import receipt_files
 from app.migrations import migrate
@@ -254,14 +255,19 @@ def get_products(db: Session = Depends(get_db)):
 
 @app.get("/products/{name}")
 def get_product(name: str, db: Session = Depends(get_db)):
-    """Every registered price of one product, oldest first, for the product page."""
-    rows = (
-        db.query(models.ReceiptItem, models.Receipt)
-        .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
-        .filter(models.ReceiptItem.canonical_name == name)
-        .order_by(models.Receipt.purchase_date, models.ReceiptItem.id)
-        .all()
-    )
+    """Every registered price of one product, oldest first, for the product
+    page. A link with a name the product no longer has still finds it."""
+    def prices_of(name):
+        return (
+            db.query(models.ReceiptItem, models.Receipt)
+            .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
+            .filter(models.ReceiptItem.canonical_name == name)
+            .order_by(models.Receipt.purchase_date, models.ReceiptItem.id)
+            .all()
+        )
+    rows = prices_of(name)
+    if not rows and (now := names.Names(db).resolve(name)) != name:
+        name, rows = now, prices_of(now)
     if not rows:
         raise HTTPException(404, "Fant ikke produktet.")
 
@@ -359,10 +365,19 @@ class ShoppingList(BaseModel):
 @app.post("/basket")
 def price_basket(shopping_list: ShoppingList, db: Session = Depends(get_db)):
     """What a shopping list costs at each chain, for the shopping-list page.
-    Every price is read, since a chain's estimates depend on all its prices."""
+    Every price is read, since a chain's estimates depend on all its prices.
+    A name on a saved list that a product no longer has is priced as the
+    product, and `renamed` tells the page to update the list."""
+    in_use = names.Names(db)
     wanted: dict[str, int] = {}
+    renamed = {}
     for item in shopping_list.items:
-        wanted[item.name] = wanted.get(item.name, 0) + item.count
+        name = in_use.resolve(item.name)
+        if name != item.name and name.lower() != item.name.lower():
+            renamed[item.name] = name
+        else:
+            name = item.name
+        wanted[name] = wanted.get(name, 0) + item.count
     rows = (
         db.query(models.ReceiptItem, models.Receipt)
         .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
@@ -370,7 +385,7 @@ def price_basket(shopping_list: ShoppingList, db: Session = Depends(get_db)):
         .all()
     )
     deals = basket.flyer_deals(flyers.active_offers(db, date.today()))
-    return basket.price_list(list(wanted.items()), basket.latest_offers(rows), deals)
+    return {**basket.price_list(list(wanted.items()), basket.latest_offers(rows), deals), "renamed": renamed}
 
 
 @app.get("/offers")
@@ -378,7 +393,7 @@ def get_offers(navn: str | None = None, best: bool = False, db: Session = Depend
     """This week's flyer offers, each judged against what receipts say the
     product usually costs, best first. `navn` keeps one product's offers;
     `best` keeps only the best offer per product (for the product cards)."""
-    offers = flyers.offer_list(db, date.today(), name=navn)
+    offers = flyers.offer_list(db, date.today(), name=navn and names.Names(db).resolve(navn))
     if best:
         seen = set()
         offers = [o for o in offers if o["canonical_name"] not in seen and not seen.add(o["canonical_name"])]

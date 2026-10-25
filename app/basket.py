@@ -9,7 +9,7 @@ import math
 import re
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from statistics import median
 
@@ -64,29 +64,34 @@ class Offer:
     date: date | None
     until: date | None = None   # set for flyer offers: the last day they apply
     deal: str | None = None
+    # Every priced line of the product at the chain, newest first (this one
+    # among them): a product's typical size is judged from all it was bought
+    # in, and a chain whose latest is a multipack still has a price for one
+    history: list["Offer"] = field(default_factory=list)
 
 
 def latest_offers(rows) -> dict[tuple[str, str], Offer]:
     """rows: (ReceiptItem, Receipt) pairs in any order. Keeps the newest
     priced line per product and chain."""
-    offers: dict[tuple[str, str], Offer] = {}
+    lines: dict[tuple[str, str], list[Offer]] = {}
     for item, receipt in rows:
         chain = chain_name(receipt.store_chain)
         # Trumf also covers florists and the like (Mester Grønn): not a grocery store to compare
         if chain not in GROCERY_CHAINS or item.total_price is None or not item.canonical_name:
             continue
-        key = (item.canonical_name, chain)
-        current = offers.get(key)
-        when = receipt.purchase_date
-        if current and current.date and (when is None or when < current.date):
-            continue
         sized = item.unit in ("g", "ml") and item.quantity and item.price_per_unit
-        offers[key] = Offer(
+        lines.setdefault((item.canonical_name, chain), []).append(Offer(
             product=item.canonical_name, chain=chain,
             each=item.total_price / max(item.pack_size or 1, 1),
             per_unit=item.price_per_unit if sized else None,
-            unit=item.unit, quantity=item.quantity, brand=item.brand, date=when,
-        )
+            unit=item.unit, quantity=item.quantity, brand=item.brand, date=receipt.purchase_date,
+        ))
+    offers = {}
+    for key, history in lines.items():
+        # Newest first; an undated line counts as older than any dated one
+        history.sort(key=lambda o: o.date or date.min, reverse=True)
+        offers[key] = history[0]
+        history[0].history = history
     return offers
 
 
@@ -97,6 +102,11 @@ def by_product(offers: dict[tuple[str, str], Offer]) -> dict[str, dict[str, Offe
     return grouped
 
 
+# A line more than twice the typical size isn't priced from (see scale);
+# flyer verdicts call sizes this far apart different products
+SIZE_RATIO = 2
+
+
 def typical_size(quantities: list[float]) -> float:
     """The size to price a product at: the most common one, so the list
     says "for 1 l" rather than "for 1083 ml"; with no size more common than
@@ -105,30 +115,39 @@ def typical_size(quantities: list[float]) -> float:
     return size if n > 1 else float(f"{median(quantities):.2g}")
 
 
-def scale(offers: list[Offer]) -> tuple[Callable[[Offer], float], str | None, Callable[[Offer], bool]]:
+def scale(offers: list[Offer]) -> tuple[Callable[[Offer], float], str | None, Callable[[Offer], Offer | None]]:
     """How to make one product's prices comparable.
 
     When most offers have a size in the same unit, prices are scaled to the
     product's typical size (so 0.5 l at one store and 1 l at another compare
     fairly), and offers without that kind of size can't be compared: a
-    6-pack of apples against apples by the kilo. Otherwise the price of one
-    item is used. Returns the pricing function, the size it prices, if any,
-    and which offers it can price."""
+    6-pack of apples against apples by the kilo. Nor is a price scaled down
+    from a pack much bigger than that: a 9-litre multipack says little about
+    a half-litre bottle, and would make its store look cheap. (Smaller is
+    fine: one weighed apple is a price by the kilo.) So at each chain the
+    newest line that fits is used, and a chain with none has no price.
+    Otherwise the price of one item is used. Returns the pricing function, the size it
+    prices, if any, and the line to price an offer by (None: none fits)."""
     sized = [o for o in offers if o.unit in ("g", "ml") and o.quantity and o.per_unit]
     if sized:
         unit, n = Counter(o.unit for o in sized).most_common(1)[0]
         if n * 2 > len(offers):
-            size = typical_size([o.quantity for o in sized if o.unit == unit])
+            # A flyer offer has only its own size
+            size = typical_size([h.quantity for o in sized for h in o.history or [o] if h.unit == unit and h.quantity])
+
+            def fits(o: Offer) -> bool:
+                return o.unit == unit and bool(o.quantity and o.per_unit) and o.quantity <= size * SIZE_RATIO
             # From the price paid, not the rounded per_unit, so a store selling
             # exactly this size shows exactly what it charged
-            return (lambda o: o.each / o.quantity * size), f"{size:g} {unit}", (lambda o: o in sized and o.unit == unit)
-    return (lambda o: o.each), None, (lambda o: True)
+            return ((lambda o: o.each / o.quantity * size), f"{size:g} {unit}",
+                    (lambda o: next((h for h in o.history or [o] if fits(h)), None)))
+    return (lambda o: o.each), None, (lambda o: o)
 
 
 def line_prices(chains: dict[str, Offer]) -> tuple[dict[str, float], str | None]:
     """What one product costs at each chain, made comparable (see scale)."""
-    price, size, fits = scale(list(chains.values()))
-    return {c: price(o) for c, o in chains.items() if fits(o)}, size
+    price, size, pick = scale(list(chains.values()))
+    return {c: price(line) for c, o in chains.items() if (line := pick(o))}, size
 
 
 def flyer_deals(rows) -> dict[tuple[str, str], Offer]:
@@ -184,9 +203,9 @@ def price_list(wanted: list[tuple[str, int]], offers: dict[tuple[str, str], Offe
     comparable = {}
     for name, _ in listed:
         regular, deal = grouped.get(name, {}), on_offer.get(name, {})
-        price_of, size, fits = scale([*regular.values(), *deal.values()])
-        comparable[name] = (price_of, size, {c: o for c, o in regular.items() if fits(o)},
-                            {c: o for c, o in deal.items() if fits(o)})
+        price_of, size, pick = scale([*regular.values(), *deal.values()])
+        comparable[name] = (price_of, size, {c: line for c, o in regular.items() if (line := pick(o))},
+                            {c: line for c, o in deal.items() if (line := pick(o))})
     chains = sorted({c for _, _, regular, deal in comparable.values() for c in [*regular, *deal]})
 
     items = []

@@ -480,6 +480,18 @@
                 });
                 if (!res.ok) throw new Error();
                 result = await res.json();
+                // A product renamed since the list was saved ("Grandiosa" is
+                // now "Pizza"): the list takes the new name
+                if (Object.keys(result.renamed || {}).length) {
+                    const merged = [];
+                    for (const i of ShoppingList.read()) {
+                        const name = result.renamed[i.name] || i.name;
+                        const same = merged.find(m => m.name.toLowerCase() === name.toLowerCase());
+                        if (same) same.count = Math.min(same.count + i.count, 99);
+                        else merged.push({ ...i, name });
+                    }
+                    ShoppingList.write(merged);
+                }
                 renderList();
                 renderResult();
                 showSticky();

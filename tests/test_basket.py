@@ -220,6 +220,34 @@ def test_the_typical_size_is_one_people_buy(quantities, size):
     assert basket.typical_size(quantities) == pytest.approx(size, rel=0.05)
 
 
+def test_the_typical_size_is_judged_from_every_purchase_not_the_latest():
+    # The real case: two chains' latest pizza was a 1 kg one, so every pizza
+    # was priced "for 1 kg", twice what anyone pays for theirs
+    rows = [row("Pizza", chain, price, unit="g", quantity=570, days=10)
+            for chain, price in [("Kiwi", 59.9), ("Kiwi", 62.9), ("Meny", 64.9), ("Meny", 65.9), ("Rema 1000", 57.9)]]
+    rows += [row("Pizza", "Kiwi", 149, unit="g", quantity=1000), row("Pizza", "Meny", 159, unit="g", quantity=1000)]
+    item = priced([("Pizza", 1)], rows)["items"][0]
+    assert item["size"] == "570 g"
+    assert item["prices"]["Rema 1000"]["price"] == 57.9
+
+
+def test_a_big_pack_is_not_scaled_down_to_a_small_one():
+    # Kiwi's latest Brus was a 9-litre multipack: 4,94 kr "for 500 ml".
+    # Kiwi is priced from its last bottle instead; Extra, with only a
+    # 24-pack, gets no price of its own
+    rows = [row("Brus", "Kiwi", 24.9, unit="ml", quantity=500, days=30),
+            row("Brus", "Kiwi", 89, unit="ml", quantity=9000),
+            row("Brus", "Meny", 29.9, unit="ml", quantity=500),
+            row("Brus", "Rema 1000", 27.9, unit="ml", quantity=500),
+            row("Brus", "Extra", 66.7, unit="ml", quantity=12000)]
+    result = priced([("Brus", 1)], rows)
+    item = result["items"][0]
+    assert item["size"] == "500 ml"
+    assert item["prices"]["Kiwi"]["price"] == 24.9 and not item["prices"]["Kiwi"]["estimated"]
+    assert "Extra" not in item["prices"]
+    assert item["cheapest"] == "Kiwi"
+
+
 def test_a_split_never_sends_you_to_a_store_on_a_guess():
     # Rema has no coffee price; its estimate is cheap because Rema is cheap
     # on meat. The split buys coffee where its price is known.
