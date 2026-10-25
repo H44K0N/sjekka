@@ -3,6 +3,9 @@
 #   pull request to main  ->  check, image (build + smoke test)
 #   push to main          ->  check, image (build + smoke test + push), deploy
 #
+# check and image run side by side; deploy waits for both, so nothing
+# reaches production, or the image's latest tag, before the tests pass.
+#
 # Deploying needs these repository secrets (set up by deploy/setup-vps.sh):
 #   VPS_HOST         hostname or IP of the VPS
 #   VPS_SSH_KEY      private key of the CI deploy key. On the server it is
@@ -56,14 +59,14 @@ jobs:
       - name: Test
         # Unit, integration, deploy-script and browser tests. E2E_REQUIRED
         # makes the browser tests fail instead of skipping if Playwright is
-        # missing.
+        # missing. Spread over the runner's cores: the browser tests are most
+        # of the time, and each worker starts its own server and browser.
         env:
           E2E_REQUIRED: "1"
-        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=95
+        run: pytest -n auto --cov=app --cov-report=term-missing --cov-fail-under=95
 
   image:
     name: Build and smoke test image
-    needs: check
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -101,16 +104,15 @@ jobs:
         run: docker logs sjekka || true
 
       - name: Push
+        # Only under its commit: it becomes latest once the tests pass (deploy)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:latest"
           docker push "$IMAGE:${{ github.sha }}"
-          docker push "$IMAGE:latest"
 
   deploy:
     name: Deploy to production
-    needs: image
+    needs: [check, image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
@@ -121,8 +123,13 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
-      packages: read
+      packages: write
     steps:
+      - name: Tag the image latest
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker buildx imagetools create -t "$IMAGE:latest" "$IMAGE:${{ github.sha }}"
+
       - name: Deploy
         run: |
           mkdir -p ~/.ssh
