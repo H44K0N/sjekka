@@ -5,13 +5,13 @@ from datetime import date
 from app import main, models
 
 
-def add_item(db, name, price, purchase_date, store="Kiwi"):
+def add_item(db, name, price, purchase_date, store="Kiwi", brand=None, variant=None):
     receipt = models.Receipt(image_filename="r.jpg", store_chain=store, purchase_date=purchase_date)
     db.add(receipt)
     db.flush()
     db.add(models.ReceiptItem(
         receipt_id=receipt.id, canonical_name=name, category="Meieri",
-        quantity=1000, unit="ml", pack_size=1, total_price=price,
+        quantity=1000, unit="ml", pack_size=1, total_price=price, price_per_unit=price / 10, brand=brand, variant=variant,
     ))
     db.commit()
 
@@ -298,3 +298,35 @@ def test_pages_load_nothing_from_google(client):
 def test_self_hosted_fonts_are_served(client):
     for name in ["Libron-Regular.woff2", "Libron-Bold.woff2"]:
         assert client.get(f"/fonts/{name}").status_code == 200, name
+
+
+def add_brus(db):
+    day = date(2026, 10, 20)
+    add_item(db, "Brus", 29.9, day, "Kiwi", "Coca-Cola", "Zero")
+    add_item(db, "Brus", 27.9, day, "Meny", "Coca-Cola", "Zero")
+    add_item(db, "Brus", 24.9, day, "Kiwi", "Coca-Cola", "Original")
+    add_item(db, "Brus", 19.9, day, "Meny", "Pepsi", "Max")
+
+
+def test_a_product_lists_its_items_and_one_item_can_be_asked_for(client, db):
+    add_brus(db)
+    product = client.get("/products/Brus").json()
+    assert product["item"] is None and len(product["prices"]) == 4
+    assert [(i["brand"], i["variant"], i["cheapest"]["chain"], i["chains"]) for i in product["items"]] == [
+        ("Coca-Cola", "Zero", "Meny", 2), ("Coca-Cola", "Original", "Kiwi", 1), ("Pepsi", "Max", "Meny", 1)]
+    zero = client.get("/products/Brus", params={"merke": "coca cola", "variant": "zero"}).json()
+    # Spelled as the receipts spell it, and only its own prices
+    assert zero["item"] == {"brand": "Coca-Cola", "variant": "Zero", "key": "Brus|Coca-Cola|Zero"}
+    assert sorted(p["store_chain"] for p in zero["prices"]) == ["Kiwi", "Meny"]
+    assert client.get("/products/Brus", params={"merke": "Coca-Cola", "variant": "Creamy Vanilla"}).status_code == 404
+
+
+def test_the_shopping_list_prices_an_item_or_the_cheapest_of_the_product(client, db):
+    add_brus(db)
+    data = client.post("/basket", json={"items": [{"name": "Brus"}, {"name": "Brus", "brand": "Coca-Cola", "variant": "Zero"},
+                                                 {"name": "Brus", "brand": "Coca-Cola", "variant": "Creamy Vanilla"}]}).json()
+    anything, zero = data["items"]
+    assert (anything["key"], anything["cheapest"], anything["prices"]["Meny"]["brand"]) == ("Brus", "Meny", "Pepsi")
+    assert (zero["key"], zero["name"], zero["brand"], zero["variant"]) == ("Brus|Coca-Cola|Zero", "Brus", "Coca-Cola", "Zero")
+    assert {c: p["price"] for c, p in zero["prices"].items()} == {"Kiwi": 29.9, "Meny": 27.9}
+    assert data["unknown"] == ["Brus|Coca-Cola|Creamy Vanilla"]

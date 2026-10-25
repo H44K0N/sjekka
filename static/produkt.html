@@ -34,17 +34,25 @@
 
     <main class="product">
         <section>
-            <p class="meta"><a href="/" class="back">← Alle produkter</a><span id="category"></span></p>
+            <p class="meta"><a href="/" class="back">← Alle produkter</a><span id="category"></span><span id="product-link"></span></p>
             <h1 id="name">…</h1>
             <p class="lede" id="summary"></p>
             <div class="best" id="best" hidden>
                 <span class="label">Billigst nå</span>
                 <span class="best-row"><span id="best-chain"></span><b id="best-price"></b><span id="best-unit"></span></span>
+                <span class="best-what" id="best-what" hidden></span>
             </div>
             <div class="product-actions" id="product-actions" hidden>
                 <button type="button" class="button" id="list-button">Legg på handlelisten</button>
                 <a class="text-link" id="list-link" href="/handleliste.html" hidden>Se hvor listen er billigst <span class="arrow">→</span></a>
             </div>
+        </section>
+
+        <section class="items-section" id="items-section" hidden>
+            <h2 class="label" id="items-title">Velg en bestemt</h2>
+            <p class="note" id="items-note"></p>
+            <ul class="item-list" id="items"></ul>
+            <button type="button" class="text-button" id="items-more" hidden></button>
         </section>
 
         <section class="offers-now" id="offers-now" hidden>
@@ -53,7 +61,7 @@
         </section>
 
         <section class="stores-section" id="stores-section" hidden>
-            <h2 class="label">Pris per butikk</h2>
+            <h2 class="label" id="stores-title">Pris per butikk</h2>
             <p class="label scale-note" id="scale-note"></p>
             <ol class="stores" id="stores"></ol>
             <div class="axis" id="axis" aria-hidden="true"><span></span><span></span></div>
@@ -79,8 +87,14 @@
     <script src="/chains.js"></script>
     <script src="/list.js"></script>
     <script>
-        const name = new URLSearchParams(location.search).get("navn");
+        const query = new URLSearchParams(location.search);
+        const name = query.get("navn");
+        // One item of the product ("Coca-Cola Zero") rather than all of it
+        const brand = query.get("merke"), variant = query.get("variant");
         const $ = id => document.getElementById(id);
+        // Brands and variants as receipts spell them loosely (as app/basket.py's plain)
+        const plain = s => (s || "").toLowerCase().replace(/[^0-9a-zæøå%]/g, "");
+        let several = false;  // the product holds more than one item: its cheapest is any of them
 
         const each = p => p.pack_size > 1 ? p.total_price / p.pack_size : p.total_price;
         // Loose produce (bananas by weight) is priced and compared per kilo:
@@ -98,30 +112,67 @@
         const day = p => p.purchase_date ? new Date(p.purchase_date).getTime() : null;
 
         // Any product can go on the list, also one only seen in this week's flyers
-        function listButton(productName) {
+        // `what`: the product's name, or an item ({ name, brand, variant })
+        function listButton(what) {
             $("product-actions").hidden = false;
+            // Any of several: say it's the cheapest that goes on the list, not this one
+            const add = typeof what === "string" && several ? `Legg billigste ${what.toLowerCase()} på handlelisten` : "Legg på handlelisten";
             const showListed = () => {
-                const on = ShoppingList.has(productName);
+                const on = ShoppingList.has(what);
                 // The label says the state, so it isn't also a pressed toggle
                 $("list-button").classList.toggle("on", on);
-                $("list-button").textContent = on ? "På handlelisten ✓" : "Legg på handlelisten";
+                $("list-button").textContent = on ? "På handlelisten ✓" : add;
                 $("list-button").title = on ? "Trykk for å ta den av listen" : "";
                 $("list-link").hidden = !on;
             };
             $("list-button").addEventListener("click", () => {
-                if (ShoppingList.has(productName)) ShoppingList.remove(productName);
-                else ShoppingList.add(productName);
+                if (ShoppingList.has(what)) ShoppingList.remove(what);
+                else ShoppingList.add(what);
                 showListed();
             });
             showListed();
         }
 
-        function render(product) {
-            document.title = `Sjekka – ${product.canonical_name}`;
-            $("name").textContent = product.canonical_name;
-            if (product.category) $("category").textContent = ` · ${product.category}`;
+        // The product's items, each a link to its own page, for whoever wants one in particular
+        function renderItems(product) {
+            const items = product.items;
+            $("items-section").hidden = false;
+            $("items-note").textContent = `${product.canonical_name} er ${items.length} forskjellige varer. Prisene under er for den billigste av dem; velg en for å sammenligne bare den.`;
+            const SHOWN = 6;
+            const row = item => {
+                const li = el("li", "item-row");
+                const one = { name: product.canonical_name, brand: item.brand, variant: item.variant };
+                const link = el("a", "", ShoppingList.label(one));
+                link.href = productLink(one);
+                const where = el("span", "item-where");
+                where.append(`fra ${kr.format(item.cheapest.price)} kr${item.size ? ` for ${item.size}` : ""} hos `, chainBadge(item.cheapest.chain));
+                li.append(link, where, el("span", "item-count", `${item.prices} ${item.prices === 1 ? "pris" : "priser"} · ${item.chains} ${item.chains === 1 ? "butikk" : "butikker"}`));
+                return li;
+            };
+            $("items").replaceChildren(...items.slice(0, SHOWN).map(row));
+            $("items-more").hidden = items.length <= SHOWN;
+            $("items-more").textContent = `Vis alle ${items.length}`;
+            $("items-more").onclick = () => { $("items").replaceChildren(...items.map(row)); $("items-more").hidden = true; };
+        }
 
-            listButton(product.canonical_name);
+        function render(product) {
+            const item = product.item;
+            const title = item ? ShoppingList.label({ name: product.canonical_name, ...item }) : product.canonical_name;
+            document.title = `Sjekka – ${title}`;
+            $("name").textContent = title;
+            if (product.category) $("category").textContent = ` · ${product.category}`;
+            several = !item && product.items.length > 1;
+            if (item) {
+                // Back to all of the product, which this is one of
+                const all = el("a", "", product.canonical_name);
+                all.href = productLink(product.canonical_name);
+                $("product-link").replaceChildren(" · ", all);
+            } else if (several) {
+                renderItems(product);
+                $("stores-title").textContent = `Billigste ${product.canonical_name.toLowerCase()} per butikk`;
+            }
+
+            listButton(item ? { name: product.canonical_name, brand: item.brand, variant: item.variant } : product.canonical_name);
 
             const prices = product.prices.filter(p => p.total_price != null);
             receipts = prices;
@@ -164,6 +215,9 @@
                 // Not "24,90 kr / stk" under 24,90 kr
                 : cheapest.price_per_unit != null && Math.abs(comparable(cheapest) - each(cheapest)) > 0.005 ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : "";
             $("best-unit").textContent = [unit, cheapest.purchase_date && daysAgo(cheapest.purchase_date)].filter(Boolean).join(" · ");
+            // Any of several: which one is the cheapest
+            $("best-what").hidden = !several;
+            if (several) $("best-what").textContent = describe(cheapest);
 
             // Shared axes for every store's timeline, so the rows compare directly
             const days = prices.map(day).filter(Boolean);
@@ -266,9 +320,10 @@
         async function load() {
             if (!name) { $("notice").textContent = "Ingen produkt valgt."; return; }
             try {
-                const res = await fetch(`/products/${encodeURIComponent(name)}`);
+                const one = brand ? `?${new URLSearchParams(variant ? { merke: brand, variant } : { merke: brand })}` : "";
+                const res = await fetch(`/products/${encodeURIComponent(name)}${one}`);
                 if (res.status === 404) {
-                    $("name").textContent = name;
+                    $("name").textContent = brand ? ShoppingList.label({ name, brand, variant }) : name;
                     $("notice").textContent = "Ingen kvitteringer har denne varen ennå.";
                     listButton(name);
                     return;
@@ -282,7 +337,9 @@
         // This week's flyer offers for the product, if any. Waits for the
         // prices, so a cheaper offer can take over "Billigst nå".
         const offersLoaded = fetch(`/offers?navn=${encodeURIComponent(name)}`).then(r => r.ok ? r.json() : []).catch(() => []);
-        load().then(() => offersLoaded).then(mine => {
+        load().then(() => offersLoaded).then(all => {
+            // One item: its brand's offers, of its variant or of every variant ("4 varianter")
+            const mine = brand ? all.filter(o => plain(o.brand) === plain(brand) && (!o.variant || plain(o.variant) === plain(variant))) : all;
             if (!mine.length) return;
             // Only flyer prices so far: say where the prices above come from
             if (!cheapest && name) $("notice").textContent = "Ingen kvitteringer ennå. Prisene over er fra kundeavisene.";
@@ -306,12 +363,17 @@
             const best = mine[0].verdict.per === "stk" ? null : mine.reduce((a, b) => a.per_unit <= b.per_unit ? a : b);
             const offerPer = best && (weighed && best.unit === "g" ? "kr / kg" : `kr / ${best.verdict.per}`);
             const offerValue = best && (offerPer === "kr / kg" ? best.per_unit * 10 : best.per_unit);
-            if (best && cheapest && unitLabel(cheapest) === offerPer && offerValue < comparable(cheapest)) {
+            // A multipack far bigger than what's usually bought isn't the cheapest bottle (as app/basket.py's SIZE_RATIO)
+            const sized = best && (weighed || !cheapest?.quantity || !best.quantity || best.quantity <= cheapest.quantity * 2);
+            if (best && cheapest && sized && unitLabel(cheapest) === offerPer && offerValue < comparable(cheapest)) {
                 $("best").querySelector(".label").textContent = "Billigst nå, på tilbud";
                 $("best-chain").replaceChildren(chainBadge(best.chain));
                 $("best-price").textContent = offerPrice(best);
                 $("best-unit").textContent = [`${kr.format(offerValue)} ${offerPer}`,
                     best.pack_size > 1 ? `bare når du kjøper ${best.pack_size}` : "", until(best.valid_to)].filter(Boolean).join(" · ");
+                // The offer's own item, not the receipt line it beat
+                $("best-what").hidden = !several;
+                $("best-what").textContent = [best.brand, best.variant, packSize(best)].filter(Boolean).join(" · ");
                 $("best").hidden = false;
             }
         });

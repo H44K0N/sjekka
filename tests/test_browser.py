@@ -1106,7 +1106,41 @@ def test_a_name_without_prices_suggests_ones_that_have_them(page):
     # Swapped, with its count, and now priced
     assert list_names(page) == ["Lettmelk"]
     expect(page.locator(".list-item", has_text="Lettmelk").locator(".qty")).to_contain_text("2")
-    expect(page.locator(".list-item", has_text="Lettmelk").locator(".hint")).to_contain_text("billigst hos")
+    expect(page.locator(".list-item", has_text="Lettmelk").locator(".hint")).to_contain_text("billigst: Q hos")
+
+
+def test_a_product_of_several_items_lets_you_pick_one(page):
+    page.goto("/produkt.html?navn=Lettmelk")
+    # Lettmelk is Tine's and Q's: the page says its prices are the cheapest of them
+    expect(page.locator("#items .item-row a")).to_have_text(["Tine lettmelk", "Q lettmelk"])
+    expect(page.locator("#best-what")).to_have_text("Q · 1 l")
+    expect(page.locator("#stores-title")).to_have_text("Billigste lettmelk per butikk")
+    expect(page.locator("#list-button")).to_have_text("Legg billigste lettmelk på handlelisten")
+    page.locator("#items a", has_text="Tine lettmelk").click()
+    # Tine's own page: only Tine's prices, and that is what goes on the list
+    expect(page.locator("h1")).to_have_text("Tine lettmelk")
+    expect(page.locator("#product-link a")).to_have_text("Lettmelk")
+    expect(page.locator("#items-section")).to_be_hidden()
+    expect(page.locator(".store")).to_have_count(1)
+    page.locator("#list-button").click()
+    assert page.evaluate("JSON.parse(localStorage.getItem('sjekka.handleliste'))") == [
+        {"name": "Lettmelk", "count": 1, "brand": "Tine", "variant": None}]
+
+
+def test_the_list_prices_an_item_apart_from_the_cheapest_of_its_product(page):
+    page.goto("/handleliste.html?v=Lettmelk&v=Lettmelk|Tine~2")
+    anything, tine = page.locator(".list-item").nth(0), page.locator(".list-item").nth(1)
+    expect(anything.locator(".what a")).to_have_text("Lettmelk")
+    expect(anything.locator(".hint")).to_contain_text("billigst: Q hos")
+    expect(tine.locator(".what a")).to_have_text("Tine lettmelk")
+    expect(tine.locator(".what a")).to_have_attribute("href", "/produkt.html?navn=Lettmelk&merke=Tine")
+    expect(tine.locator(".hint")).to_contain_text("billigst hos")
+    expect(tine.locator(".hint")).to_contain_text("24,90 kr")  # its latest at Kiwi
+    expect(tine.locator(".qty")).to_contain_text("2")
+    tine.get_by_role("button", name="Flere Tine lettmelk").click()
+    expect(tine.locator(".qty")).to_contain_text("3")
+    # Shared on as it is
+    assert page.evaluate("listLink()").endswith("?v=Lettmelk&v=Lettmelk%7CTine%7E3")
 
 
 def test_offers_ask_for_receipts_while_most_cannot_be_checked(page):

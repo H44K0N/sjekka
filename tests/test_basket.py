@@ -9,12 +9,12 @@ from app import basket, models, worker
 TODAY = date(2026, 10, 24)
 
 
-def row(name, chain, price, *, unit=None, quantity=None, pack=1, days=0, brand=None, raw=None):
+def row(name, chain, price, *, unit=None, quantity=None, pack=1, days=0, brand=None, raw=None, variant=None):
     """A (ReceiptItem, Receipt) pair as the query returns them."""
     each = price / pack if price is not None else None
     per_unit = worker.price_per(each, quantity, unit) if each else None
     item = SimpleNamespace(canonical_name=name, total_price=price, pack_size=pack, unit=unit,
-                           quantity=quantity, price_per_unit=per_unit, brand=brand, raw_name=raw)
+                           quantity=quantity, price_per_unit=per_unit, brand=brand, raw_name=raw, variant=variant)
     receipt = SimpleNamespace(store_chain=chain, purchase_date=TODAY - timedelta(days=days))
     return item, receipt
 
@@ -65,7 +65,8 @@ def test_missing_prices_are_estimated_from_how_expensive_the_chain_is():
     rows += [row(p, "Meny", price * 1.2) for p, price in [("A", 10), ("B", 20), ("C", 30)]]
     result = priced([("A", 1), ("Egg", 1)], rows)
     egg = result["items"][1]["prices"]
-    assert egg["Kiwi"] == {"price": 40, "estimated": False, "date": str(TODAY), "brand": None, "offer_until": None, "deal": None}
+    assert egg["Kiwi"] == {"price": 40, "estimated": False, "date": str(TODAY), "brand": None, "variant": None,
+                           "offer_until": None, "deal": None}
     assert egg["Meny"]["estimated"] is True
     # Dearer than the known price, but pulled towards average by the prior
     assert 40 < egg["Meny"]["price"] < 40 * 1.2
@@ -300,3 +301,50 @@ def test_a_split_never_sends_you_to_a_store_on_a_guess():
     assert plan.get("Kaffe", "Kiwi") == "Kiwi"
     assert basket.pick({"A": {"x": (10, True)}, "B": {"x": (20, False)}}, "x", "A", "B") == "B"
     assert basket.pick({"A": {"x": (10, False)}, "B": {"x": (20, False)}}, "x", "A", "B") == "A"
+
+
+# One item, not any of the product
+
+def brus():
+    zero = dict(unit="ml", quantity=500, brand="Coca-Cola", variant="Zero")
+    return [row("Brus", "Kiwi", 29.9, **zero), row("Brus", "Rema 1000", 27.9, **{**zero, "brand": "Coca Cola"}),
+            row("Brus", "Kiwi", 24.9, unit="ml", quantity=500, brand="Coca-Cola", variant="Original", days=1),
+            row("Brus", "Rema 1000", 20.0, unit="ml", quantity=500, brand="Pepsi", variant="Max", days=1)]
+
+
+def test_an_item_is_priced_from_its_own_lines_only():
+    offers = basket.latest_offers(brus())
+    zero = basket.Item("Brus", "Coca-Cola", "Zero")
+    result = basket.price_list([("Brus", 1), (zero.key, 1)], offers, {}, [zero])
+    anything, exact = result["items"]
+    # The cheapest of the product is whichever drink is cheapest; the item is that drink
+    assert (anything["cheapest"], anything["prices"]["Rema 1000"]["brand"]) == ("Rema 1000", "Pepsi")
+    assert {c: p["price"] for c, p in exact["prices"].items()} == {"Kiwi": 29.9, "Rema 1000": 27.9}
+    assert exact["prices"]["Rema 1000"]["variant"] == "Zero"
+
+
+def test_an_item_never_seen_is_unknown():
+    vanilla = basket.Item("Brus", "Coca-Cola", "Creamy Vanilla")
+    assert basket.price_list([(vanilla.key, 1)], basket.latest_offers(brus()), {}, [vanilla])["unknown"] == [vanilla.key]
+
+
+def test_a_flyer_offer_for_a_brand_covers_its_variants():
+    week = SimpleNamespace(chain="Kiwi", valid_from=TODAY, valid_to=TODAY + timedelta(days=3))
+    flyer = [(SimpleNamespace(canonical_name="Brus", total_price=price, pack_size=1, unit="ml", quantity=500,
+                              price_per_unit=price / 5, brand=brand, variant=None, deal=None, raw_name=None), week)
+             for price, brand in [(10.0, "Pepsi"), (15.0, "Coca-Cola")]]
+    deals = basket.flyer_deals(flyer)
+    zero = basket.Item("Brus", "Coca-Cola", "Zero")
+    # The cheapest offer is Pepsi; Coca-Cola's is kept behind it for whoever wants that
+    line = basket.price_list([(zero.key, 1)], basket.latest_offers(brus()), deals, [zero])["items"][0]
+    assert line["prices"]["Kiwi"]["price"] == 15.0 and line["prices"]["Kiwi"]["offer_until"]
+
+
+def test_a_products_items_are_spelled_as_most_often_written():
+    items = basket.items_of(basket.latest_offers(brus()))
+    assert sorted((i.brand, i.variant) for i in items) == [("Coca-Cola", "Original"), ("Coca-Cola", "Zero"), ("Pepsi", "Max")]
+    assert basket.plain("Coca Cola") == basket.plain("coca-cola")
+    # Split loosely between brand and variant, it's still one item
+    assert basket.ident("Pepsi Max", "Max") == basket.ident("Pepsi Max", None) == basket.ident("Pepsi", "Max")
+    assert basket.ident("Solo Super", "Super") == basket.ident("Solo", "Super")
+    assert basket.ident("Coca-Cola", "Zero") != basket.ident("Coca-Cola", "Original")
