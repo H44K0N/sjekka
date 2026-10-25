@@ -46,6 +46,14 @@
             </div>
         </div>
 
+        <!-- On phones the result is below the list. This bar holds the answer in view
+             while you add items, and moves with you down the page -->
+        <a class="result-bar" id="bar" href="#verdict" hidden>
+            <span id="bar-chain"></span>
+            <span class="bar-text"><b id="bar-total"></b><small id="bar-note"></small></span>
+            <span class="arrow" aria-hidden="true">↓</span>
+        </a>
+
         <section class="planner">
             <div class="list-col">
                 <h2 class="label">Listen</h2>
@@ -88,9 +96,6 @@
                 </div>
 
                 <p class="unknown" id="unknown" hidden></p>
-                <a class="sticky-total" id="sticky" href="#verdict" hidden aria-hidden="true" tabindex="-1">
-                    <span class="label">Billigst</span><span id="sticky-chain"></span><b id="sticky-total"></b><span class="arrow">↓</span>
-                </a>
                 <details class="fold method" id="method" hidden>
                     <summary>Slik regner vi</summary>
                     <p class="note">Vi bruker den siste prisen hver butikk har på kvitteringene, og tilbud fra kundeavisene mens de gjelder. Mangler en butikk pris på en vare, anslår vi den ut fra varens vanlige pris og hvor dyr butikken er på varer vi kan sammenligne. Trykk på en butikk for å se hver vare. Jo flere kvitteringer, jo færre anslag: <a href="/upload.html">last opp din</a>.</p>
@@ -386,20 +391,32 @@
             $("unknown").hidden = !unknown.length;
             $("unknown").textContent = unknown.length
                 ? `${unknown.length === 1 ? "Denne" : "Disse"} har ingen registrert pris ennå og er ikke med i summen: ${unknown.join(", ")}.` : "";
+            $("bar").hidden = $("verdict").hidden;
             if (!show || !stores.length) return;
 
-            const best = stores[0], worst = stores[stores.length - 1];
-            $("sticky-chain").replaceChildren(chainBadge(best.chain));
-            $("sticky-total").textContent = total(best);
+            const best = stores[0], second = stores[1], worst = stores[stores.length - 1];
+            // The bar: who's cheapest, the total, and by how much over the next best
+            $("bar-chain").replaceChildren(chainBadge(best.chain));
+            $("bar-total").textContent = total(best);
+            const barNote = [stores.length === 1 ? "eneste med priser"
+                : tooClose(best, second) ? `omtrent likt med ${second.chain}` : `${gap(best, second)} under ${second.chain}`];
+            if (best.estimated) barNote.push(`${best.estimated} ${best.estimated === 1 ? "pris" : "priser"} anslått`);
+            $("bar-note").textContent = barNote.join(" · ");
             $("verdict").querySelector(".label").textContent = rough(best) || (stores.length > 1 && tooClose(best, stores[1]))
                 ? "Trolig billigst for hele listen" : "Billigst for hele listen";
             $("verdict-chain").replaceChildren(chainBadge(best.chain));
             $("verdict-total").textContent = total(best);
             const notes = [];
-            if (stores.length > 1 && tooClose(best, stores[1])) {
-                notes.push(`Omtrent likt med ${stores[1].chain}. Flere kvitteringer gir et sikrere svar.`);
-            } else if (stores.length > 1 && worst.total - best.total >= 0.5) {
-                notes.push(`${rough(best) || rough(worst) ? "Rundt " : ""}${gap(best, worst)} billigere enn ${worst.chain}, som er dyrest.`);
+            // Against the next best store, which is the choice that matters, and
+            // against the most expensive, which says how much the choice is worth
+            if (stores.length > 1 && tooClose(best, second)) {
+                notes.push(`Omtrent likt med ${second.chain}. Flere kvitteringer gir et sikrere svar.`);
+            } else if (stores.length > 1 && second.total - best.total >= 0.5) {
+                const about = a => rough(best) || rough(a) ? "Rundt " : "";
+                notes.push(`${about(second)}${gap(best, second)} billigere enn ${second.chain}${stores.length > 2 ? ", som er nest billigst" : ""}.`);
+                if (stores.length > 2 && worst.total - best.total >= 0.5) {
+                    notes.push(`Mot ${worst.chain}, som er dyrest, sparer du ${rough(best) || rough(worst) ? "rundt " : ""}${gap(best, worst)}.`);
+                }
             } else if (stores.length === 1) {
                 notes.push("Bare denne butikken har priser på varene dine ennå.");
             }
@@ -486,20 +503,6 @@
             }));
         }
 
-        // On phones the result is below the list: while it's out of sight, a
-        // bar at the bottom shows the cheapest store and jumps to it
-        let verdictVisible = true;
-        new IntersectionObserver(([entry]) => { verdictVisible = entry.isIntersecting; showSticky(); })
-            .observe($("verdict"));
-        function showSticky() {
-            // Kept out of the way while typing, when the keyboard leaves little room
-            $("sticky").hidden = verdictVisible || $("verdict").hidden || !matchMedia("(max-width: 860px)").matches ||
-                $("verdict").getBoundingClientRect().top < 0 || document.activeElement === $("add");
-            document.body.classList.toggle("has-sticky", !$("sticky").hidden);
-        }
-        addEventListener("resize", showSticky);
-        $("add").addEventListener("focus", showSticky);
-        $("add").addEventListener("blur", showSticky);
 
         // ---- keeping it all in step ----
 
@@ -509,7 +512,7 @@
             // Once there's a list, it matters more than the explanation
             $("intro").classList.toggle("compact", items.length > 0 && !keepIntro);
             keepIntro = false;
-            if (!items.length) { result = null; renderResult(); showSticky(); return; }
+            if (!items.length) { result = null; renderResult(); return; }
             request?.abort();
             request = new AbortController();
             $("result").setAttribute("aria-busy", "true");
@@ -536,7 +539,6 @@
                 }
                 renderList();
                 renderResult();
-                showSticky();
             } catch (e) {
                 if (e.name === "AbortError") return;
                 result = null;

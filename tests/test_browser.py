@@ -220,10 +220,34 @@ def test_search_matches_name_and_brand(page):
     expect(page.locator("#offer-hits")).to_be_hidden()
 
 
+def open_categories(page):
+    page.locator("#category-toggle").click()
+    expect(page.locator("#categories")).to_be_visible()
+
+
+def test_the_categories_are_folded_away_until_asked_for(page):
+    page.goto("/")
+    expect(cards(page).first).to_be_visible()
+    # A row of them takes a lot of a phone's screen, so only the toggle shows
+    expect(page.locator("#category-toggle")).to_have_text(re.compile(r"Kategori:\s+alle"))
+    expect(page.locator("#category-toggle")).to_have_attribute("aria-expanded", "false")
+    expect(page.locator("#categories")).to_be_hidden()
+    open_categories(page)
+    expect(page.locator("#category-toggle")).to_have_attribute("aria-expanded", "true")
+    page.keyboard.press("Escape")
+    expect(page.locator("#categories")).to_be_hidden()
+    expect(page.locator("#category-toggle")).to_be_focused()
+
+
 def test_category_filter(page):
     page.goto("/")
+    open_categories(page)
     page.get_by_role("button", name="Meieri", exact=True).click()
     expect(cards(page)).to_have_count(1)
+    # Picking one folds the list away and the toggle says which
+    expect(page.locator("#categories")).to_be_hidden()
+    expect(page.locator("#category-toggle")).to_have_text(re.compile(r"Kategori:\s+Meieri"))
+    open_categories(page)
     expect(page.get_by_role("button", name="Meieri", exact=True)).to_have_attribute("aria-pressed", "true")
     page.get_by_role("button", name="Alle", exact=True).click()
     expect(cards(page)).to_have_count(5)
@@ -415,6 +439,7 @@ def test_sorting_by_price_and_newest(page):
 
 def test_view_is_kept_in_the_url(page):
     page.goto("/")
+    open_categories(page)
     page.get_by_role("button", name="Meieri", exact=True).click()
     sort_by(page, "Lavest pris")
     page.fill("#search", "melk")
@@ -422,6 +447,8 @@ def test_view_is_kept_in_the_url(page):
 
     page.goto("/?kategori=Kj%C3%B8tt&sorter=nyest")
     expect(cards(page)).to_have_count(1)
+    expect(page.locator("#category-toggle")).to_have_text(re.compile(r"Kategori:\s+Kjøtt"))
+    open_categories(page)
     expect(page.get_by_role("button", name="Kjøtt", exact=True)).to_have_attribute("aria-pressed", "true")
     expect(page.locator("#sort-current")).to_have_text("nyest")
 
@@ -432,6 +459,7 @@ def test_unknown_category_in_url_falls_back_to_all(page):
     total = cards(page).count()
     page.goto("/?kategori=Finnes%20ikke")
     expect(cards(page)).to_have_count(total)
+    open_categories(page)
     expect(page.get_by_role("button", name="Alle", exact=True)).to_have_attribute("aria-pressed", "true")
 
 
@@ -640,16 +668,42 @@ def test_shared_list_link(page, browser, site):
     assert list_names(page) == ["Agurk"]
 
 
-def test_phone_shows_the_total_while_the_result_is_out_of_sight(browser, site):
+def test_phone_keeps_the_answer_in_view_while_the_page_scrolls(browser, site):
     context = browser.new_context(base_url=site[0], viewport={"width": 390, "height": 700})
     page = context.new_page()
     page.goto("/handleliste.html?v=Lettmelk&v=Kj%C3%B8ttdeig&v=Agurk&v=Seigmenn")
-    sticky = page.locator("#sticky")
-    expect(sticky).to_be_visible()
-    expect(sticky).to_contain_text("kr")
-    page.locator("#verdict").scroll_into_view_if_needed()
-    expect(sticky).to_be_hidden()
+    bar = page.locator("#bar")
+    expect(bar).to_be_visible()
+    expect(bar).to_contain_text("kr")
+    # Under the heading to begin with, and at the top of the screen once you scroll
+    start = bar.bounding_box()["y"]
+    assert start > 100
+    page.mouse.wheel(0, 900)
+    page.wait_for_timeout(300)
+    assert bar.bounding_box()["y"] == 0
+    # It says who is cheapest and by how much over the next best
+    expect(page.locator("#bar-note")).to_contain_text(re.compile(r"kr under |omtrent likt med "))
+    # A tap brings the full answer into view, not hidden under the bar
+    bar.click()
+    page.wait_for_timeout(600)
+    assert page.locator("#verdict").bounding_box()["y"] >= bar.bounding_box()["height"]
     context.close()
+
+
+def test_the_bar_updates_as_items_are_added(browser, site):
+    context = browser.new_context(base_url=site[0], viewport={"width": 390, "height": 700})
+    page = context.new_page()
+    page.goto("/handleliste.html?v=Lettmelk")
+    before = page.locator("#bar-total").inner_text()
+    page.locator("#pick-list button").first.click()
+    expect(page.locator("#bar-total")).not_to_have_text(before)
+    context.close()
+
+
+def test_the_bar_is_not_shown_on_a_wide_screen(page):
+    page.goto("/handleliste.html?v=Lettmelk&v=Kj%C3%B8ttdeig&v=Agurk&v=Seigmenn")
+    expect(page.locator("#verdict")).to_be_visible()
+    expect(page.locator("#bar")).to_be_hidden()
 
 
 # Flyer offers
@@ -920,8 +974,25 @@ def test_a_clear_gap_on_estimates_is_rounded(page):
         route.fulfill(json=result)
     page.route("**/basket", apart)
     page.goto("/handleliste.html?v=Lettmelk&v=Kj%C3%B8ttdeig")
-    expect(page.locator("#verdict-note")).to_have_text("Rundt 41 kr billigere enn Kiwi, som er dyrest.")
+    expect(page.locator("#verdict-note")).to_have_text("Rundt 41 kr billigere enn Kiwi.")
     expect(page.locator(".rank").nth(1).locator(".amount")).to_have_text("190,70 kr+41 kr")
+
+
+def test_the_verdict_compares_with_the_next_best_store_and_the_dearest(page):
+    def three(route):
+        result = route.fetch().json()
+        rema, kiwi = result["stores"]
+        rema.update(total=100.0, known=5, estimated=0, estimated_prices=0)
+        kiwi.update(total=111.8, known=5, estimated=0)
+        joker = {**kiwi, "chain": "Joker", "total": 160.8}
+        result["stores"] = [rema, kiwi, joker]
+        for line in result["items"]:
+            line["prices"]["Joker"] = line["prices"][kiwi["chain"]]
+        route.fulfill(json=result)
+    page.route("**/basket", three)
+    page.goto("/handleliste.html?v=Lettmelk&v=Kj%C3%B8ttdeig")
+    expect(page.locator("#verdict-note")).to_have_text(
+        "11,80 kr billigere enn Kiwi, som er nest billigst. Mot Joker, som er dyrest, sparer du 60,80 kr.")
 
 
 def test_about_page_shows_the_films_without_loading_them(page):
@@ -1109,9 +1180,9 @@ def test_the_total_bar_goes_when_the_list_is_cleared(browser, site):
     context = browser.new_context(base_url=site[0], viewport={"width": 390, "height": 700})
     page = context.new_page()
     page.goto("/handleliste.html?v=Lettmelk&v=Kj%C3%B8ttdeig&v=Agurk&v=Seigmenn")
-    expect(page.locator("#sticky")).to_be_visible()
+    expect(page.locator("#bar")).to_be_visible()
     page.get_by_role("button", name="Tøm listen").click()
-    expect(page.locator("#sticky")).to_be_hidden()
+    expect(page.locator("#bar")).to_be_hidden()
     context.close()
 
 

@@ -121,7 +121,7 @@ Add a line here for each AI-assisted change.
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
 | 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
-| 24–25 Oct 2026 | #55–#78: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
+| 24–25 Oct 2026 | #55–#79: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -198,3 +198,4 @@ Add a line here for each AI-assisted change.
 | #76 | The privacy page and the upload page say that Sjekka uses Gemini's free tier, where Google may train on uploads | Haakon: update the privacy policy to reflect that we use Gemini's cheaper tier, which lets Google train on them. The page had said the opposite |
 | #77 | Every file a page points at (films, captions, posters, fonts, logos, scripts, styles) is linked by a hash of its contents and kept for a year; a stylesheet's hash covers its fonts | Haakon, after Cloudflare kept an old film under the same name: "change the video names so the cache updates instantly. We should probably handle this automatically for all media. And other cached items" |
 | #78 | Shopping list, first part of the rework: tapping a suggestion in the search dropdown adds it and stays on the page (on phones it opened the product page), the field stays focused for the next one, and a Foreslått panel of tap-to-add chips (offers first, then what most stores sell) sits under the list, as one swipeable row on phones | Haakon: "the shopping list doesn't work as a user might think ... clicking items in the suggested drop list brings you to the product page, which makes it tedious to go back a page to add more items"; priorities chosen: add many items without leaving, and a clearer result |
+| #79 | The shopping list's answer is kept in view on phones: a bar under the heading shows the cheapest store, the total, and the saving over the next best store, and stays at the top as you scroll; the verdict compares with the next best store first and the most expensive second; the front page's categories fold behind a "Kategori" pill | Haakon: "Yeah build that" (Claude's recommendation after he picked "clearer result"), and mid-way: "the categories on the main page take too much space, especially on mobile. Make it collapsed by default" |
