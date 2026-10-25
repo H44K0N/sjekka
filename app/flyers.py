@@ -5,6 +5,7 @@ Flyers are imported by hand with util/import_flyer.py: a PDF or page images
 go to Gemini, and the offers are stored with the dates they apply. Receipts
 stay the source of truth for what things normally cost; offers are kept
 apart and only count while they're valid."""
+import re
 import time
 from collections import Counter
 from dataclasses import dataclass
@@ -26,6 +27,12 @@ RETRY_SECONDS = 20
 # real offer, and how much for "a little cheaper"
 REAL_DISCOUNT = 0.15
 SMALL_DISCOUNT = 0.03
+# A receipt says what a product costs now only if it's recent; prices move,
+# and an offer judged against last year's price says nothing
+RECENT_DAYS = 180
+# Sizes this far apart are different products to compare (a 6-pack against
+# one bar, a 225 g bag against a 65 g one), even under the same name
+SIZE_RATIO = 2
 
 
 class FlyerError(Exception):
@@ -120,25 +127,47 @@ def comparable(total_price, pack_size, unit, quantity) -> Price | None:
     return Price(each, "stk")
 
 
+def brands(text: str | None) -> set[str]:
+    """A brand as comparable words: "Coca-Cola / Farris" -> {"cocacola", "farris"}."""
+    return {re.sub(r"\W", "", b.lower()) for b in re.split(r"/|,|\bog\b", text or "")} - {""}
+
+
+def like_for_like(offer: models.FlyerOffer, item: models.ReceiptItem) -> bool:
+    """Whether a receipt line is the same product as the offer, closely
+    enough to compare prices: canonical names are generic ("Kyllingfilet"),
+    so a different brand or a much bigger or smaller pack is a different
+    product. What isn't known on either side isn't held against it."""
+    if brands(offer.brand) and brands(item.brand) and not brands(offer.brand) & brands(item.brand):
+        return False
+    # quantity is one item's size on both: "3 for 100" is three of the same item
+    size, other = offer.quantity, item.quantity
+    if offer.unit == item.unit and size and other and max(size, other) / min(size, other) > SIZE_RATIO:
+        return False
+    return True
+
+
 def judge(offer: models.FlyerOffer, flyer: models.Flyer, receipts) -> dict:
     """Is this offer cheaper than usual? `receipts` are (ReceiptItem, Receipt)
     pairs for the same product. "Usual" is the chain's latest receipt price
     from before the offer started (a receipt from the offer week would just
-    show the offer price), compared per 100 g/ml or per item."""
+    show the offer price), compared per 100 g/ml or per item. Only recent
+    receipts for the same product (see like_for_like) count."""
     price = comparable(offer.total_price, offer.pack_size, offer.unit, offer.quantity)
     usual, usual_date, elsewhere = None, None, {}
     for item, receipt in receipts:
         p = comparable(item.total_price, item.pack_size, item.unit, item.quantity)
-        if not p or p.per != price.per:
+        when = receipt.purchase_date
+        if not p or p.per != price.per or not when or (flyer.valid_from - when).days > RECENT_DAYS:
+            continue
+        if not like_for_like(offer, item):
             continue
         chain = chain_name(receipt.store_chain)
-        when = receipt.purchase_date
         if chain == flyer.chain:
-            if when and when < flyer.valid_from and (usual_date is None or when > usual_date):
+            if when < flyer.valid_from and (usual_date is None or when > usual_date):
                 usual, usual_date = p.value, when
         elif chain:
             # The latest price at each other chain
-            if chain not in elsewhere or (when and elsewhere[chain][1] and when > elsewhere[chain][1]):
+            if chain not in elsewhere or when > elsewhere[chain][1]:
                 elsewhere[chain] = (p.value, when)
 
     verdict = {"kind": "unknown", "usual": round(usual, 2) if usual else None, "discount": None, "cheaper_chain": None, "cheaper_price": None, "per": price.per}

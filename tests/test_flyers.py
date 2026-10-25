@@ -379,3 +379,55 @@ def test_cli_reports_failures_and_carries_on(clean, db, tmp_path, capsys):
     err = capsys.readouterr().err
     assert "bad.pdf: Gemini returned an invalid answer" in err and "missing.pdf: no such file" in err
     assert db.query(models.Flyer).count() == 1
+
+
+# Like for like: a canonical name ("Kyllingfilet") covers many products
+
+def add_branded_price(db, name, chain, price, days_ago, brand=None, unit=None, quantity=None):
+    add_receipt_price(db, name, chain, price, days_ago, unit=unit, quantity=quantity)
+    item = db.query(models.ReceiptItem).order_by(models.ReceiptItem.id.desc()).first()
+    item.brand = brand
+    db.commit()
+
+
+def test_an_old_receipt_says_nothing_about_the_usual_price(clean, db):
+    # The real case: a 1.5 kg First Price offer judged "real" against a 20-month-old receipt
+    add_receipt_price(db, "Kyllingfilet", "Kiwi", 299, days_ago=flyers.RECENT_DAYS + 30, unit="g", quantity=2000)
+    v = judged(db, "Kyllingfilet", "Kiwi", 187, unit="g", quantity=1500)
+    assert v["kind"] == "unknown" and v["usual"] is None
+
+
+def test_an_old_receipt_elsewhere_is_ignored_too(clean, db):
+    add_receipt_price(db, "Kaffe", "Meny", 50, days_ago=flyers.RECENT_DAYS + 30)
+    assert judged(db, "Kaffe", "Kiwi", 90)["kind"] == "unknown"
+
+
+def test_another_brand_is_another_product(clean, db):
+    add_branded_price(db, "Buljong", "Kiwi", 60, days_ago=10, brand="Toro")
+    v = judged(db, "Buljong", "Kiwi", 30, brand="Maggi")
+    assert v["kind"] == "unknown"
+    # The same brand, written differently, is the same
+    add_branded_price(db, "Buljong", "Kiwi", 40, days_ago=5, brand="MAGGI")
+    assert judged(db, "Buljong", "Kiwi", 30, brand="Maggi")["usual"] == 40
+
+
+def test_a_brand_list_matches_any_of_its_brands(clean, db):
+    add_branded_price(db, "Brus", "Kiwi", 30, days_ago=10, brand="Farris")
+    assert judged(db, "Brus", "Kiwi", 20, brand="Coca-Cola / Farris")["kind"] == "real"
+
+
+def test_a_much_bigger_or_smaller_pack_is_another_product(clean, db):
+    # A 6-pack of 47 g bars against a 100 g plate, a 225 g salad bag against a 65 g one
+    add_receipt_price(db, "Kvikk lunsj", "Kiwi", 29.9, days_ago=30, unit="g", quantity=100)
+    assert judged(db, "Kvikk lunsj", "Kiwi", 49.9, unit="g", quantity=282)["kind"] == "unknown"
+    add_receipt_price(db, "Salatmiks", "Kiwi", 16.9, days_ago=30, unit="g", quantity=65)
+    assert judged(db, "Salatmiks", "Kiwi", 26.9, unit="g", quantity=225)["kind"] == "unknown"
+    # Within a factor of two it's still compared, per 100 g
+    add_receipt_price(db, "Ris", "Kiwi", 80, days_ago=10, unit="g", quantity=1000)
+    assert judged(db, "Ris", "Kiwi", 30, unit="g", quantity=500)["kind"] == "real"
+
+
+def test_a_multibuy_is_compared_by_the_size_of_one_item(clean, db):
+    add_receipt_price(db, "Saus", "Kiwi", 49.5, days_ago=10, unit="g", quantity=360)
+    v = judged(db, "Saus", "Kiwi", 100, unit="g", quantity=360, pack_size=3)
+    assert v["kind"] == "real" and v["discount"] == pytest.approx(0.327, abs=0.001)
