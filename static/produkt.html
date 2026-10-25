@@ -143,7 +143,9 @@
             $("best").hidden = false;
             // An old price isn't what it costs now: say when it was seen
             const age = cheapest.purchase_date ? (Date.now() - new Date(cheapest.purchase_date)) / 864e5 : Infinity;
-            $("best").querySelector(".label").textContent = age <= RECENT_DAYS ? "Billigst nå" : "Billigst sist vi så";
+            // With one store there's nothing to be cheapest of: it's just the price
+            const label = stores.length === 1 ? ["Pris nå", "Pris sist vi så"] : ["Billigst nå", "Billigst sist vi så"];
+            $("best").querySelector(".label").textContent = label[age <= RECENT_DAYS ? 0 : 1];
             $("best-chain").replaceChildren(chainBadge(stores[0].chain));
             // Stores selling different sizes are ranked per 100 g/ml, so lead
             // with that: "29,90 kr" for 1,75 l is cheaper than 21,90 kr for 1 l
@@ -152,7 +154,8 @@
             $("best-price").textContent = perUnit ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : amount(cheapest);
             const unit = weighed && cheapest.by_weight ? `${packSize(cheapest)} for ${kr.format(cheapest.total_price)} kr`
                 : perUnit ? `${amount(cheapest)} for ${packSize(cheapest)}`
-                : cheapest.price_per_unit != null ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : "";
+                // Not "24,90 kr / stk" under 24,90 kr
+                : cheapest.price_per_unit != null && unitLabel(cheapest) !== "kr / stk" ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : "";
             $("best-unit").textContent = [unit, cheapest.purchase_date && daysAgo(cheapest.purchase_date)].filter(Boolean).join(" · ");
 
             // Shared axes for every store's timeline, so the rows compare directly
