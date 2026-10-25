@@ -18,6 +18,7 @@ class Receipt(Base):
     store_location = Column(String)     # "Grünerløkka"
     region = Column(String)             # "Oslo"
     purchase_date = Column(Date)
+    total = Column(Float)               # as printed; exact from a Trumf history
     uploaded_at = Column(DateTime, default=utcnow)
     items = relationship("ReceiptItem", back_populates="receipt")
 

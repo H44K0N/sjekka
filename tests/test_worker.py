@@ -100,7 +100,8 @@ def test_duplicate_receipt_is_not_saved_twice(client, db):
 
 def test_same_store_and_day_with_other_items_is_not_a_duplicate(client, db):
     run(db, lambda path, known=(): receipt().model_dump_json(), filename="a.jpg")
-    job = run(db, lambda path, known=(): receipt(items=receipt().items[:1]).model_dump_json(), filename="b.jpg")
+    first = receipt().items[0]
+    job = run(db, lambda path, known=(): receipt(items=[first], total=first.total_price).model_dump_json(), filename="b.jpg")
     assert job.status == "done"
     assert db.query(models.Receipt).count() == 2
 
@@ -294,3 +295,16 @@ def test_receipts_saved_before_get_their_chains_name_once(client, db):
     assert worker.repair_chain_names(db) == 0
     rows = {r.image_filename: (r.store_chain, r.store_location) for r in db.query(models.Receipt)}
     assert rows == {"a.jpg": ("Meny", "MENY"), "b.json": ("Meny", "MENY Sandvika Storsenter"), "c.json": ("Kiwi", None)}
+
+
+def test_the_same_total_and_a_price_in_common_is_the_same_purchase(client, db):
+    saved_receipt(db, "Kiwi", "2025-08-28", [32.9, 29.9])
+    db.query(models.Receipt).one().total = 113.8
+    db.commit()
+    def found(total, *prices):
+        return worker.find_duplicate(db, ExtractedReceipt(store_chain="Nærbutikken Kiwi", purchase_date="2025-08-28",
+                                                         total=total, items=items(*prices)))
+    assert found(113.8, 32.9, 29.9, 49.0) is not None  # a line more, read differently
+    assert found(113.8, 12.0) is None                  # the same total by chance, nothing alike
+    assert found(99.0, 32.9, 29.9) is not None         # another total, but the very same lines
+    assert found(None, 32.9, 29.9, 49.0) is None       # no total: a short receipt must match exactly

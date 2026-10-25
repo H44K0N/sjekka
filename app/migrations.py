@@ -11,6 +11,7 @@ COLUMNS = [
     ("jobs", "raw_response", "TEXT"),
     ("jobs", "model", "VARCHAR"),
     ("jobs", "batch", "VARCHAR"),
+    ("receipts", "total", "FLOAT"),
 ]
 
 
@@ -19,7 +20,10 @@ def migrate(engine: Engine) -> list[str]:
     added = []
     with engine.begin() as conn:
         existing = {}
+        tables = set(inspect(conn).get_table_names())
         for table, column, sql_type in COLUMNS:
+            if table not in tables:  # create_all makes it, with every column
+                continue
             if table not in existing:
                 existing[table] = {c["name"] for c in inspect(conn).get_columns(table)}
             if column not in existing[table]:

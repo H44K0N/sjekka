@@ -163,3 +163,52 @@ def test_other_files_are_not_read_again(client, db):
     assert worker.reread_trumf_histories(db) == 0
     assert db.query(models.Receipt).count() == 1
     (ORIGINALS_DIR / "export.json").unlink()
+
+
+def read_all(db):
+    while job := worker.next_job(db):
+        asyncio.run(worker.process_job(job, db))
+
+
+def test_receipts_keep_the_total_printed_on_them(client, db, monkeypatch):
+    monkeypatch.setattr(trumf, "gemini_names", namer())
+    helpers.upload(client, json.dumps(HISTORY, ensure_ascii=False).encode(), name="trumf.json")
+    read_all(db)
+    assert sorted(r.total for r in db.query(models.Receipt)) == [34.9, 156.38]
+
+
+def test_a_history_uploaded_again_is_not_saved_twice_however_its_lines_are_named(client, db, monkeypatch):
+    # The real case: read a second time, "Ukjent produkt" was kept as a product,
+    # and the receipt's lines no longer matched the first reading's
+    monkeypatch.setattr(trumf, "gemini_names", namer())
+    data = json.dumps(HISTORY, ensure_ascii=False).encode()
+    helpers.upload(client, data, name="trumf.json")
+    read_all(db)
+    NAMES["Ukjent produkt"]["product"] = True
+    try:
+        helpers.upload(client, data, name="trumf-again.json")
+        read_all(db)
+    finally:
+        NAMES["Ukjent produkt"]["product"] = False
+    assert db.query(models.Receipt).count() == 2
+
+
+def test_receipts_saved_before_get_their_total_from_the_kept_file(client, db):
+    from app.config import ORIGINALS_DIR
+    (ORIGINALS_DIR / "hist.json").write_bytes(json.dumps(HISTORY, ensure_ascii=False).encode())
+    job = models.Job(filename="hist-001.json", batch="hist", status="done", model="trumf:x")
+    db.add(job)
+    from datetime import date
+    for store, day, prices in [("MENY Sandvika Storsenter", date(2026, 10, 23), [49.8, 70.49]),
+                               ("KIWI 305 Kjørbo", date(2025, 9, 2), [24.9, 15.0]),
+                               ("KIWI 305 Kjørbo", date(2025, 9, 3), [24.9])]:  # not in the file
+        receipt = models.Receipt(image_filename=job.filename, store_chain=store, store_location=store, purchase_date=day)
+        db.add(receipt)
+        db.flush()
+        db.add_all(models.ReceiptItem(receipt_id=receipt.id, canonical_name="X", total_price=p) for p in prices)
+    db.commit()
+    assert worker.fill_receipt_totals(db) == 2
+    assert worker.fill_receipt_totals(db) == 0
+    assert sorted((r.purchase_date.isoformat(), r.total) for r in db.query(models.Receipt)) == [
+        ("2025-09-02", 34.9), ("2025-09-03", None), ("2026-10-23", 156.38)]
+    (ORIGINALS_DIR / "hist.json").unlink()

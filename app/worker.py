@@ -4,7 +4,7 @@ import logging
 import re
 import time
 from collections import Counter
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import httpx
 from google.genai import errors
@@ -180,17 +180,63 @@ def same_purchase(a: Counter, b: Counter) -> bool:
     return sum((a & b).values()) / n >= SAME_PURCHASE
 
 
+def is_duplicate(total_a: float | None, prices_a: Counter, total_b: float | None, prices_b: Counter) -> bool:
+    """Whether two receipts from the same chain and day are one purchase:
+    the same total to the øre and a price in common, or mostly the same
+    prices (see same_purchase). The total matters because the lines saved
+    depend on how they were read: a Trumf receipt read twice can keep a
+    different line the second time ("Ukjent produkt" or not), and on a
+    receipt of two or three lines that alone made it look new."""
+    if total_a is not None and total_b is not None and abs(total_a - total_b) < 0.005:
+        return bool(prices_a & prices_b) or not prices_a or not prices_b
+    return same_purchase(prices_a, prices_b)
+
+
 def find_duplicate(db: Session, data: ExtractedReceipt) -> models.Receipt | None:
     """A receipt already saved for the same purchase: same chain and day,
-    and the same prices, however the store and lines were written."""
+    and the same total or prices, however the store and lines were written."""
     purchase_date = parse_date(data.purchase_date)
     if not data.store_chain or not purchase_date:
         return None
     chain, prices = chain_name(data.store_chain), prices_of(data.items)
     for receipt in db.query(models.Receipt).filter_by(purchase_date=purchase_date):
-        if chain_name(receipt.store_chain) == chain and same_purchase(prices, prices_of(receipt.items)):
+        if chain_name(receipt.store_chain) == chain and is_duplicate(data.total, prices, receipt.total, prices_of(receipt.items)):
             return receipt
     return None
+
+
+def fill_receipt_totals(db: Session) -> int:
+    """Gives receipts read from a kept Trumf history the total printed in
+    it, for those saved before receipts had one, so a history uploaded
+    again is recognised by it (see is_duplicate). Each is matched to the
+    file's receipt from the same store and day with the most prices in
+    common. Safe to run again."""
+    filled = 0
+    for original in sorted(ORIGINALS_DIR.glob("*.json")):
+        try:
+            history = trumf.receipts_in(json.loads(original.read_bytes()))
+        except json.JSONDecodeError:
+            continue
+        if not history:
+            continue
+        in_file: dict[tuple, list[tuple[float, Counter]]] = {}
+        for r in history:
+            if r.get("totaltBelop") in (None, ""):
+                continue
+            key = (datetime.strptime(r["dato"], "%d.%m.%Y").date(), r["butikknavn"])
+            prices = Counter(round(trumf.number(line["vareBelop"]), 2) for line in r["varelinjer"])
+            in_file.setdefault(key, []).append((trumf.number(r["totaltBelop"]), prices))
+        filenames = [job.filename for job in db.query(models.Job).filter_by(batch=original.stem)]
+        for receipt in db.query(models.Receipt).filter(models.Receipt.image_filename.in_(filenames),
+                                                       models.Receipt.total.is_(None)):
+            candidates = in_file.get((receipt.purchase_date, receipt.store_location), [])
+            if not candidates:
+                continue
+            prices = prices_of(receipt.items)
+            receipt.total = max(candidates, key=lambda c: sum((c[1] & prices).values()))[0]
+            filled += 1
+    db.commit()
+    return filled
 
 
 def reread_trumf_histories(db: Session) -> int:
@@ -260,7 +306,7 @@ def repair_duplicates(db: Session) -> int:
     for group in groups.values():
         kept: list[models.Receipt] = []
         for receipt in group:
-            original = next((k for k in kept if same_purchase(prices_of(k.items), prices_of(receipt.items))), None)
+            original = next((k for k in kept if is_duplicate(k.total, prices_of(k.items), receipt.total, prices_of(receipt.items))), None)
             if original is None:
                 kept.append(receipt)
                 continue
@@ -282,6 +328,7 @@ def save_receipt(db: Session, job: models.Job, data: ExtractedReceipt) -> models
         store_location=data.store_location or data.store_chain,
         region=data.region,
         purchase_date=parse_date(data.purchase_date),
+        total=data.total,
     )
     db.add(receipt)
     db.flush()
@@ -435,6 +482,7 @@ async def run_worker():
     db.commit()
     repair_multipacks(db)
     repair_chain_names(db)
+    fill_receipt_totals(db)
     repair_duplicates(db)
     reread_trumf_histories(db)
     db.close()
