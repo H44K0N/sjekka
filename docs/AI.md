@@ -8,7 +8,7 @@ AI plays two parts: **in the app**, Google's Gemini reads receipts and names fly
 - **In building it,** Haakon described what he wanted in a sentence or two; Claude Code wrote the code, the tests and the docs, opened pull requests and watched them deploy. Haakon decided what to build, judged the results and said when to ship.
 - **How much:** on 24 October 2026 alone, 32 pull requests were merged: about 5,500 new lines in 58 files, and the test suite grew from 110 to 349 tests.
 - **How it was kept honest:** every change went through a pull request and automated checks, bugs got a test that fails without the fix, and the mistakes are recorded below.
-- **In the films,** the voice-over is AI-generated (Kokoro, running locally); the music is a royalty-free track by a human composer. The about page says so.
+- **In the films,** the voice-over is AI-generated (Chatterbox, running locally); the music is royalty-free tracks by human composers. The about page says so.
 
 ## Building Sjekka by describing it
 
@@ -83,6 +83,7 @@ The AI's work wasn't right the first time every time. Recorded so the process ca
 - Claude committed the product page directly on `main` and pushed it, skipping the branch and PR. It noticed at once and cancelled the pipeline before the deploy step, so production never got the unreviewed change; the commit was then reviewed as part of PR #15.
 - Turning on the flyer import in production ran the 512 MB container out of memory: listing offers loaded every flyer's raw answer. Found from the public site's 502s and fixed the same day by loading that column only when asked for (#27).
 - A deploy left the offers page blank for visitors, because Cloudflare served old JavaScript next to new pages. Haakon reported it; the fix and a regression test followed (#29).
+- The reworked promo first piled up invented red "TILBUD" signs. Haakon found them cheap and AI-looking. They were replaced with crops of this week's real flyers, from the catalogues the app already reads. Claude kept one invented sign for "deals that aren't really deals", since a real chain's offer can't be called fake without checking it.
 - The first promo films had no voice and synthesised music, and Haakon found them flat ("they don't tell a story") and the music "too haunting". Claude can't hear audio, so it had judged the music only by measurements. They were remade with a voice-over and a real royalty-free track (#46, #47).
 - When several PRs were merged in parallel, two of them conflicted in the same test file and the merge stopped without saying so. It was caught by checking the PRs' state, and they were rebased and merged one at a time.
 
@@ -119,7 +120,7 @@ Add a line here for each AI-assisted change.
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
 | 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
-| 24–25 Oct 2026 | #55–#73: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
+| 24–25 Oct 2026 | #55–#75: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -191,3 +192,5 @@ Add a line here for each AI-assisted change.
 | #71 | A chain is priced by the cheapest brand it sells now (each brand's latest price from the last 180 days), not by whatever was bought there last | Followed #70: with brands inside one product, "the latest line" was often a family pack or a dear brand |
 | #72 | Packs are counted in pieces ("EGG 12STK" is 12 stk) and compared per piece | A 6-pack of eggs looked cheaper than a 12-pack; Gemini gave piece counts only about half the time |
 | #73 | Product cards and the product page show the same choice as the shopping list, and a pack given by weight whose name says how many pieces it holds counts as pieces when the product is counted in pieces (Coop's "12 PK … 816 g" eggs) | Searching "grandiosa" showed a 1 kg pizza at 169 kr. The user asked for these two after #72 |
+| #74 | Tests run on every core and the image is built alongside them; CI went from about 3 minutes to under 2 | Haakon asked how long CI takes, then "if they don't sacrifice quality, do it" |
+| #75 | The films reworked: a marketing story that picks the desktop or phone version, a film on how the app works and one on how it was built with AI; all made from code (real app captures moved by a timeline, a new voice with the best of five takes, sound design, captions) | Haakon: "rework the videos, let's try to make them studio grade like from a tier 1 marketing team", and after the first draft: "the offer signs look a little cheap and AI generated, could we clip some real world Norwegian style offers?" |

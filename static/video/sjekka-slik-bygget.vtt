@@ -1,0 +1,121 @@
+WEBVTT
+
+00:00:00.700 --> 00:00:03.984
+Sjekka is built by one developer, and an AI.
+
+00:00:03.984 --> 00:00:04.880
+This is how.
+
+00:00:05.430 --> 00:00:07.038
+Haakon decides what to build.
+
+00:00:07.038 --> 00:00:10.031
+Claude Code, an AI coding agent, does the engineering:
+
+00:00:10.031 --> 00:00:14.300
+it reads the code, writes the change and its tests, and opens a pull request.
+
+00:00:14.850 --> 00:00:16.989
+Most changes start as a single sentence.
+
+00:00:16.989 --> 00:00:20.037
+Grocery list that auto checks what store is the cheapest.
+
+00:00:20.037 --> 00:00:22.550
+That became the shopping list, built overnight.
+
+00:00:23.100 --> 00:00:24.537
+Over seventy pull requests.
+
+00:00:24.537 --> 00:00:25.921
+Nearly five hundred tests.
+
+00:00:25.921 --> 00:00:27.890
+Almost every line of the app covered.
+
+00:00:28.440 --> 00:00:30.296
+Every change takes the same road.
+
+00:00:30.296 --> 00:00:32.772
+A branch, a pull request, then the pipeline.
+
+00:00:32.772 --> 00:00:38.228
+The linters and every test, including real browser and accessibility tests, run across all cores.
+
+00:00:38.228 --> 00:00:41.660
+At the same time, the Docker image is built and smoke tested.
+
+00:00:42.210 --> 00:00:43.998
+Only when both pass does it ship.
+
+00:00:43.998 --> 00:00:46.814
+The server gets a key that can do exactly one thing.
+
+00:00:46.814 --> 00:00:50.768
+It starts the new version, and rolls back on its own if it isn't healthy.
+
+00:00:50.768 --> 00:00:53.260
+From merge to production in under two minutes.
+
+00:00:53.810 --> 00:00:59.880
+The site sits behind a Cloudflare tunnel, so the server has no open ports, and the database is backed up every night.
+
+00:01:00.430 --> 00:01:02.056
+The AI doesn't get free rein.
+
+00:01:02.056 --> 00:01:04.804
+It can't touch the production server or its data.
+
+00:01:04.804 --> 00:01:06.598
+Merging needs Haakon's go-ahead.
+
+00:01:06.598 --> 00:01:09.850
+And every bug fix comes with a test that fails without it.
+
+00:01:10.400 --> 00:01:11.874
+AI tests the product too.
+
+00:01:11.874 --> 00:01:19.301
+In one overnight run, five personas, from a student on a phone to a senior on an iPad, walked through a copy of the real data.
+
+00:01:19.301 --> 00:01:20.597
+Fifty-two screenshots.
+
+00:01:20.597 --> 00:01:21.541
+Six root causes.
+
+00:01:21.541 --> 00:01:22.130
+Six fixes.
+
+00:01:22.680 --> 00:01:25.093
+It looks for root causes, not symptoms.
+
+00:01:25.093 --> 00:01:28.125
+Pizza had its prices split across three products:
+
+00:01:28.125 --> 00:01:30.477
+Grandiosa, Pizza Grandiosa, and Pizza.
+
+00:01:30.477 --> 00:01:32.890
+One change gave every product one name.
+
+00:01:33.440 --> 00:01:35.076
+And everything is written down.
+
+00:01:35.076 --> 00:01:39.510
+Every decision, every prompt, and every mistake the AI made, in one public document.
+
+00:01:40.060 --> 00:01:41.942
+Even this film is made by code.
+
+00:01:41.942 --> 00:01:45.280
+The script, the voice, the music edit, and every frame.
+
+00:01:45.980 --> 00:01:47.016
+One developer.
+
+00:01:47.016 --> 00:01:47.534
+One AI.
+
+00:01:47.534 --> 00:01:48.940
+Shipping every day.

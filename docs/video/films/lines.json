@@ -1,0 +1,44 @@
+{
+  "promo": {
+    "goal": "Every week, the big grocery chains have one goal.",
+    "spend": "Getting you to spend more than you planned.",
+    "signs": "Red signs. Two for one. Deals that aren't really deals.",
+    "war": "So we're declaring war on the big chains.",
+    "meet": "Meet Sjekka.",
+    "add": "Add what you need.",
+    "list": "See what your whole list costs in every store, and where it's cheapest.",
+    "receipts": "Every price comes from real receipts, shared by people like you.",
+    "offers": "Every offer is checked against what it cost before the sale. So you know which deals are real.",
+    "share": "Snap your receipt, and help everyone pay less.",
+    "end": "Sjekka. Stop overpaying."
+  },
+  "how": {
+    "intro": "This is how Sjekka works. From a crumpled receipt, to the cheapest way to fill your basket.",
+    "upload": "It starts with a photo. The browser checks it first. The server turns it the right way up, and puts it in a queue, so you get an answer straight away.",
+    "gemini": "A background worker sends the photo to Google's Gemini. Gemini has one job: to read the receipt into a strict format. The store, the date, and every line.",
+    "checks": "Then code takes over. The answer is validated, unit prices are calculated instead of trusted to the model, and a receipt seen before is skipped. The photo is deleted once it's read.",
+    "names": "Next, names. The same pizza might come back as Grandiosa, Pizza Grandiosa, or just Pizza. Sjekka files them as one product, Pizza, with Grandiosa as the brand. So you can ask for the cheapest pizza, across every brand.",
+    "sizes": "Sizes are made comparable too: per hundred grams, per litre, or per piece. A six-pack of eggs is compared with a twelve-pack, egg for egg.",
+    "list": "Your shopping list is priced in every chain. For each product, Sjekka takes the cheapest choice that chain sells right now, at the size people usually buy.",
+    "estimate": "Receipts never cover everything. When a chain has no price for something, it's estimated from how expensive that chain is on the products we can compare. And every estimate is marked.",
+    "flyers": "Every six hours, Sjekka also reads the chains' new flyers. Each offer is held up against what receipts say it cost before the sale. Some are real deals. Others are the usual price, with a red sign.",
+    "history": "You can also share a whole year at once. A loyalty card history is read straight from the file, with exact prices, and Gemini only names the products.",
+    "privacy": "No accounts. No cookies. No photos kept. Just prices.",
+    "outro": "That's Sjekka. Real prices, from real receipts."
+  },
+  "built": {
+    "intro": "Sjekka is built by one developer, and an AI. This is how.",
+    "roles": "Haakon decides what to build. Claude Code, an AI coding agent, does the engineering: it reads the code, writes the change and its tests, and opens a pull request.",
+    "prompts": "Most changes start as a single sentence. Grocery list that auto checks what store is the cheapest. That became the shopping list, built overnight.",
+    "numbers": "Over seventy pull requests. Nearly five hundred tests. Almost every line of the app covered.",
+    "pipeline": "Every change takes the same road. A branch, a pull request, then the pipeline. The linters and every test, including real browser and accessibility tests, run across all cores. At the same time, the Docker image is built and smoke tested.",
+    "deploy": "Only when both pass does it ship. The server gets a key that can do exactly one thing. It starts the new version, and rolls back on its own if it isn't healthy. From merge to production in under two minutes.",
+    "infra": "The site sits behind a Cloudflare tunnel, so the server has no open ports, and the database is backed up every night.",
+    "limits": "The AI doesn't get free rein. It can't touch the production server or its data. Merging needs Haakon's go-ahead. And every bug fix comes with a test that fails without it.",
+    "personas": "AI tests the product too. In one overnight run, five personas, from a student on a phone to a senior on an iPad, walked through a copy of the real data. Fifty-two screenshots. Six root causes. Six fixes.",
+    "roots": "It looks for root causes, not symptoms. Pizza had its prices split across three products: Grandiosa, Pizza Grandiosa, and Pizza. One change gave every product one name.",
+    "log": "And everything is written down. Every decision, every prompt, and every mistake the AI made, in one public document.",
+    "film": "Even this film is made by code. The script, the voice, the music edit, and every frame.",
+    "outro": "One developer. One AI. Shipping every day."
+  }
+}

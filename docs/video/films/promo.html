@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sjekka promo</title>
+<link rel="stylesheet" href="studio.css">
+<script src="/lib/gsap.min.js"></script>
+<style>
+  .big { font-weight: 700; letter-spacing: -0.035em; line-height: 1.02; }
+  .receipt { position: absolute; background: #efe8dc; color: #1a1714; font: 400 30px/1.5 "Mono", monospace; padding: 40px 44px;
+    box-shadow: 0 40px 120px rgba(0,0,0,0.6); overflow: hidden; }
+  .receipt .row { display: flex; justify-content: space-between; gap: 40px; white-space: nowrap; }
+  .receipt .total { position: absolute; left: 0; right: 0; bottom: 0; background: #efe8dc; padding: 26px 44px 34px; border-top: 3px dashed #1a1714;
+    display: flex; justify-content: space-between; font-weight: 700; font-size: 44px; }
+  .same { font: 400 40px/1.3 "Mono", monospace; color: var(--text); white-space: nowrap; }
+  .mark-corner { position: absolute; font-weight: 700; letter-spacing: -0.03em; color: var(--text); }
+  .chapter { font-size: 22px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); }
+  .say { font-weight: 700; letter-spacing: -0.03em; line-height: 1.04; }
+  .note { position: absolute; font-size: 26px; color: var(--soft); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+import { W, H, PHONE, stage, load, h, layer, place, words, Film, Device, Camera, rise, onVoice, sink, count, ready, addGrain, middle } from "./studio.js";
+
+await load("promo");
+const film = new Film("promo");
+const tl = film.tl;
+const fs = (d, m) => PHONE ? m : d;  // a size for desktop or phone
+
+// A small shake of the whole picture, for impacts
+const shaker = h("div", "abs", stage);
+place(shaker, 0, 0, W, H);
+function shake(at, power = 14) {
+  const steps = 7;
+  for (let i = 0; i < steps; i++) {
+    const k = power * (1 - i / steps);
+    tl.to(shaker, { x: ((i * 37) % 7 - 3) / 3 * k, y: ((i * 53) % 5 - 2) / 2 * k, duration: 0.035, ease: "none" }, at + i * 0.035);
+  }
+  tl.to(shaker, { x: 0, y: 0, duration: 0.08 }, at + steps * 0.035);
+}
+const L = name => { const e = h("div", `layer ${name}`, shaker); return e; };
+
+// ================= Act 1: the chains want your money =================
+let t = 0.7;
+
+// "Every week, the big grocery chains have one goal."
+const goal = L("goal");
+const goalText = words(goal, "Every week, the big grocery chains have <br>*one goal.*", "big abs");
+place(goalText, fs(150, 90), 0, fs(1600, 900));
+goalText.style.fontSize = fs("118px", "104px");
+middle(goalText, H / 2);
+film.span(goal, 0, null);
+const sGoal = film.say("goal", t);
+onVoice(film, goalText, sGoal);
+film.fx("drone", 0, 0.9);
+film.fx("hit", sGoal.at("one"), 0.6);
+t = sGoal.end + 0.35;
+sink(film, goalText, t - 0.1);
+film.span(goal, 0, t + 0.6);
+
+// "Getting you to spend more than you planned." The receipt keeps growing
+const spend = L("spend");
+film.span(spend, t, null);
+const spendText = words(spend, "Getting you to spend <br>*more* than you <br>planned.", "big abs");
+place(spendText, fs(150, 90), 0, fs(820, 900));
+spendText.style.fontSize = fs("96px", "96px");
+middle(spendText, fs(H / 2, 420));
+const receipt = h("div", "receipt", spend);
+const rw = fs(640, 820), rh = fs(860, 1000);
+place(receipt, fs(1110, 130), fs(110, 760), rw, rh);
+const ITEMS = [["KJØTTDEIG 400G", "59,90"], ["LETTMELK 1L", "24,90"], ["NORVEGIA 500G", "79,90"], ["LAKSEFILET 400G", "94,90"], ["GROVBRØD", "44,90"],
+  ["KAFFE 500G", "89,90"], ["SMØR 250G", "39,90"], ["BANANER 1,2KG", "33,40"], ["SJOKOLADE 200G", "42,90"], ["POTETGULL 175G", "34,90"],
+  ["PIZZA 575G", "59,90"], ["BRUS 1,5L", "29,90"], ["EGG 12STK", "54,90"], ["OST SKIVET", "49,90"], ["YOGHURT 4PK", "36,90"],
+  ["SJAMPO", "69,90"], ["TACOKRYDDER", "14,90"], ["TORTILLA 8STK", "32,90"], ["RØMME", "26,90"], ["AVOKADO 2STK", "49,00"],
+  ["JUICE 1L", "32,90"], ["KYLLINGFILET", "119,00"], ["PAPRIKA", "19,90"], ["IS 2L", "64,90"]];
+const strip = h("div", "abs", receipt);
+place(strip, 44, 40, rw - 88);
+for (const [name, price] of ITEMS) {
+  const r = h("div", "row", strip);
+  h("span", "", r, name);
+  h("span", "", r, price);
+}
+const total = h("div", "total", receipt);
+h("span", "", total, "TOTALT");
+const totalNum = h("span", "", total, "0,00");
+tl.fromTo(receipt, { y: H, rotation: fs(4, 3) }, { y: 0, rotation: fs(2, 1.5), duration: 0.9, ease: "power3.out" }, t);
+const sSpend = film.say("spend", t + 0.25);
+onVoice(film, spendText, sSpend);
+const stripEnd = t + 4.6;
+tl.fromTo(strip, { y: rh - 120 }, { y: -(ITEMS.length * 45) + rh - 200, duration: stripEnd - t, ease: "power1.in" }, t + 0.2);
+count(film, totalNum, 0, 1248.6, t + 0.3, stripEnd - t - 0.4, { decimals: 2 });
+for (let i = 0; i < 16; i++) film.fx("tick", t + 0.4 + i * 0.22 * (1 - i / 40), 0.35);
+film.fx("hit", sSpend.at("more"), 0.5);
+t = Math.max(sSpend.end + 0.3, stripEnd - 0.6);
+tl.to([receipt, spendText], { autoAlpha: 0, duration: 0.35 }, t);
+film.span(spend, null, t + 0.4);
+
+// "Red signs. Two for one. Deals that aren't really deals."
+const signs = L("signs");
+film.span(signs, t, null);
+// Real flyer offers: crops from the Tjek catalogues Sjekka already reads
+// (build/flyers, from the offers' own image links), in the chains' own
+// red, blue and green, laid out in a loose grid and slammed down in turn.
+// The last element is our own generic sign, for "aren't really deals".
+const FLYERS = await (await fetch("/flyers/sizes.json")).json();
+const COLS = PHONE ? 3 : 5, ROWS = PHONE ? 5 : 3;
+const CELLS = [];
+for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) CELLS.push([c, r]);
+// Which cell each flyer takes: scattered, so they don't land in reading order
+const ORDER = PHONE ? [4, 1, 8, 6, 10, 2, 13, 11, 0, 7, 9, 3, 14] : [6, 2, 10, 8, 0, 12, 4, 14, 1, 11, 5, 9, 13];
+const cellW = W / COLS, cellH = H / ROWS;
+const signEls = FLYERS.map(([fw, fh], i) => {
+  const maxW = cellW * 0.92, maxH = cellH * 1.08;
+  const w = Math.min(maxW, maxH * fw / fh);
+  const [c, r] = CELLS[ORDER[i]];
+  const img = h("img", "abs", signs);
+  img.src = `/flyers/f${i}.jpg`;
+  const jx = ((i * 37) % 21 - 10) / 10 * cellW * 0.05, jy = ((i * 53) % 21 - 10) / 10 * cellH * 0.05;
+  Object.assign(img.style, { width: `${w}px`, borderRadius: "6px", boxShadow: "0 24px 60px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.4)",
+    left: `${c * cellW + (cellW - w) / 2 + jx}px`, top: `${r * cellH + 4 + jy}px` });
+  gsap.set(img, { scale: 0, rotation: (i % 2 ? 1 : -1) * (2 + (i * 7) % 5), autoAlpha: 0 });
+  return img;
+});
+const SIGNS = [...signEls, null];
+const hero = h("div", "tag-sign", signs, "TILBUD<br>49,90");
+hero.style.textAlign = "center";
+gsap.set(hero, { scale: 0, autoAlpha: 0 });
+signEls.push(hero);
+const sSigns = film.say("signs", t + 0.2);
+// One sign on each word, and the rest in between, faster and faster
+const slamAt = [sSigns.at("red"), sSigns.at("signs"), sSigns.at("two"), sSigns.at("one"), sSigns.at("deals")];
+const extra = [];
+for (let i = 0; extra.length < SIGNS.length - slamAt.length - 1; i++) extra.push(slamAt[1] + 0.2 + i * 0.16);
+const times = [...slamAt, ...extra].sort((a, b) => a - b).slice(0, SIGNS.length - 1);
+times.forEach((at, i) => {
+  const s = signEls[i];
+  tl.fromTo(s, { scale: 2.4, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.22, ease: "back.out(2.2)" }, at);
+  film.fx("slam", at, 0.55 - Math.min(0.25, i * 0.02));
+  if (i < 5) shake(at + 0.05, 16 - i * 2);
+});
+// "...aren't really deals": the sign in the middle, and last week's price under it
+hero.style.fontSize = fs("120px", "120px");
+place(hero, W / 2 - fs(230, 220), H / 2 - fs(220, 260));
+const heroAt = sSigns.at("aren't") - 0.1;
+tl.to(signEls.slice(0, -1), { autoAlpha: 0.18, filter: "blur(6px)", duration: 0.4 }, heroAt);
+tl.fromTo(hero, { scale: 2.6, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.25, ease: "back.out(2)" }, heroAt);
+film.fx("slam", heroAt, 0.6);
+shake(heroAt + 0.05, 18);
+const same = h("div", "same abs", signs, "Price last week: 49,90");
+place(same, W / 2 - fs(250, 250), H / 2 + fs(150, 140));
+tl.fromTo(same, { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, sSigns.at("really"));
+tl.to(hero, { filter: "grayscale(1) brightness(0.7)", duration: 0.6 }, sSigns.at("really") + 0.2);
+film.fx("thud", sSigns.at("really") + 0.2, 0.4);
+t = sSigns.end + 0.45;
+
+// "So we're declaring war on the big chains."
+const war = L("war");
+tl.to([...signEls, same], { y: `+=${H}`, rotation: "+=25", autoAlpha: 0, duration: 0.6, ease: "power2.in", stagger: 0.015 }, t);
+film.fx("whoosh", t, 0.6);
+film.span(signs, null, t + 0.9);
+film.span(war, t + 0.45, null);
+const warText = words(war, "So we're declaring <br>*war* on the <br>big chains.", "big abs");
+place(warText, fs(150, 90), 0, fs(1600, 900));
+warText.style.fontSize = fs("150px", "128px");
+middle(warText, H / 2);
+const sWar = film.say("war", t + 0.5);
+onVoice(film, warText, sWar, { dur: 0.45 });
+film.fx("boom", sWar.at("war"), 1);
+shake(sWar.at("war") + 0.02, 22);
+tl.fromTo(warText, { scale: 1 }, { scale: 1.06, duration: sWar.end - sWar.start + 1.2, ease: "none", transformOrigin: "0% 50%" }, sWar.start);
+film.fx("riser", sWar.end - 0.2, 0.8);
+
+// ================= Act 2: the reveal, on the music's drop =================
+const R = sWar.end + 1.7;
+const DROP = 44.93;  // where "Golden Storm" drops (see music.py)
+film.score("470", 0, DROP - R, { fadeIn: 1.2, gain: 1 });
+tl.to(warText.spans, { yPercent: -115, duration: 0.45, ease: "power3.in", stagger: 0.02 }, R - 0.6);
+film.span(war, null, R);
+
+const meet = L("meet");
+film.span(meet, R, null);
+const mark = h("div", "wordmark abs", meet);
+const markSize = fs(360, 270);
+mark.style.fontSize = `${markSize}px`;
+const markBlock = words(mark, "sjekka", "");
+place(mark, 0, H / 2 - markSize * 0.62, W);
+mark.style.textAlign = "center";
+// letters, not words, rise for the wordmark
+markBlock.innerHTML = "";
+const letters = [..."sjekka"].map(c => { const o = h("span", "word", markBlock); return h("span", "", o, c); });
+tl.fromTo(letters, { yPercent: 120 }, { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.045 }, R);
+const rule = h("div", "abs", meet);
+place(rule, W / 2 - fs(330, 250), H / 2 + markSize * 0.42, fs(660, 500), 3);
+rule.style.background = "var(--accent)";
+tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: 0.9, ease: "expo.inOut" }, R + 0.35);
+const tagline = h("div", "abs soft", meet, "Real grocery prices, from real receipts.");
+Object.assign(tagline.style, { fontSize: fs("40px", "40px"), width: `${W}px`, textAlign: "center" });
+place(tagline, 0, H / 2 + markSize * 0.42 + 40);
+tl.fromTo(tagline, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.7, ease: "power3.out" }, R + 0.8);
+film.fx("impact", R, 1);
+film.fx("shimmer", R + 0.05, 0.5);
+const sMeet = film.say("meet", R + 0.3);
+tl.fromTo(mark, { scale: 1 }, { scale: 1.04, duration: 3, ease: "none" }, R);
+
+// The wordmark moves into the corner and stays there, small
+let t2 = film.beat(Math.max(sMeet.end + 1.3, R + 3.0), "down");
+const corner = h("div", "mark-corner", stage);
+corner.textContent = "sjekka";
+corner.style.fontSize = fs("40px", "46px");
+place(corner, fs(70, 70), fs(54, 70));
+gsap.set(corner, { autoAlpha: 0 });
+tl.to([rule, tagline], { autoAlpha: 0, duration: 0.3 }, t2 - 0.3);
+tl.to(letters, { yPercent: -120, duration: 0.5, ease: "power3.in", stagger: 0.03 }, t2 - 0.35);
+tl.fromTo(corner, { autoAlpha: 0, y: 12 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out" }, t2 + 0.2);
+film.span(meet, null, t2 + 0.4);
+
+// ================= Act 3: the app, cut to the beat =================
+const app = L("app");
+film.span(app, t2, null);
+const cam = new Camera(film, h("div", "abs", app));
+place(cam.el, 0, 0, W, H);
+cam.el.parentElement.style.perspective = "2600px";
+const scale = fs(0.96, 1.63);
+const dev = new Device(film, cam.el, PHONE
+  ? { x: (W - (390 + 28) * scale) / 2, y: 520, scale }
+  : { x: 640, y: (H - 952 * scale) / 2 + 30, scale });
+// On the phone the camera keeps the phone's top edge just under the words
+function zoom(px, py, z, at, dur, desk) {
+  if (!PHONE) return cam.frame(px, py, z, at, dur, desk);
+  return cam.frame(px, py, z, at, dur, { qx: W / 2, qy: 500 - z * (dev.y - py) });
+}
+// A slow turn of the device through each chapter, so it never sits dead still
+function drift(from, to) {
+  tl.fromTo(dev.el, { rotationY: fs(-7, -5), rotationX: fs(3, 2) }, { rotationY: fs(2, 1.5), rotationX: 0, duration: to - from, ease: "sine.inOut" }, from);
+}
+
+// The words beside the device, set as they're spoken
+// On the phone the words sit above the phone and stay put while the camera
+// moves; on desktop they're beside the device and dim while it zooms in
+const textBox = h("div", "abs", PHONE ? app : cam.el);
+place(textBox, fs(110, 90), fs(340, 170), fs(480, 900));
+let chapterNo = 0;
+function caption(line, text, at) {
+  const box = h("div", "", textBox);
+  const chap = h("div", "chapter", box);
+  chapterNo++;
+  chap.textContent = `0${chapterNo}`;
+  const block = words(box, text, "say");
+  block.style.fontSize = fs("70px", "74px");
+  block.style.marginTop = "22px";
+  film.span(box, at - 0.2, null);
+  box.style.visibility = "hidden";
+  box.style.position = "absolute";
+  tl.fromTo(chap, { autoAlpha: 0, x: -20 }, { autoAlpha: 1, x: 0, duration: 0.5 }, at - 0.2);
+  onVoice(film, block, line);
+  return { dim: (from, to) => { if (PHONE) return; tl.to(box, { autoAlpha: 0, duration: 0.4 }, from); tl.to(box, { autoAlpha: 1, duration: 0.5 }, to); },
+    out: when => { tl.to(chap, { autoAlpha: 0, duration: 0.3 }, when); sink(film, block, when, { stagger: 0.015, dur: 0.35 }); film.span(box, null, when + 0.6); } };
+}
+
+// The device rises in, tilted, and settles
+dev.show("home-0", t2, 0);
+dev.scroll(PHONE ? "card-Grovbrød" : "card-Bananer", t2, 0, { offset: PHONE ? 30 : 16 });
+tl.fromTo(dev.el, { y: dev.y + 500, rotationX: 32, autoAlpha: 0 }, { y: dev.y, rotationX: 0, autoAlpha: 1, duration: 1.2, ease: "expo.out" }, t2);
+film.fx("whoosh", t2, 0.7);
+
+// 01: Add what you need, a tap on each beat
+let t3 = t2 + 0.9;
+drift(t2, t2 + 30);
+const sAdd = film.say("add", t3);
+const cAdd = caption(sAdd, "Add what you <br>*need.*", sAdd.start);
+const taps = PHONE ? ["Grovbrød", "Kjøttdeig", "Laksefilet", "Lettmelk"] : ["Kjøttdeig", "Lettmelk", "Laksefilet", "Grovbrød", "Bananer", "Gulost"];
+const order = ["Kjøttdeig", "Lettmelk", "Laksefilet", "Grovbrød", "Bananer", "Gulost"];
+// The captures add in `order`; tap them in that order so each state follows the one before
+let tapT = film.beat(sAdd.start + 0.5);
+let done = 0;
+for (const name of order.slice(0, PHONE ? 4 : 6)) {
+  const [, y, , hh] = dev.box(`add-${name}`, `home-${done}`);
+  // On the phone, scroll the card into view first
+  if (PHONE && (y - dev.scrollY < 120 || y + hh - dev.scrollY > 844 - 120)) {
+    dev.scroll(y - 300, tapT - 0.6, 0.55);
+  }
+  dev.state = `home-${done}`;
+  dev.point(`add-${name}`, tapT - 0.42, 0.4);
+  dev.tap(tapT);
+  done++;
+  dev.show(`home-${done}`, tapT + 0.05, 0.12);
+  film.fx("pop", tapT + 0.06, 0.4);
+  tapT = film.beat(tapT + (PHONE ? 0.8 : 0.42));
+}
+// The list's count in the menu
+let t4 = tapT + 0.1;
+dev.hidePointer(t4);
+cAdd.out(t4 + 0.1);
+
+// 02: the whole list, in every store
+t4 = film.beat(t4 + 0.3, "down");
+dev.navigate("list", t4, { path: "/handleliste.html" });
+film.fx("swoosh", t4, 0.6);
+const sList = film.say("list", t4 + 0.3);
+const cList = caption(sList, "Your whole list, <br>priced in <br>*every store.*", sList.start);
+dev.scroll("verdict", t4 + 0.6, 1.1, { offset: fs(230, 20) });
+// Close in on the answer
+const [vx, vy] = dev.center("verdict", "list");
+const [sx, sy] = dev.onStage(vx, vy);
+zoom(sx, sy, fs(1.6, 1.22), t4 + 1.5, 1.4, { qx: 1150, qy: H / 2 });
+cList.dim(t4 + 1.4, t4 + 4.4);
+dev.highlight("verdict-total", t4 + 2.4, 2.0, 10);
+film.fx("chime", t4 + 2.45, 0.45);
+// Then the ranking, store by store
+let t5 = t4 + 4.3;
+cam.reset(t5, 1.0);
+dev.scroll("ranking", t5, 1.1, { offset: PHONE ? 80 : 120 });
+for (let i = 0; i < 7; i++) {
+  const at = t5 + 1.1 + i * 0.16;
+  try { dev.highlight(`rows.${i}`, at, 0.4, 4); } catch {}
+  film.fx("tick", at, 0.3);
+}
+const save = h("div", "callout", cam.el);
+save.innerHTML = PHONE ? "Kiwi: cheapest for the whole list" : "Cheapest for the whole list";
+const [rx, ry] = dev.onStage(...dev.center("rows.0", "list"));
+place(save, PHONE ? 140 : rx - 10, PHONE ? ry - 150 : ry - 120);
+tl.fromTo(save, { autoAlpha: 0, y: 20, scale: 0.9 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.5, ease: "back.out(2)" }, t5 + 2.4);
+film.fx("pop", t5 + 2.4, 0.5);
+let t6 = Math.max(sList.end + 0.6, t5 + 4.2);
+tl.to(save, { autoAlpha: 0, duration: 0.3 }, t6 - 0.3);
+cList.out(t6 - 0.3);
+
+// 03: real receipts
+t6 = film.beat(t6, "down");
+dev.navigate("product", t6, { path: "/produkt.html?navn=Kjøttdeig" });
+film.fx("swoosh", t6, 0.6);
+const sRec = film.say("receipts", t6 + 0.25);
+const cRec = caption(sRec, "Real prices, <br>from *real <br>receipts.*", sRec.start);
+dev.scroll("section", t6 + 0.4, 1.4, { offset: PHONE ? 10 : 20 });
+const [px, py] = dev.onStage(...dev.center("sparks.2", "product"));
+zoom(px, py, fs(1.35, 1.15), t6 + 1.9, 1.6, { qx: 1250, qy: 560 });
+const real = h("div", "callout dark", cam.el, "34 prices from 7 stores");
+place(real, PHONE ? 220 : px - 160, PHONE ? py - 260 : py - 260);
+tl.fromTo(real, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, t6 + 2.6);
+let t7 = Math.max(sRec.end + 0.5, t6 + 4.4);
+cRec.dim(t6 + 1.8, t7 - 0.5);
+tl.to(real, { autoAlpha: 0, duration: 0.3 }, t7 - 0.3);
+cam.reset(t7 - 0.3, 0.8);
+cRec.out(t7 - 0.3);
+
+// 04: offers, checked
+t7 = film.beat(t7 + 0.3, "down");
+dev.navigate("offers", t7, { path: "/tilbud.html" });
+film.fx("swoosh", t7, 0.6);
+const sOff = film.say("offers", t7 + 0.25);
+const cOff = caption(sOff, "Offers, <br>*checked.*", sOff.start);
+dev.scroll("real.0", t7 + 0.4, 1.1, { offset: PHONE ? 60 : 40 });
+const realCard = dev.lift("real.0", cam.el, sOff.at("checked") + 0.1, { scale: fs(1.35, 1.25), hold: 2.4, dy: fs(-30, -40) });
+dev.highlight("real-tag.0", sOff.at("checked") + 0.6, 1.6, 6);
+film.fx("lift", sOff.at("checked") + 0.1, 0.5);
+const realTag = h("div", "callout", cam.el, "Real deal: checked against receipts");
+const [ox, oy] = dev.onStage(...dev.center("real-tag.0", "offers"));
+place(realTag, PHONE ? 120 : ox + 160, oy + fs(70, 170));
+tl.fromTo(realTag, { autoAlpha: 0, x: -20 }, { autoAlpha: 1, x: 0, duration: 0.5, ease: "power3.out" }, sOff.at("checked") + 0.7);
+film.fx("chime", sOff.at("checked") + 0.75, 0.35);
+tl.to(realTag, { autoAlpha: 0, duration: 0.3 }, sOff.at("checked") + 2.6);
+let t8 = Math.max(sOff.end + 0.5, sOff.at("checked") + 3.4);
+cOff.out(t8 - 0.3);
+
+// 05: share a receipt
+t8 = film.beat(t8, "down");
+dev.navigate("upload", t8, { path: "/upload.html" });
+film.fx("swoosh", t8, 0.6);
+const sShare = film.say("share", t8 + 0.25);
+const cShare = caption(sShare, "Snap a receipt. <br>*Help everyone.*", sShare.start);
+dev.scroll("drop", t8 + 0.3, 0.8, { offset: PHONE ? 80 : 120 });
+// The receipt flies in and lands in the drop zone
+const photo = h("img", "abs", cam.el);
+photo.src = "/shots/receipt.jpg";
+const [dx, dy] = dev.onStage(...dev.center("drop", "upload"));
+const pw = fs(300, 360);
+Object.assign(photo.style, { width: `${pw}px`, boxShadow: "0 30px 80px rgba(0,0,0,0.6)" });
+tl.fromTo(photo, { x: dx - pw / 2 + fs(700, 0), y: dy - pw * 0.7 + fs(-200, -900), rotation: -18, autoAlpha: 0 },
+  { x: dx - pw / 2, y: dy - pw * 0.7, rotation: -3, autoAlpha: 1, duration: 0.9, ease: "expo.out" }, t8 + 1.0);
+film.fx("whoosh", t8 + 1.0, 0.5);
+tl.to(photo, { scale: 0.3, autoAlpha: 0, duration: 0.35, ease: "power2.in" }, t8 + 2.0);
+dev.show("upload-file", t8 + 2.1, 0.2);
+film.fx("pop", t8 + 2.1, 0.4);
+dev.state = "upload-file";
+dev.point("button", t8 + 2.3, 0.5);
+dev.tap(t8 + 2.95);
+let t9 = t8 + 3.3;
+dev.navigate("thanks", t9, { path: "/takk.html" });
+dev.hidePointer(t9);
+dev.scroll("found", t9 + 0.2, 0.8, { offset: PHONE ? 40 : 60 });
+for (let i = 0; i < 5; i++) {
+  dev.highlight(`lines.${i}`, t9 + 1.0 + i * 0.2, 0.35, 3);
+  film.fx("tick", t9 + 1.0 + i * 0.2, 0.3);
+}
+let tEnd = Math.max(sShare.end + 0.8, t9 + 2.6);
+cShare.out(tEnd - 0.3);
+
+// ================= Act 4: the end card =================
+tEnd = film.beat(tEnd, "down");
+tl.to(dev.el, { y: `+=${fs(140, 200)}`, autoAlpha: 0, scale: dev.scale * 0.92, duration: 0.7, ease: "power3.in" }, tEnd - 0.2);
+tl.to(corner, { autoAlpha: 0, duration: 0.4 }, tEnd - 0.2);
+film.span(app, null, tEnd + 0.6);
+const end = L("end");
+film.span(end, tEnd + 0.3, null);
+const endMark = h("div", "wordmark abs", end);
+endMark.style.fontSize = `${markSize}px`;
+endMark.style.width = `${W}px`;
+endMark.style.textAlign = "center";
+place(endMark, 0, H / 2 - markSize * 0.85);
+const endLetters = [..."sjekka"].map(c => { const o = h("span", "word", endMark); return h("span", "", o, c); });
+tl.fromTo(endLetters, { yPercent: 120 }, { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.045 }, tEnd + 0.3);
+const stop = words(end, "Stop *overpaying.*", "say abs");
+stop.style.fontSize = fs("84px", "80px");
+stop.style.width = `${W}px`;
+stop.style.textAlign = "center";
+place(stop, 0, H / 2 + markSize * 0.25);
+const sEnd = film.say("end", tEnd + 0.5);
+rise(film, stop, sEnd.at("stop") - 0.05, { stagger: 0.12 });
+film.fx("impact", tEnd + 0.3, 0.7);
+const url = h("div", "abs", end, "sjekka.tischbein.dev");
+Object.assign(url.style, { fontSize: fs("38px", "40px"), color: "var(--accent)", width: `${W}px`, textAlign: "center" });
+place(url, 0, H / 2 + markSize * 0.25 + fs(130, 140));
+tl.fromTo(url, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.8 }, sEnd.end + 0.2);
+const free = h("div", "abs soft", end, "Free. No account. Demo data shown.");
+Object.assign(free.style, { fontSize: fs("26px", "28px"), width: `${W}px`, textAlign: "center" });
+place(free, 0, H - fs(110, 160));
+tl.fromTo(free, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.8 }, sEnd.end + 0.6);
+
+
+film.finish(sEnd.end + 3.6);
+await ready();
+</script>
+</body>
+</html>

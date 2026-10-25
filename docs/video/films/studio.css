@@ -1,0 +1,103 @@
+/* The films' look: the site's palette and type (tischbein.dev), set big.
+   No gradients and no emoji, as on the site. */
+@font-face { font-family: "Libron"; src: url("/fonts/Libron-Regular.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Libron"; src: url("/fonts/Libron-Bold.woff2") format("woff2"); font-weight: 700; }
+@font-face { font-family: "Mono"; src: url("/fonts/mono-400.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Mono"; src: url("/fonts/mono-700.woff2") format("woff2"); font-weight: 700; }
+
+:root {
+  --ink: #0d0c0b;
+  --ink-2: #151311;
+  --ink-3: #1d1a17;
+  --line: rgba(236, 230, 220, 0.12);
+  --line-strong: rgba(236, 230, 220, 0.24);
+  --accent: #c9b48f;
+  --accent-soft: rgba(201, 180, 143, 0.16);
+  --soft: #8e877c;
+  --text: #ece6dc;
+  --red: #d62718;
+  --yellow: #ffd400;
+  --good: #9fb98a;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ink); overflow: hidden; }
+body { font-family: "Libron", Georgia, serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+
+#stage { position: relative; overflow: hidden; background: var(--ink); }
+.layer { position: absolute; inset: 0; visibility: hidden; }
+.abs { position: absolute; }
+.center { display: flex; align-items: center; justify-content: center; }
+
+/* Kinetic type: each word in a mask it rises out of */
+.words { display: block; }
+.word { display: inline-block; overflow: hidden; vertical-align: top; padding: 0.08em 0.02em 0.14em; margin: -0.08em -0.02em -0.14em; }
+.word > span { display: inline-block; will-change: transform; }
+.accent { color: var(--accent); }
+.soft { color: var(--soft); }
+.mono { font-family: "Mono", ui-monospace, monospace; }
+
+.eyebrow { font-size: 0.32em; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); font-weight: 400; }
+.hair { position: absolute; background: var(--line); }
+
+/* A browser window around the desktop site */
+.browser { position: absolute; border-radius: 18px; background: #1b1916; overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(236, 230, 220, 0.10), 0 40px 120px rgba(0, 0, 0, 0.6), 0 12px 30px rgba(0, 0, 0, 0.45); }
+.browser .bar { height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid rgba(236, 230, 220, 0.07); }
+.browser .dot { width: 13px; height: 13px; border-radius: 50%; background: #3a3631; }
+.browser .url { margin-left: 22px; flex: 0 0 520px; height: 32px; border-radius: 9px; background: #262320; color: #a49c90;
+  font: 400 16px/32px "Libron", Georgia, serif; padding: 0 16px; letter-spacing: 0.01em; }
+.screen { position: relative; overflow: hidden; background: var(--ink); }
+.page { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.page img.state { position: absolute; left: 0; top: 0; display: block; }
+
+/* A phone around the mobile site */
+.phone { position: absolute; border-radius: 64px; background: #080706; padding: 14px;
+  box-shadow: 0 0 0 2px #2b2824, 0 0 0 3px #0a0908, 0 50px 140px rgba(0, 0, 0, 0.65), 0 14px 34px rgba(0, 0, 0, 0.5); }
+.phone .screen { border-radius: 50px; }
+.phone .island { position: absolute; left: 50%; top: 24px; width: 120px; height: 34px; margin-left: -60px; border-radius: 20px; background: #000; z-index: 5; }
+.phone .status { position: absolute; left: 0; right: 0; top: 0; height: 52px; z-index: 4; display: flex; justify-content: space-between;
+  padding: 18px 38px 0 44px; font: 600 15px/1 -apple-system, "Helvetica Neue", Arial, sans-serif; color: var(--text); background: var(--ink); }
+
+/* A pointer and a touch */
+.cursor { position: absolute; width: 26px; height: 34px; margin: -2px 0 0 -2px; z-index: 20; transform-origin: 2px 2px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.55)); }
+.touch { position: absolute; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; z-index: 20;
+  background: rgba(236, 230, 220, 0.30); border: 2px solid rgba(236, 230, 220, 0.85); }
+.ripple { position: absolute; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; z-index: 19;
+  border: 2px solid var(--accent); opacity: 0; }
+.ring { position: absolute; z-index: 15; border: 2.5px solid var(--accent); border-radius: 12px; opacity: 0;
+  box-shadow: 0 0 0 6px rgba(201, 180, 143, 0.14); }
+
+/* Labels pointing at something on screen, in English */
+.callout { position: absolute; z-index: 30; display: flex; align-items: center; gap: 14px; white-space: nowrap;
+  font: 400 30px/1.2 "Libron", Georgia, serif; color: var(--ink); background: var(--accent); padding: 12px 22px; border-radius: 999px; }
+.callout.dark { background: var(--ink-2); color: var(--text); box-shadow: 0 0 0 1px var(--line-strong); }
+
+/* Diagram pieces for the technical films */
+.node { position: absolute; border-radius: 22px; background: var(--ink-2); box-shadow: 0 0 0 1.5px var(--line-strong);
+  display: flex; flex-direction: column; justify-content: center; padding: 22px 28px; }
+.node .k { font-size: 20px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); }
+.node .v { font-size: 40px; line-height: 1.15; margin-top: 6px; }
+.node.hot { box-shadow: 0 0 0 2px var(--accent), 0 0 60px rgba(201, 180, 143, 0.18); }
+svg.wires { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+svg.wires path { fill: none; stroke: var(--line-strong); stroke-width: 2; }
+svg.wires path.lit { stroke: var(--accent); stroke-width: 2.5; }
+.packet { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 18px rgba(201, 180, 143, 0.9); }
+.code { position: absolute; font: 400 25px/1.55 "Mono", ui-monospace, monospace; color: #cfc7ba; white-space: pre;
+  background: var(--ink-2); border-radius: 18px; padding: 28px 34px; box-shadow: 0 0 0 1.5px var(--line); }
+.code .c { color: #6f685e; }
+.code .s { color: #c9b48f; }
+.code .n { color: #9fb98a; }
+.code .k { color: #d9a07a; }
+.chip { display: inline-flex; align-items: center; height: 48px; padding: 0 22px; border-radius: 999px; font-size: 26px;
+  background: var(--ink-3); box-shadow: 0 0 0 1.5px var(--line-strong); white-space: nowrap; }
+.chip.on { background: var(--accent); color: var(--ink); box-shadow: none; }
+.tag-sign { position: absolute; padding: 0.22em 0.6em; font: 700 64px/1 Impact, "Arial Black", sans-serif; letter-spacing: 0.02em;
+  color: #fff; background: var(--red); border: 0.08em solid var(--yellow); border-radius: 0.14em; box-shadow: 0 0.25em 0.7em rgba(0, 0, 0, 0.55); white-space: nowrap; }
+.tag-sign.y { color: var(--red); background: var(--yellow); border-color: var(--red); }
+.logo-chain { height: 46px; object-fit: contain; }
+.wordmark { font-weight: 700; letter-spacing: -0.035em; line-height: 0.9; }
+.stat { font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.grain { position: absolute; inset: -50%; z-index: 90; pointer-events: none; opacity: 0.045; mix-blend-mode: screen; }

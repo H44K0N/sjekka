@@ -36,20 +36,31 @@
             <p class="lede">Sjekka viser hva maten faktisk koster i hver butikk, hvor hele handlelisten din er billigst, og om ukens tilbud egentlig er et tilbud. Prisene kommer fra kvitteringer folk deler.</p>
         </section>
 
-        <section class="promo" aria-label="Sjekka på film">
-            <figure class="wide">
-                <video controls playsinline preload="none" poster="/video/sjekka-film-desktop.jpg" aria-label="Sjekka på PC, 45 sekunder, engelsk tale">
-                    <source src="/video/sjekka-film-desktop.mp4" type="video/mp4">
+        <section class="films" aria-label="Sjekka på film">
+            <figure class="film-main" id="promo">
+                <video controls playsinline preload="none" poster="/video/sjekka-promo-desktop.jpg" aria-label="Sjekka, 1 minutt, engelsk tale og tekst">
+                    <source src="/video/sjekka-promo-desktop.mp4" type="video/mp4">
+                    <track kind="captions" src="/video/sjekka-promo-desktop.vtt" srclang="en" label="English" default>
                 </video>
-                <figcaption>På PC</figcaption>
+                <figcaption>Bruk Sjekka. Du ser versjonen som passer skjermen din.</figcaption>
             </figure>
-            <figure class="tall">
-                <video controls playsinline preload="none" poster="/video/sjekka-film-mobil.jpg" aria-label="Sjekka på mobil, 44 sekunder, engelsk tale">
-                    <source src="/video/sjekka-film-mobil.mp4" type="video/mp4">
-                </video>
-                <figcaption>På mobil</figcaption>
-            </figure>
-            <p class="promo-note">Filmene viser demodata. Stemmen er laget med KI, og musikken er «Motivating Mornings» av Ahjay Stelino (Mixkit).</p>
+            <div class="film-pair">
+                <figure>
+                    <video controls playsinline preload="none" poster="/video/sjekka-slik-fungerer.jpg" aria-label="Slik fungerer Sjekka, 1 minutt 45 sekunder, engelsk tale og tekst">
+                        <source src="/video/sjekka-slik-fungerer.mp4" type="video/mp4">
+                        <track kind="captions" src="/video/sjekka-slik-fungerer.vtt" srclang="en" label="English" default>
+                    </video>
+                    <figcaption><b>Slik fungerer det.</b> Fra kvitteringsbildet til billigste handlekurv.</figcaption>
+                </figure>
+                <figure>
+                    <video controls playsinline preload="none" poster="/video/sjekka-slik-bygget.jpg" aria-label="Slik er Sjekka bygget, 1 minutt 55 sekunder, engelsk tale og tekst">
+                        <source src="/video/sjekka-slik-bygget.mp4" type="video/mp4">
+                        <track kind="captions" src="/video/sjekka-slik-bygget.vtt" srclang="en" label="English" default>
+                    </video>
+                    <figcaption><b>Slik er det bygget.</b> En utvikler, en KI, og et løp som bare slipper gjennom det som er testet.</figcaption>
+                </figure>
+            </div>
+            <p class="promo-note">Filmene viser demodata og har engelsk tale og tekst. Stemmen er laget med KI (Chatterbox, kjørt lokalt). Musikken er «Golden Storm» av Diego Nava og «Focus on Yourself» og «Sonor #2» av Eugenio Mininni, fra Mixkit. Tilbudsavisene i åpningen er ukas ekte tilbud fra kjedene, vist kort som eksempel.</p>
         </section>
 
         <section class="about-facts">
@@ -84,5 +95,25 @@
     </footer>
 
     <script src="/list.js"></script>
+    <script>
+        // One "use Sjekka" film, in the shape of the screen it's watched on
+        (() => {
+            const video = document.querySelector("#promo video");
+            const source = video.querySelector("source"), track = video.querySelector("track");
+            const phone = matchMedia("(max-width: 700px), (pointer: coarse) and (orientation: portrait) and (max-width: 900px)");
+            const choose = () => {
+                if (!video.paused || video.currentTime > 0) return;  // never swap one that's playing
+                const name = phone.matches ? "sjekka-promo-mobil" : "sjekka-promo-desktop";
+                if (source.getAttribute("src") === `/video/${name}.mp4`) return;
+                source.src = `/video/${name}.mp4`;
+                track.src = `/video/${name}.vtt`;
+                video.poster = `/video/${name}.jpg`;
+                video.parentElement.classList.toggle("tall", phone.matches);
+                video.load();
+            };
+            choose();
+            phone.addEventListener("change", choose);
+        })();
+    </script>
 </body>
 </html>

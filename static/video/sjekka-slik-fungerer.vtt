@@ -1,0 +1,109 @@
+WEBVTT
+
+00:00:00.700 --> 00:00:02.133
+This is how Sjekka works.
+
+00:00:02.133 --> 00:00:05.860
+From a crumpled receipt, to the cheapest way to fill your basket.
+
+00:00:06.410 --> 00:00:07.560
+It starts with a photo.
+
+00:00:07.560 --> 00:00:08.960
+The browser checks it first.
+
+00:00:08.960 --> 00:00:13.810
+The server turns it the right way up, and puts it in a queue, so you get an answer straight away.
+
+00:00:14.360 --> 00:00:17.288
+A background worker sends the photo to Google's Gemini.
+
+00:00:17.288 --> 00:00:18.300
+Gemini has one job:
+
+00:00:18.300 --> 00:00:20.483
+to read the receipt into a strict format.
+
+00:00:20.483 --> 00:00:22.400
+The store, the date, and every line.
+
+00:00:22.950 --> 00:00:24.053
+Then code takes over.
+
+00:00:24.053 --> 00:00:30.459
+The answer is validated, unit prices are calculated instead of trusted to the model, and a receipt seen before is skipped.
+
+00:00:30.459 --> 00:00:32.350
+The photo is deleted once it's read.
+
+00:00:32.900 --> 00:00:33.632
+Next, names.
+
+00:00:33.632 --> 00:00:38.266
+The same pizza might come back as Grandiosa, Pizza Grandiosa, or just Pizza.
+
+00:00:38.266 --> 00:00:42.473
+Sjekka files them as one product, Pizza, with Grandiosa as the brand.
+
+00:00:42.473 --> 00:00:46.010
+So you can ask for the cheapest pizza, across every brand.
+
+00:00:46.560 --> 00:00:48.296
+Sizes are made comparable too:
+
+00:00:48.296 --> 00:00:50.784
+per hundred grams, per litre, or per piece.
+
+00:00:50.784 --> 00:00:54.430
+A six-pack of eggs is compared with a twelve-pack, egg for egg.
+
+00:00:54.980 --> 00:00:57.289
+Your shopping list is priced in every chain.
+
+00:00:57.289 --> 00:01:03.060
+For each product, Sjekka takes the cheapest choice that chain sells right now, at the size people usually buy.
+
+00:01:03.610 --> 00:01:05.242
+Receipts never cover everything.
+
+00:01:05.242 --> 00:01:11.361
+When a chain has no price for something, it's estimated from how expensive that chain is on the products we can compare.
+
+00:01:11.361 --> 00:01:12.840
+And every estimate is marked.
+
+00:01:13.390 --> 00:01:16.610
+Every six hours, Sjekka also reads the chains' new flyers.
+
+00:01:16.610 --> 00:01:20.607
+Each offer is held up against what receipts say it cost before the sale.
+
+00:01:20.607 --> 00:01:21.717
+Some are real deals.
+
+00:01:21.717 --> 00:01:24.160
+Others are the usual price, with a red sign.
+
+00:01:24.710 --> 00:01:26.954
+You can also share a whole year at once.
+
+00:01:26.954 --> 00:01:33.070
+A loyalty card history is read straight from the file, with exact prices, and Gemini only names the products.
+
+00:01:33.620 --> 00:01:34.506
+No accounts.
+
+00:01:34.506 --> 00:01:35.317
+No cookies.
+
+00:01:35.317 --> 00:01:36.424
+No photos kept.
+
+00:01:36.424 --> 00:01:37.310
+Just prices.
+
+00:01:38.010 --> 00:01:38.923
+That's Sjekka.
+
+00:01:38.923 --> 00:01:41.010
+Real prices, from real receipts.

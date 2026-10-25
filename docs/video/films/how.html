@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How Sjekka works</title>
+<link rel="stylesheet" href="studio.css">
+<script src="/lib/gsap.min.js"></script>
+<style>
+  .receipt { position: absolute; background: #efe8dc; color: #1a1714; font: 400 26px/1.55 "Mono", monospace; padding: 34px 38px;
+    box-shadow: 0 40px 120px rgba(0,0,0,0.6); }
+  .receipt .row { display: flex; justify-content: space-between; gap: 30px; white-space: nowrap; }
+  .tagline { font-size: 44px; color: var(--soft); }
+  .pill { position: absolute; display: inline-flex; align-items: center; gap: 12px; height: 56px; padding: 0 26px; border-radius: 999px;
+    font-size: 30px; background: var(--ink-3); box-shadow: 0 0 0 1.5px var(--line-strong); white-space: nowrap; }
+  .pill.on { background: var(--accent); color: var(--ink); box-shadow: none; }
+  .big-num { font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .table { position: absolute; font-size: 34px; }
+  .table .r { position: absolute; left: 0; display: flex; align-items: center; height: 76px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .brandtag { font-size: 24px; color: var(--soft); margin-left: 18px; }
+  .est { background: repeating-linear-gradient(135deg, rgba(201,180,143,0.10) 0 8px, transparent 8px 16px); color: var(--soft); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+import { W, H, stage, load, h, place, words, Film, rise, onVoice, sink, count, ready, middle } from "./studio.js";
+import { scene, chapter, subs, node, centre, wire, packet, glow, stagger, check, code } from "./kit.js";
+
+const { shots } = await load("how");
+const film = new Film("how");
+const tl = film.tl;
+const GAP = 0.55;
+let t = 0.7;
+
+// App pieces, cropped from the captures of the real pages
+function crop(parent, state, key, x, y, scale = 1) {
+  const b = shots[state].boxes[key];
+  const d = h("div", "abs", parent);
+  Object.assign(d.style, { left: `${x}px`, top: `${y}px`, width: `${b[2] * scale}px`, height: `${b[3] * scale}px`, borderRadius: "14px",
+    backgroundImage: `url("/shots/desktop/${state}.png")`, backgroundSize: `${shots[state].width * scale}px ${shots[state].height * scale}px`,
+    backgroundPosition: `${-b[0] * scale}px ${-b[1] * scale}px`, boxShadow: "0 0 0 1px rgba(236,230,220,0.14), 0 30px 80px rgba(0,0,0,0.55)" });
+  return d;
+}
+const mark = h("div", "abs", stage, "sjekka");
+mark.style.cssText = "left:120px;top:36px;font-size:30px;font-weight:700;letter-spacing:-.03em;z-index:50;opacity:0";
+const bar = h("div", "abs", stage);
+bar.style.cssText = `left:0;bottom:0;height:4px;width:${W}px;background:var(--accent);transform-origin:0 0;z-index:50;opacity:.7`;
+
+// ---------- 0. Intro ----------
+const introLine = film.say("intro", t);
+const intro = scene(film, stage, 0, introLine.end + GAP - 0.1);
+const title = words(intro, "How *Sjekka* <br>works.", "abs");
+title.style.cssText += "font-size:170px;font-weight:700;letter-spacing:-.035em;line-height:1";
+place(title, 120, 0);
+middle(title, H / 2 - 40);
+onVoice(film, title, { words: [{ s: introLine.start + 0.05 }, { s: introLine.start + 0.3 }, { s: introLine.start + 0.6 }], end: introLine.end }, { dur: 0.9 });
+const sub = h("div", "tagline abs", intro, "From a crumpled receipt<br>to the cheapest basket.");
+place(sub, 124, H / 2 + 150);
+tl.fromTo(sub, { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.8, ease: "power3.out" }, introLine.start + 1.2);
+const rc = h("div", "receipt", intro);
+place(rc, 1210, 150, 480, 700);
+const rows = [["REMA 1000", ""], ["GRÜNERLØKKA", ""], ["", ""], ["KJØTTDEIG 400G", "54,90"], ["TORTILLA 8STK", "32,90"], ["RØMME LETT", "26,90"], ["AVOKADO 2STK", "49,00"], ["TACOKRYDDER", "14,90"], ["", ""], ["TOTALT", "178,60"]];
+rows.forEach(([a, b]) => { const r = h("div", "row", rc); h("span", "", r, a || "&nbsp;"); h("span", "", r, b); });
+tl.fromTo(rc, { y: H, rotation: 9, autoAlpha: 0 }, { y: 0, rotation: 4, autoAlpha: 1, duration: 1.3, ease: "expo.out" }, introLine.start + 0.2);
+tl.to(rc, { rotation: 2, y: -14, duration: 5, ease: "sine.inOut" }, introLine.start + 1.4);
+film.score("568", 0, 0.0, { fadeIn: 2, level: 0.55, duck: 0.03 });
+film.fx("whoosh", introLine.start + 0.2, 0.6);
+t = introLine.end + GAP;
+film.tl.set(mark, { autoAlpha: 0 }, 0);
+tl.to(mark, { autoAlpha: 1, duration: 0.6 }, t);
+
+// ---------- 1. Upload ----------
+const upLine = film.say("upload", t);
+const up = scene(film, stage, t - 0.1, upLine.end + GAP - 0.1);
+chapter(film, up, "01", "A photo, and a queue.", t);
+const NW = 470, NH = 190, NY = 470;
+const xs = [120, 725, 1330];
+const nb = node(up, xs[0], NY, NW, NH, "Browser", "Checks the photo first");
+const ns = node(up, xs[1], NY, NW, NH, "FastAPI server", "Turns it upright, rate-limits");
+const nq = node(up, xs[2], NY, NW, NH, "Job queue", "An answer straight away");
+stagger(film, [nb, ns, nq], t + 0.5, 0.25);
+const mid = NY + NH / 2;
+wire(film, up, [xs[0] + NW + 6, mid], [xs[1] - 8, mid], upLine.at("server") - 0.6, 0.5);
+wire(film, up, [xs[1] + NW + 6, mid], [xs[2] - 8, mid], upLine.at("queue") - 0.6, 0.5);
+// The photo travels and ends up in the queue
+const photo = h("div", "abs", up);
+photo.style.cssText = "width:70px;height:92px;background:#efe8dc;border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,0.5);margin:-46px 0 0 -35px";
+packet(film, up, [[xs[0] + NW / 2, mid + 120], [xs[0] + NW / 2, mid + 120], [xs[1] + NW / 2, mid + 120], [xs[2] + NW / 2, mid + 120]], upLine.at("starts") || t + 0.8, upLine.end - t - 1.4, photo);
+glow(film, nb, upLine.at("browser"), 1.6);
+glow(film, ns, upLine.at("server"), 1.8);
+glow(film, nq, upLine.at("queue"), 1.8);
+const done = h("div", "pill on", up, "Answered in under a second");
+place(done, 1330, NY + NH + 60);
+tl.fromTo(done, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "back.out(2)" }, upLine.at("straight"));
+film.fx("pop", upLine.at("straight"), 0.5);
+film.fx("click", upLine.at("browser"), 0.5);
+subs(film, upLine, up);
+t = upLine.end + GAP;
+
+// ---------- 2. Gemini ----------
+const gLine = film.say("gemini", t);
+const gm = scene(film, stage, t - 0.1, gLine.end + GAP - 0.1);
+chapter(film, gm, "02", "One job for the AI.", t);
+const gw = node(gm, 120, 400, 400, 170, "Worker", "Takes the next job");
+const gg = node(gm, 640, 360, 420, 250, "Google Gemini", "Reads the photo into a strict format", "hot");
+const gcode = code(gm, 1190, 290, 610, `<span class="c">// the answer must fit this shape</span>
+{
+  <span class="s">"store_chain"</span>: <span class="n">"Rema 1000"</span>,
+  <span class="s">"purchase_date"</span>: <span class="n">"2026-10-25"</span>,
+  <span class="s">"items"</span>: [{
+    <span class="s">"raw_name"</span>: <span class="n">"KJØTTDEIG 400G"</span>,
+    <span class="s">"quantity"</span>: 400, <span class="s">"unit"</span>: <span class="n">"g"</span>,
+    <span class="s">"total_price"</span>: 54.90
+  }]
+}`, 24);
+stagger(film, [gw, gg], t + 0.5, 0.25);
+wire(film, gm, [526, 485], [632, 485], gLine.at("sends") || t + 1.2, 0.5);
+wire(film, gm, [1066, 485], [1180, 485], gLine.at("strict") - 0.2, 0.5);
+const lines = gcode.innerHTML.split("\n");
+gcode.innerHTML = lines.map(l => `<div class="ln" style="opacity:0">${l}</div>`).join("");
+const lns = [...gcode.querySelectorAll(".ln")];
+tl.fromTo(gcode, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, gLine.at("strict") - 0.2);
+lns.forEach((l, i) => tl.to(l, { opacity: 1, duration: 0.2 }, gLine.at("strict") + 0.1 + i * 0.25));
+glow(film, gg, gLine.at("one"), 3);
+film.fx("chime", gLine.at("strict") + 0.3, 0.3);
+const strict = h("div", "pill", gm, "Only values from fixed lists");
+place(strict, 1190, 700);
+tl.fromTo(strict, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, gLine.at("every"));
+subs(film, gLine, gm);
+t = gLine.end + GAP;
+
+// ---------- 3. The checks ----------
+const cLine = film.say("checks", t);
+const ck = scene(film, stage, t - 0.1, cLine.end + GAP - 0.1);
+chapter(film, ck, "03", "Then code takes over.", t);
+code(ck, 120, 330, 760, `<span class="c"># the model reads prices; it never does maths</span>
+<span class="k">def</span> price_per(price, quantity, unit):
+    <span class="k">if</span> unit <span class="k">in</span> (<span class="n">"g"</span>, <span class="n">"ml"</span>):
+        <span class="k">return</span> price / quantity * <span class="n">100</span>
+    <span class="k">return</span> price / quantity  <span class="c"># per piece</span>
+
+<span class="c"># KJØTTDEIG 400G, 54,90 kr</span>
+price_per(<span class="n">54.90</span>, <span class="n">400</span>, <span class="n">"g"</span>)  <span class="c"># 13,73 kr / 100 g</span>`, 25);
+const rowsC = ["Validated against the schema", "Unit prices worked out in code", "Seen before? Skipped", "The photo is deleted once read"];
+const cks = rowsC.map((txt, i) => check(ck, 1000, 330 + i * 120, 800, txt));
+const cueAt = [cLine.at("validated"), cLine.at("unit"), cLine.at("seen"), cLine.at("photo")];
+cks.forEach((c, i) => {
+  tl.fromTo(c.row, { autoAlpha: 0, x: 40 }, { autoAlpha: 1, x: 0, duration: 0.5, ease: "power3.out" }, cueAt[i] - 0.2);
+  tl.fromTo(c.ring, { scale: 0 }, { scale: 1, duration: 0.4, ease: "back.out(3)" }, cueAt[i] + 0.1);
+  film.fx("pop", cueAt[i] + 0.1, 0.5);
+});
+subs(film, cLine, ck);
+t = cLine.end + GAP;
+
+// ---------- 4. Names ----------
+const nLine = film.say("names", t);
+const nm = scene(film, stage, t - 0.1, nLine.end + GAP - 0.1);
+chapter(film, nm, "04", "One product, one name.", t);
+const chips = ["Grandiosa", "Pizza grandiosa", "Pizza"].map((txt, i) => {
+  const c = h("div", "pill", nm, txt);
+  place(c, 140 + i * 40, 360 + i * 110);
+  c.style.fontSize = "38px"; c.style.height = "72px";
+  return c;
+});
+chips.forEach((c, i) => tl.fromTo(c, { autoAlpha: 0, x: -60 }, { autoAlpha: 1, x: 0, duration: 0.6, ease: "power3.out" }, nLine.at("grandiosa") + i * 0.5 - 0.2));
+const third = h("div", "abs soft", nm, "A third of the prices each");
+place(third, 140, 700); third.style.fontSize = "34px";
+tl.fromTo(third, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.5 }, nLine.at("grandiosa") + 1.6);
+// They merge into one card
+const prod = h("div", "node hot", nm);
+place(prod, 1000, 330, 700, 400);
+h("div", "k", prod, "Product");
+const pn = h("div", "", prod, "Pizza"); pn.style.cssText = "font-size:120px;font-weight:700;letter-spacing:-.03em;line-height:1.1";
+const brands = h("div", "", prod); brands.style.cssText = "display:flex;gap:12px;margin-top:20px;flex-wrap:wrap";
+["Grandiosa", "Big One", "Dr. Oetker", "Coop"].forEach(b => { const x = h("span", "chip", brands, b); x.style.opacity = 0; });
+const total = h("div", "", prod); total.style.cssText = "font-size:34px;color:var(--soft);margin-top:24px";
+const mergeAt = nLine.at("sheka") ;
+tl.fromTo(prod, { autoAlpha: 0, scale: 0.9 }, { autoAlpha: 1, scale: 1, duration: 0.7, ease: "expo.out" }, mergeAt + 0.3);
+chips.forEach((c, i) => tl.to(c, { x: 820 - i * 40, y: 80 - i * 110, scale: 0.6, autoAlpha: 0, duration: 0.7, ease: "power3.in" }, mergeAt + 0.1 + i * 0.1));
+tl.to(third, { autoAlpha: 0, duration: 0.3 }, mergeAt);
+film.fx("whoosh", mergeAt + 0.1, 0.5);
+film.fx("impact", mergeAt + 0.6, 0.35);
+[...brands.children].forEach((b, i) => tl.fromTo(b, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.4 }, nLine.at("brand") + i * 0.18));
+tl.set(total, { autoAlpha: 0 }, 0);
+tl.set(total, { autoAlpha: 1 }, nLine.at("cheapest") - 1.7);
+count(film, total, 0, 104, nLine.at("cheapest") - 1.6, 1.4, { suffix: " prices" });
+const cheap = h("div", "pill on", nm, "Cheapest pizza right now: 41,30 kr");
+place(cheap, 1000, 790);
+tl.fromTo(cheap, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "back.out(2)" }, nLine.at("cheapest"));
+film.fx("chime", nLine.at("cheapest") + 0.05, 0.35);
+subs(film, nLine, nm);
+t = nLine.end + GAP;
+
+// ---------- 5. Sizes ----------
+const zLine = film.say("sizes", t);
+const sz = scene(film, stage, t - 0.1, zLine.end + GAP - 0.1);
+chapter(film, sz, "05", "Sizes that compare.", t);
+function pack(x, label, price, n, per, hot) {
+  const c = h("div", `node ${hot ? "hot" : ""}`, sz);
+  place(c, x, 340, 520, 420);
+  h("div", "k", c, label);
+  const p = h("div", "big-num", c, price); p.style.cssText = "font-size:96px;margin-top:10px";
+  const eggs = h("div", "", c); eggs.style.cssText = "display:flex;flex-wrap:wrap;gap:10px;margin:22px 0;width:440px";
+  for (let i = 0; i < n; i++) { const e = h("span", "", eggs); e.style.cssText = "width:50px;height:62px;border-radius:50% 50% 50% 50% / 62% 62% 38% 38%;background:#e8dcc4"; }
+  const pe = h("div", "", c, per); pe.style.cssText = "font-size:42px;color:var(--accent)";
+  return c;
+}
+const six = pack(260, "6-pack", "29,90 kr", 6, "4,98 kr per egg");
+const twelve = pack(1000, "12-pack", "56,40 kr", 12, "4,70 kr per egg", true);
+stagger(film, [six, twelve], zLine.at("six") - 0.3, 0.4);
+glow(film, twelve, zLine.at("12"), 3);
+const units = h("div", "abs", sz); units.style.cssText = "left:120px;top:830px;display:flex;gap:16px";
+["per 100 g", "per litre", "per piece"].forEach(u => h("span", "chip", units, u));
+tl.fromTo(units.children, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.5, stagger: 0.2 }, zLine.at("per"));
+film.fx("pop", zLine.at("egg") , 0.4);
+subs(film, zLine, sz);
+t = zLine.end + GAP;
+
+// ---------- 6. The list ----------
+const lLine = film.say("list", t);
+const ls = scene(film, stage, t - 0.1, lLine.end + GAP - 0.1);
+chapter(film, ls, "06", "The cheapest choice, per chain.", t);
+const LOGOS = { "Bunnpris": "/chains/bunnpris.png", "Obs": "/chains/obs.png", "Extra": "/chains/extra.png", "Spar": "/chains/spar.svg", "Kiwi": "/chains/kiwi.png" };
+const CH = [["Bunnpris", "41,30", "Grandiosa"], ["Obs", "48,17", "Coop"], ["Extra", "49,40", "Coop"], ["Spar", "50,67", "Dr. Oetker"], ["Kiwi", "69,90", "Big One"]];
+const tb = h("div", "table", ls);
+place(tb, 220, 330, 1300);
+const head = h("div", "soft", tb, "Pizza, for 570 g"); head.style.cssText = "font-size:28px;margin-bottom:12px";
+const trs = CH.map(([chain, price, brand], i) => {
+  const r = h("div", "r", tb); r.style.top = `${54 + i * 84}px`; r.style.width = "1300px";
+  const lg = h("img", "logo-chain", r); lg.src = LOGOS[chain]; lg.style.cssText = "height:44px;width:150px;object-fit:contain;object-position:left";
+  const bar = h("div", "", r); bar.style.cssText = `height:14px;border-radius:7px;background:${i === 0 ? "var(--accent)" : "#4a453e"};width:${(+price.replace(",", ".") / 70) * 600}px;margin-left:40px;transform-origin:0 50%`;
+  const p = h("div", "", r, `${price} kr`); p.style.cssText = "margin-left:auto;font-size:40px;width:190px;text-align:right";
+  const b = h("div", "brandtag", r, brand); b.style.cssText += ";width:220px";
+  return { r, bar };
+});
+trs.forEach(({ r, bar }, i) => {
+  tl.fromTo(r, { autoAlpha: 0, x: 30 }, { autoAlpha: 1, x: 0, duration: 0.5, ease: "power3.out" }, lLine.at("cheapest") + i * 0.35);
+  tl.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: "power3.out" }, lLine.at("cheapest") + 0.2 + i * 0.35);
+});
+film.fx("tick", lLine.at("cheapest"), 0.3);
+const sizeNote = h("div", "pill on", ls, "Each chain's cheapest brand now, at the usual size");
+place(sizeNote, 220, 840);
+tl.fromTo(sizeNote, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "back.out(2)" }, lLine.at("usually") - 0.3);
+subs(film, lLine, ls);
+t = lLine.end + GAP;
+
+// ---------- 7. Estimates ----------
+const eLine = film.say("estimate", t);
+const es = scene(film, stage, t - 0.1, eLine.end + GAP - 0.1);
+chapter(film, es, "07", "Gaps are estimated, and marked.", t);
+const GRID = [["", "Kiwi", "Rema 1000", "Extra"], ["Kjøttdeig", "62,90", "59,90", "≈ 60,40"], ["Lettmelk", "24,90", "≈ 24,10", "22,90"], ["Laksefilet", "69,90", "≈ 71,20", "≈ 76,10"], ["Grovbrød", "29,90", "28,90", "≈ 30,80"]];
+const gridEl = h("div", "abs", es);
+place(gridEl, 120, 320);
+const CWID = [300, 250, 250, 250];
+GRID.forEach((row, ri) => row.forEach((cell, ci) => {
+  const c = h("div", `abs ${cell.startsWith("≈") ? "est" : ""}`, gridEl, cell);
+  const left = CWID.slice(0, ci).reduce((a, b) => a + b, 0);
+  c.style.cssText += `left:${left}px;top:${ri * 96}px;width:${CWID[ci] - 12}px;height:84px;display:flex;align-items:center;justify-content:${ci ? "center" : "flex-start"};font-size:${ri ? 38 : 28}px;border-radius:12px;${ri === 0 ? "color:var(--soft)" : ""}`;
+  if (cell.startsWith("≈")) tl.fromTo(c, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.5 }, eLine.at("estimated") + 0.15 * (ri + ci));
+  else tl.fromTo(c, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, t + 0.4 + 0.07 * (ri * 4 + ci));
+}));
+const idx = node(es, 1260, 330, 520, 330, "Price index", "How expensive a chain is on the products we can compare");
+const iv = h("div", "big-num", idx, "×0,93"); iv.style.cssText = "font-size:110px;margin-top:20px;color:var(--accent)";
+const ik = h("div", "soft", idx, "Kiwi: 7 % cheaper than typical"); ik.style.fontSize = "26px";
+tl.fromTo(idx, { autoAlpha: 0, x: 40 }, { autoAlpha: 1, x: 0, duration: 0.7, ease: "power3.out" }, eLine.at("how"));
+glow(film, idx, eLine.at("how") + 0.3, 3);
+const mk = h("div", "pill on", es, "≈ is always shown as an estimate");
+place(mk, 120, 850);
+tl.fromTo(mk, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "back.out(2)" }, eLine.at("every") - 0.3);
+const ex = h("div", "abs soft", es, "Example data"); ex.style.cssText += ";right:120px;top:36px;font-size:24px";
+subs(film, eLine, es);
+t = eLine.end + GAP;
+
+// ---------- 8. Flyers ----------
+const fLine = film.say("flyers", t);
+const fl = scene(film, stage, t - 0.1, fLine.end + GAP - 0.1);
+chapter(film, fl, "08", "Offers, held to account.", t);
+const flyers = [["/flyers/f4.jpg", 0, 0], ["/flyers/f1.jpg", 1, 0], ["/flyers/f7.jpg", 2, 0]];
+const fstack = h("div", "abs", fl);
+place(fstack, 120, 320);
+flyers.forEach(([src, i], k) => {
+  const im = h("img", "abs", fstack); im.src = src;
+  im.style.cssText += `left:${k * 150}px;top:${k * 20}px;height:${430 - k * 30}px;border-radius:6px;box-shadow:0 20px 50px rgba(0,0,0,0.55);transform:rotate(${(k - 1) * 4}deg)`;
+  tl.fromTo(im, { autoAlpha: 0, y: 60 }, { autoAlpha: 1, y: 0, duration: 0.7, ease: "expo.out" }, t + 0.5 + k * 0.3);
+});
+const arrow = h("div", "abs", fl, "→"); arrow.style.cssText += ";left:760px;top:440px;font-size:90px;color:var(--accent)";
+tl.fromTo(arrow, { autoAlpha: 0, x: -20 }, { autoAlpha: 1, x: 0, duration: 0.5 }, fLine.at("held"));
+const offerCard = crop(fl, "offers-open", "real.0", 920, 330, 1.45);
+tl.fromTo(offerCard, { autoAlpha: 0, x: 40 }, { autoAlpha: 1, x: 0, duration: 0.7, ease: "power3.out" }, fLine.at("held"));
+const demo = h("div", "abs soft", fl, "Verdicts shown on demo data"); demo.style.cssText += ";right:120px;top:36px;font-size:24px";
+const hint = h("div", "pill on", fl, "Checked against what receipts say it cost before the sale");
+place(hint, 920, 800);
+tl.fromTo(hint, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "back.out(2)" }, fLine.at("some") - 0.2);
+const every = h("div", "pill", fl, "Every 6 hours");
+place(every, 120, 840);
+tl.fromTo(every, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.5 }, fLine.at("every"));
+subs(film, fLine, fl);
+t = fLine.end + GAP;
+
+// ---------- 9. A whole history ----------
+const hLine = film.say("history", t);
+const hs = scene(film, stage, t - 0.1, hLine.end + GAP - 0.1);
+chapter(film, hs, "09", "A whole year at once.", t);
+const jc = code(hs, 120, 330, 760, `<span class="c">// trumf.json, as exported</span>
+{ <span class="s">"tidspunkt"</span>: <span class="n">"2026-10-12T17:42"</span>,
+  <span class="s">"butikk"</span>: <span class="n">"KIWI 505 Storo"</span>,
+  <span class="s">"varelinjer"</span>: [
+    { <span class="s">"tekst"</span>: <span class="n">"KJØTTDEIG 400G"</span>, <span class="s">"belop"</span>: 54.90 },
+    { <span class="s">"tekst"</span>: <span class="n">"LETTMELK 1L"</span>, <span class="s">"belop"</span>: 24.90 }
+  ] }`, 24);
+tl.fromTo(jc, { autoAlpha: 0, x: -30 }, { autoAlpha: 1, x: 0, duration: 0.7, ease: "power3.out" }, t + 0.5);
+const hnum = h("div", "big-num abs", hs); place(hnum, 1010, 340); hnum.style.fontSize = "150px";
+count(film, hnum, 0, 258, hLine.at("exact") - 0.3, 2.0, {});
+const hl = h("div", "abs", hs, "receipts, with exact prices"); place(hl, 1014, 520); hl.style.cssText += ";font-size:38px;color:var(--soft)";
+tl.fromTo([hnum, hl], { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "power3.out", stagger: 0.1 }, hLine.at("exact") - 0.3);
+const ai = h("div", "pill", hs, "Gemini only names the products");
+place(ai, 1014, 640);
+tl.fromTo(ai, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "back.out(2)" }, hLine.at("gemini"));
+film.fx("pop", hLine.at("gemini"), 0.4);
+subs(film, hLine, hs);
+t = hLine.end + GAP;
+
+// ---------- 10. Privacy ----------
+const pLine = film.say("privacy", t);
+const pv = scene(film, stage, t - 0.1, pLine.end + 0.5);
+const ptext = words(pv, "No accounts. <br>No cookies. <br>No photos kept. <br>*Just prices.*", "abs");
+ptext.style.cssText += "font-size:132px;font-weight:700;letter-spacing:-.035em;line-height:1.06";
+place(ptext, 120, 0);
+middle(ptext, H / 2 - 30);
+const pw = pLine.words;
+const idxs = [0, 2, 4, 7];
+ptext.spans.forEach((s, i) => {
+  const ln = i < 2 ? 0 : i < 4 ? 1 : i < 7 ? 2 : 3;
+  const at = [pLine.start, pLine.at("No", 2) , pLine.at("photos") - 0.3, pLine.at("just") - 0.1][ln];
+  tl.fromTo(s, { yPercent: 115 }, { yPercent: 0, duration: 0.7, ease: "expo.out" }, at + (i - [0, 0, 2, 2, 4, 4, 4, 7, 7][i]) * 0.07);
+});
+film.fx("hit", pLine.start, 0.4);
+film.fx("hit", pLine.at("just"), 0.5);
+subs(film, pLine, pv);
+t = pLine.end + 0.7;
+
+// ---------- 11. Outro ----------
+const oLine = film.say("outro", t);
+const ot = scene(film, stage, t - 0.2, oLine.end + 3.2, { fade: 0.6 });
+const om = h("div", "wordmark abs", ot);
+om.style.cssText += `font-size:300px;left:0;width:${W}px;text-align:center;top:${H / 2 - 260}px`;
+const letters = [..."sjekka"].map(c => { const o = h("span", "word", om); return h("span", "", o, c); });
+tl.fromTo(letters, { yPercent: 120 }, { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.045 }, t);
+const otag = h("div", "abs soft", ot, "Real prices, from real receipts.");
+otag.style.cssText += `left:0;width:${W}px;text-align:center;top:${H / 2 + 110}px;font-size:44px`;
+tl.fromTo(otag, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.8 }, t + 0.8);
+const ourl = h("div", "abs", ot, "sjekka.tischbein.dev");
+ourl.style.cssText += `left:0;width:${W}px;text-align:center;top:${H / 2 + 190}px;font-size:36px;color:var(--accent)`;
+tl.fromTo(ourl, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.8 }, oLine.end - 0.5);
+film.fx("impact", t, 0.7);
+tl.to(mark, { autoAlpha: 0, duration: 0.4 }, t - 0.3);
+const total_s = oLine.end + 3.2;
+tl.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: total_s, ease: "none" }, 0);
+film.finish(total_s + 0.6);
+await ready();
+</script>
+</body>
+</html>
