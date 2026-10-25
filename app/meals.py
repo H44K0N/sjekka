@@ -208,9 +208,10 @@ def plan_week(priced: dict[str, dict], resolved: dict[str, list], units, plain, 
     }
 
 
-def suggest(offers, deals, portions: int = 4, chosen: list[str] | None = None) -> dict:
+def suggest(offers, deals, portions: int = 4, chosen: list[str] | None = None, days: int = len(WEEKDAYS)) -> dict:
     """Every dinner that can be priced, cheapest first, and a plan for the week."""
     portions = max(PORTIONS_MIN, min(portions, PORTIONS_MAX))
+    days = max(1, min(days, len(WEEKDAYS)))
     known = known_products(offers, deals)
     resolved = {recipe.id: lines for recipe in RECIPES if (lines := resolve(recipe, known))}
     products = sorted({product for lines in resolved.values() for _, product in lines if product})
@@ -221,4 +222,4 @@ def suggest(offers, deals, portions: int = 4, chosen: list[str] | None = None) -
               for recipe in RECIPES if recipe.id in resolved}
     recipes = sorted(priced.values(), key=lambda r: (r["per_portion"], r["name"]))
     return {"portions": portions, "recipes": recipes,
-            "plan": plan_week(priced, resolved, units, plain, portions, chosen)}
+            "plan": plan_week(priced, resolved, units, plain, portions, chosen, days)}

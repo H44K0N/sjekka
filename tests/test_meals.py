@@ -154,6 +154,18 @@ def test_a_plan_has_limited_dinners_of_one_kind_and_puts_friday_food_last(monkey
     assert set(plan["days"][0]["alternatives"]).isdisjoint(ids)
 
 
+def test_a_plan_can_be_for_fewer_dinners(monkeypatch):
+    many = tuple(dinner(f"d{i}", f"Dinner {i}", kind, ing("Pasta", "Pasta", share=0.2)) for i, kind in
+                 enumerate(["kjøtt", "kylling", "fisk", "vegetar", "svin", "pølse"]))
+    monkeypatch.setattr(meals, "RECIPES", many)
+    monkeypatch.setattr(meals, "BY_ID", {r.id: r for r in many})
+    offers = basket.latest_offers(ROWS)
+    assert len(meals.suggest(offers, {})["plan"]["days"]) == 5
+    assert len(meals.suggest(offers, {}, days=3)["plan"]["days"]) == 3
+    assert len(meals.suggest(offers, {}, days=99)["plan"]["days"]) == 5  # a working week at most
+    assert len(meals.suggest(offers, {}, days=0)["plan"]["days"]) == 1
+
+
 def test_a_plan_can_be_asked_for_with_chosen_dinners(two_dinners):
     offers = basket.latest_offers(ROWS)
     only = meals.suggest(offers, {}, chosen=["carb"])["plan"]
