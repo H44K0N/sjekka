@@ -91,6 +91,8 @@
         // The price as paid, or the kilo price for what was weighed
         const amount = p => weighed && p.by_weight ? `${kr.format(comparable(p))} kr / kg` : `${kr.format(each(p))} kr`;
         let cheapest = null;  // the cheapest store's latest price, once loaded
+        // A price this many days old still says what something costs now
+        const RECENT_DAYS = 90;
         const day = p => p.purchase_date ? new Date(p.purchase_date).getTime() : null;
 
         // Any product can go on the list, also one only seen in this week's flyers
@@ -139,10 +141,19 @@
 
             cheapest = stores[0].latest;
             $("best").hidden = false;
+            // An old price isn't what it costs now: say when it was seen
+            const age = cheapest.purchase_date ? (Date.now() - new Date(cheapest.purchase_date)) / 864e5 : Infinity;
+            $("best").querySelector(".label").textContent = age <= RECENT_DAYS ? "Billigst nå" : "Billigst sist vi så";
             $("best-chain").replaceChildren(chainBadge(stores[0].chain));
-            $("best-price").textContent = amount(cheapest);
-            $("best-unit").textContent = weighed && cheapest.by_weight ? `${packSize(cheapest)} for ${kr.format(cheapest.total_price)} kr`
+            // Stores selling different sizes are ranked per 100 g/ml, so lead
+            // with that: "29,90 kr" for 1,75 l is cheaper than 21,90 kr for 1 l
+            const sizes = new Set(stores.map(st => `${st.latest.quantity} ${st.latest.unit}`));
+            const perUnit = !weighed && sizes.size > 1 && cheapest.price_per_unit != null && cheapest.unit !== "stk";
+            $("best-price").textContent = perUnit ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : amount(cheapest);
+            const unit = weighed && cheapest.by_weight ? `${packSize(cheapest)} for ${kr.format(cheapest.total_price)} kr`
+                : perUnit ? `${amount(cheapest)} for ${packSize(cheapest)}`
                 : cheapest.price_per_unit != null ? `${kr.format(comparable(cheapest))} ${unitLabel(cheapest)}` : "";
+            $("best-unit").textContent = [unit, cheapest.purchase_date && daysAgo(cheapest.purchase_date)].filter(Boolean).join(" · ");
 
             // Shared axes for every store's timeline, so the rows compare directly
             const days = prices.map(day).filter(Boolean);
@@ -170,7 +181,8 @@
                 const price = el("div", "amount");
                 price.append(el("b", "", amount(p)));
                 const diff = comparable(p) - comparable(cheapest);
-                price.append(el("span", "", i === 0 ? "billigst" : diff < 0.005 ? "samme pris" : `+${kr.format(diff)} ${unitLabel(p)}`));
+                // With one store there's nothing to be cheapest of
+                price.append(el("span", "", stores.length === 1 ? "" : i === 0 ? "billigst" : diff < 0.005 ? "samme pris" : `+${kr.format(diff)} ${unitLabel(p)}`));
                 row.append(who, price, trend ? timeline(store.list, [t0, t1], [v0, v1]) : el("span"), el("span", "when", daysAgo(p.purchase_date)));
                 return row;
             }));
