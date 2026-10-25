@@ -55,6 +55,10 @@
                     <ul class="suggestions" id="suggestions" role="listbox" aria-label="Forslag" hidden></ul>
                 </div>
                 <ol class="list-items" id="items"></ol>
+                <div class="picks" id="picks" hidden>
+                    <h2 class="label">Foreslått</h2>
+                    <ul class="pick-list" id="pick-list"></ul>
+                </div>
                 <p class="empty" id="empty">Listen er tom. Søk etter varer over, eller trykk <b>+</b> på et produkt under <a href="/">utforsk</a>.</p>
                 <button type="button" class="text-button undo" id="undo" hidden>Listen er tømt. Angre</button>
                 <div class="list-actions" id="list-actions" hidden>
@@ -188,8 +192,11 @@
                 li.setAttribute("role", "option");
                 li.setAttribute("aria-selected", String(i === active));
                 li.append(el("span", "", o.free ? `«${o.name}»` : o.name), el("small", "", o.detail));
-                // pointerdown, so the input doesn't lose focus first
-                li.addEventListener("pointerdown", e => { e.preventDefault(); pick(i); });
+                // A tap is pointerdown, then (on phones) focus leaving the field,
+                // then click. Hiding the list on that blur let the click fall
+                // through to the product link underneath, so the list stays
+                // until the tap is over, and the item is added on click.
+                li.addEventListener("click", () => pick(i));
                 return li;
             }));
             const open = options.length > 0;
@@ -209,7 +216,13 @@
             options = [];
             drawSuggestions();
             update();
+            // Ready for the next one
+            input.focus({ preventScroll: true });
         }
+
+        // Touching a suggestion isn't leaving the field
+        let touchingBox = false;
+        box.addEventListener("pointerdown", e => { touchingBox = true; e.preventDefault(); setTimeout(() => { touchingBox = false; }, 600); });
 
         input.addEventListener("input", suggest);
         input.addEventListener("keydown", e => {
@@ -218,11 +231,40 @@
             else if (e.key === "Enter") { e.preventDefault(); pick(active >= 0 ? active : options.length - 1); }
             else if (e.key === "Escape") { options = []; drawSuggestions(); }
         });
-        input.addEventListener("blur", () => { options = []; drawSuggestions(); });
+        input.addEventListener("blur", () => { if (!touchingBox) { options = []; drawSuggestions(); } });
+
+        // ---- suggested products: a tap adds, and nothing leaves the page ----
+
+        const PICKS = 12;
+        function renderPicks() {
+            const onList = new Set(ShoppingList.read().map(i => i.name.toLowerCase()));
+            const onOffer = new Set(offerNames.map(o => o.canonical_name));
+            // On offer first, then what the most stores sell
+            const picks = known().filter(p => !onList.has(p.canonical_name.toLowerCase()))
+                .sort((a, b) => onOffer.has(b.canonical_name) - onOffer.has(a.canonical_name) ||
+                    (b.store_count || 1) - (a.store_count || 1) || a.canonical_name.localeCompare(b.canonical_name, "nb"))
+                .slice(0, PICKS);
+            $("picks").hidden = picks.length === 0;
+            // Rebuilt after each tap: keep focus on the next chip in line
+            const at = [...$("pick-list").children].findIndex(li => li.contains(document.activeElement));
+            $("pick-list").replaceChildren(...picks.map(p => {
+                const li = el("li");
+                const button = el("button", onOffer.has(p.canonical_name) ? "pick offer" : "pick");
+                button.type = "button";
+                button.setAttribute("aria-label", `Legg ${p.canonical_name} på handlelisten`);
+                button.append(el("span", "plus", "+"), p.canonical_name);
+                if (onOffer.has(p.canonical_name)) button.append(el("small", "", "tilbud"));
+                button.addEventListener("click", () => { ShoppingList.add(p.canonical_name); update(); });
+                li.append(button);
+                return li;
+            }));
+            if (at >= 0) $("pick-list").children[Math.min(at, picks.length - 1)]?.querySelector("button")?.focus();
+        }
 
         // ---- the list ----
 
         function renderList() {
+            renderPicks();
             const items = ShoppingList.read();
             $("empty").hidden = items.length > 0;
             $("list-actions").hidden = items.length === 0;
