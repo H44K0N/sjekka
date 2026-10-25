@@ -107,6 +107,8 @@
                 setState("Fikk ikke kontakt med Sjekka. Prisene dukker opp i oversikten når kvitteringen er lest.");
                 return;
             }
+            // Read (or already known): the photo is gone, so the lede says so
+            if (job.status === "done" || job.status === "duplicate") $("lede").textContent = "Kvitteringen er lest, og bildet er slettet.";
             if (job.status === "done") {
                 setState("Lest. Prisene ligger nå i oversikten.", "ok");
                 if (job.receipt) showReceipt(job.receipt);
@@ -155,6 +157,7 @@
             const notes = [];
             if (b.duplicates) notes.push(`${b.duplicates} var allerede registrert og telles ikke to ganger.`);
             if (b.failed) notes.push(`${b.failed} av ${b.parts} deler kunne ikke leses.`);
+            $("lede").textContent = "Filen er lest. Vi tar vare på den i inntil 12 måneder for å bli bedre til å lese slike filer.";
             if (!b.receipts && !b.duplicates) return setState(["Fant ingen kvitteringer i filen.", ...notes].join(" "), "error");
             setState([b.receipts ? "Lest. Prisene ligger nå i oversikten." : "Lest.", ...notes].join(" "), "ok");
         }
