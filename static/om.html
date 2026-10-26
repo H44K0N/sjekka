@@ -42,7 +42,7 @@
             <figure class="film-main" id="promo">
                 <video controls playsinline preload="none" poster="/video/sjekka-promo-desktop.jpg" aria-label="Sjekka, 1 minutt, engelsk tale og tekst">
                     <source src="/video/sjekka-promo-desktop.mp4" type="video/mp4">
-                    <track kind="captions" src="/video/sjekka-promo-desktop.vtt" srclang="en" label="English" default>
+                    <track kind="captions" src="/video/sjekka-promo-desktop.vtt" srclang="en" label="English">
                 </video>
                 <figcaption>Bruk Sjekka. Du ser versjonen som passer skjermen din.</figcaption>
             </figure>
@@ -50,14 +50,14 @@
                 <figure>
                     <video controls playsinline preload="none" poster="/video/sjekka-slik-fungerer.jpg" aria-label="Slik fungerer Sjekka, 1 minutt 45 sekunder, engelsk tale og tekst">
                         <source src="/video/sjekka-slik-fungerer.mp4" type="video/mp4">
-                        <track kind="captions" src="/video/sjekka-slik-fungerer.vtt" srclang="en" label="English" default>
+                        <track kind="captions" src="/video/sjekka-slik-fungerer.vtt" srclang="en" label="English">
                     </video>
                     <figcaption><b>Slik fungerer det.</b> Fra kvitteringsbildet til billigste handlekurv.</figcaption>
                 </figure>
                 <figure>
                     <video controls playsinline preload="none" poster="/video/sjekka-slik-bygget.jpg" aria-label="Slik er Sjekka bygget, 1 minutt 55 sekunder, engelsk tale og tekst">
                         <source src="/video/sjekka-slik-bygget.mp4" type="video/mp4">
-                        <track kind="captions" src="/video/sjekka-slik-bygget.vtt" srclang="en" label="English" default>
+                        <track kind="captions" src="/video/sjekka-slik-bygget.vtt" srclang="en" label="English">
                     </video>
                     <figcaption><b>Slik er det bygget.</b> En utvikler, en KI, og et løp som bare slipper gjennom det som er testet.</figcaption>
                 </figure>
@@ -97,6 +97,11 @@
     </footer>
 
     <script src="/list.js"></script>
+    <script>
+        // The films have their words burnt in, so the player's own captions start
+        // off (they're one click away), and the sound starts at half
+        document.querySelectorAll(".films video").forEach(video => { video.volume = 0.5; });
+    </script>
     <script>
         // One "use Sjekka" film, in the shape of the screen it's watched on
         (() => {
