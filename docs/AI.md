@@ -122,7 +122,7 @@ Add a line here for each AI-assisted change.
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
 | 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
-| 24–26 Oct 2026 | #55–#86: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
+| 24–26 Oct 2026 | #55–#87: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -207,3 +207,4 @@ Add a line here for each AI-assisted change.
 | #84 | A multi-buy says what it asks: "8 for 100 kr" with a "Må kjøpe 8 · 12,50 kr stk" tag on the offers and product pages, and the shopping list prices one can at its usual price and offers "Ta 8" instead of pretending one costs 12,50 | Haakon: "it doesnt really come across clearly enough that this only applies if you buy 8x500ml boxes of battery energy drink. Figure this out in a better way." |
 | #85 | Receipt reading keeps every word of a line in the variant, a word the till cut short too, and adds none; product pages show the receipt's own text under each price | Haakon: a "Coca-Cola" from Joker was Coca-Cola Creamy Vanilla with sugar. The line said "COCA-COLA ORIGINAL CREA": the model kept "Original" and dropped the half word, and since the line had no size the Joker row showed an older Coca-Cola Zero |
 | #86 | A product is generic ("Brus") and holds items (Coca-Cola Zero, Pepsi Max). The shopping list can hold either "billigste brus" or one item, each priced from its own lines; a product page lists its items with their own pages; "Billigst nå" names what it is and ignores packs far bigger than usual | Haakon: "i do like the idea of having a feature for \"whats the cheapest pizza\", but in this case it might have joined the vanilla coke with coke zero entry. Figure out a better and more intuitive way forward." |
+| #87 | The films' player captions start off, since the words are already in the picture, and the sound starts at half | Haakon: "since the videos are already captioned in the actual video, can we make video player captions off by default? also maybe default volume at 50%?" |

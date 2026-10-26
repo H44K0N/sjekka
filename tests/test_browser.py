@@ -1043,6 +1043,9 @@ def test_about_page_shows_the_films_without_loading_them(page):
     for i in range(3):
         expect(videos.nth(i)).to_have_attribute("preload", "none")
         expect(videos.nth(i).locator("track")).to_have_attribute("srclang", "en")
+    # The words are in the picture: the player's captions are there but off, and the sound is at half
+    assert page.evaluate("[...document.querySelectorAll('.films video')].map(v => [v.volume, v.textTracks[0].mode])") \
+        == [[0.5, "disabled"]] * 3
     page.get_by_role("contentinfo").get_by_role("link", name="om").click()
     expect(page).to_have_url(re.compile("/om.html$"))
 
