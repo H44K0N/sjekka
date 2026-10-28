@@ -101,9 +101,10 @@
         // one receipt's 1,57 kg says nothing about what the next shopper pays
         let weighed = false;
         // What prices are compared on: per 100 g/ml (or per kg) or per item, else the price of one
-        const comparable = p => weighed ? p.price_per_unit * 10 : p.price_per_unit ?? each(p);
-        const unitLabel = p => weighed ? "kr / kg" : p.price_per_unit != null && (p.unit === "g" || p.unit === "ml")
-            ? `kr / 100 ${p.unit}` : p.unit === "stk" ? "kr / stk" : "kr";
+        // Per kilo and per litre, as on Norwegian shelf labels (kept per 100 g/ml)
+        const big = p => p.price_per_unit != null && (p.unit === "g" || p.unit === "ml");
+        const comparable = p => weighed || big(p) ? p.price_per_unit * 10 : p.price_per_unit ?? each(p);
+        const unitLabel = p => weighed ? "kr / kg" : big(p) ? `kr / ${p.unit === "g" ? "kg" : "l"}` : p.unit === "stk" ? "kr / stk" : "kr";
         // The price as paid, or the kilo price for what was weighed
         const amount = p => weighed && p.by_weight ? `${kr.format(comparable(p))} kr / kg` : `${kr.format(each(p))} kr`;
         let cheapest = null;  // the cheapest store's latest price, once loaded
@@ -361,8 +362,8 @@
 
             // Offers are compared per 100 g/ml or per item, like the receipt prices
             const best = mine[0].verdict.per === "stk" ? null : mine.reduce((a, b) => a.per_unit <= b.per_unit ? a : b);
-            const offerPer = best && (weighed && best.unit === "g" ? "kr / kg" : `kr / ${best.verdict.per}`);
-            const offerValue = best && (offerPer === "kr / kg" ? best.per_unit * 10 : best.per_unit);
+            const offerPer = best && `kr / ${best.unit === "g" ? "kg" : "l"}`;
+            const offerValue = best && best.per_unit * 10;
             // A multipack far bigger than what's usually bought isn't the cheapest bottle (as app/basket.py's SIZE_RATIO)
             const sized = best && (weighed || !cheapest?.quantity || !best.quantity || best.quantity <= cheapest.quantity * 2);
             if (best && cheapest && sized && unitLabel(cheapest) === offerPer && offerValue < comparable(cheapest)) {

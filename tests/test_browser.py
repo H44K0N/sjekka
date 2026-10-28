@@ -153,7 +153,7 @@ def test_prices_use_norwegian_formatting(page):
     page.goto("/")
     milk = cards(page).filter(has_text="Q lettmelk")
     expect(milk.locator(".price")).to_have_text("22,90 kr")
-    expect(milk.locator(".unit")).to_have_text("2,29 kr / 100 ml")
+    expect(milk.locator(".unit")).to_have_text("22,90 kr / l")
     # Under the item's name, the product it is and its size
     expect(milk.locator(".brand")).to_have_text("Lettmelk · 1 l")
     expect(milk.locator(".where .chain img")).to_have_attribute("alt", "Rema 1000")
@@ -400,7 +400,7 @@ def test_product_page_ranks_stores_cheapest_first(page):
     # Rema's latest price (22,90) beats Kiwi's latest (24,90), not Kiwi's older 23,90
     expect(stores.nth(0).locator(".chain img")).to_have_attribute("alt", "Rema 1000")
     expect(stores.nth(0).locator(".amount")).to_contain_text("billigst")
-    expect(stores.nth(1).locator(".amount")).to_contain_text("+0,20 kr / 100 ml")
+    expect(stores.nth(1).locator(".amount")).to_contain_text("+2 kr / l")
     expect(page.locator("#best-price")).to_have_text("22,90 kr")
     # Kiwi's timeline has both of its prices
     expect(stores.nth(1).locator("circle:not(.hit)")).to_have_count(2)
@@ -727,7 +727,7 @@ def test_offers_page_judges_each_offer(page):
     expect(candy.locator(".verdict-tag")).to_have_text("Ekte tilbud −23 %")
     expect(candy.locator(".deal-verdict")).to_be_hidden()
     candy.get_by_text("Detaljer").click()
-    expect(candy.locator(".deal-verdict")).to_have_text("23 % under vanlig pris i butikken, som var 4,96 kr / 100 g.")
+    expect(candy.locator(".deal-verdict")).to_have_text("23 % under vanlig pris i butikken, som var 49,60 kr / kg.")
     expect(candy.locator(".chain img")).to_have_attribute("alt", "Meny")
     buns = offers.nth(1)
     expect(buns.locator(".verdict-tag")).to_have_text("Butikken sier −38 %")
@@ -1293,7 +1293,7 @@ def test_stores_selling_different_sizes_lead_with_the_unit_price(page):
     page.route("**/products/Lettmelk", sizes)
     page.goto("/produkt.html?navn=Lettmelk")
     expect(page.locator("#best-chain img")).to_have_attribute("alt", "Kiwi")
-    expect(page.locator("#best-price")).to_have_text("1,71 kr / 100 ml")
+    expect(page.locator("#best-price")).to_have_text("17,10 kr / l")
     expect(page.locator("#best-unit")).to_have_text(re.compile(r"^29,90 kr for 1,75 l · "))
 
 

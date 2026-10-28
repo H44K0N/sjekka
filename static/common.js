@@ -47,7 +47,7 @@ function prices(p) {
     }
     let unit = "";
     if (p.price_per_unit && (p.unit === "g" || p.unit === "ml")) {
-        unit = `${kr.format(p.price_per_unit)} kr / 100 ${p.unit}`;
+        unit = perPrice(p.price_per_unit, p.unit);
     } else if (p.unit === "stk" && p.quantity > 1) {
         // A 12-pack of eggs: what one egg costs
         unit = `${kr.format(each / p.quantity)} kr / stk`;
@@ -85,7 +85,11 @@ function describe(p) {
     return [p.brand, p.variant, size].filter(Boolean).join(" · ");
 }
 
-const perLabel = per => per === "stk" ? "kr / stk" : `kr / ${per}`;
+// Prices are kept per 100 g/ml, and shown per kilo and per litre, as on
+// Norwegian shelf labels: "24,90 kr / kg", "12,45 kr / l", "4,70 kr / stk"
+const PER_BIG = { "g": "kg", "ml": "l", "100 g": "kg", "100 ml": "l" };
+const perPrice = (value, per) => PER_BIG[per] ? `${kr.format(value * 10)} kr / ${PER_BIG[per]}`
+    : `${kr.format(value)} kr / ${per}`;
 
 // What a flyer offer costs: "44,90 kr", "3 for 50 kr" for a multi-buy, or "29,90 kr / kg"
 const offerPrice = o => o.pack_size > 1 ? `${o.pack_size} for ${kr.format(o.total_price)} kr`
@@ -120,14 +124,14 @@ function verdictTag(o) {
 function offerVerdict(o) {
     const v = o.verdict, line = el("p", `deal-verdict ${v.kind}`);
     const pct = v.discount != null ? `${Math.round(Math.abs(v.discount) * 100)} %` : "";
-    const usual = v.usual != null ? `${kr.format(v.usual)} ${perLabel(v.per)}` : "";
+    const usual = v.usual != null ? perPrice(v.usual, v.per) : "";
     switch (v.kind) {
         case "real": line.textContent = `${pct} under vanlig pris i butikken, som var ${usual}.`; break;
         case "small": line.textContent = `Bare ${pct} under vanlig pris i butikken, som var ${usual}.`; break;
         case "not": line.textContent = v.discount < 0
             ? `Dyrere enn vanlig pris i butikken, som var ${usual}.` : `Omtrent vanlig pris i butikken (${usual}).`; break;
         case "cheaper_elsewhere":
-            line.append("Uten tilbud er den billigere hos ", chainBadge(v.cheaper_chain), ` ${kr.format(v.cheaper_price)} ${perLabel(v.per)}`);
+            line.append("Uten tilbud er den billigere hos ", chainBadge(v.cheaper_chain), ` ${perPrice(v.cheaper_price, v.per)}`);
             break;
         case "cheapest_known": line.textContent = "Lavere enn prisene vi kjenner fra andre butikker. Vi har ingen kvittering fra denne butikken å sammenligne med."; break;
         case "claimed": line.textContent = `Kundeavisen sier ${pct} under førpris på ${kr.format(v.pre_price)} kr. Ikke sjekket mot kvitteringer ennå.`; break;
