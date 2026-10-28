@@ -142,28 +142,28 @@ def test_pages_pass_automated_accessibility_checks(page, path):
 
 def test_explore_page_shows_products_and_stats(page):
     page.goto("/")
-    expect(cards(page)).to_have_count(5)
+    expect(cards(page)).to_have_count(6)
     expect(page.locator("#stat-receipts")).to_have_text("7")
-    expect(page.locator("#count")).to_have_text("5 produkter")
+    expect(page.locator("#count")).to_have_text("6 produkter")
     expect(page.locator(".chips button")).to_have_text(
         ["Alle", "Annet", "Frukt og grønt", "Godteri", "Kjøtt", "Meieri"])
 
 
 def test_prices_use_norwegian_formatting(page):
     page.goto("/")
-    # The cheapest milk now, though the latest bought was Tine at Kiwi
-    milk = cards(page).filter(has_text="Lettmelk")
+    milk = cards(page).filter(has_text="Q lettmelk")
     expect(milk.locator(".price")).to_have_text("22,90 kr")
     expect(milk.locator(".unit")).to_have_text("2,29 kr / 100 ml")
-    expect(milk.locator(".brand")).to_have_text("Q · 1 l")
+    # Under the item's name, the product it is and its size
+    expect(milk.locator(".brand")).to_have_text("Lettmelk · 1 l")
     expect(milk.locator(".where .chain img")).to_have_attribute("alt", "Rema 1000")
     expect(milk.locator(".where")).to_contain_text("3 dager siden")
 
 
 def test_cards_say_how_big_the_package_is(page):
     page.goto("/")
-    expect(cards(page).filter(has_text="Kjøttdeig").locator(".brand")).to_have_text("Gilde · 400 g")
-    # No size to show: just the brand, or nothing
+    expect(cards(page).filter(has_text="Gilde kjøttdeig").locator(".brand")).to_have_text("Kjøttdeig · 400 g")
+    # No size to show, and the product is the name: nothing
     expect(cards(page).filter(has_text="Agurk").locator(".brand")).to_have_count(0)
     described = page.evaluate("""() => [
         describe({brand: "Grandiosa", variant: "Hjemmelaget", quantity: 1000, unit: "g"}),
@@ -208,14 +208,17 @@ def test_dates_read_naturally(page):
     expect(old).not_to_contain_text("dager siden")  # shown as a date instead
 
 
-def test_search_matches_name_and_brand(page):
+def test_search_matches_name_brand_and_category(page):
     page.goto("/")
-    expect(cards(page)).to_have_count(5)
-    # Any brand of the product, not just the one on the card
+    expect(cards(page)).to_have_count(6)
     page.fill("#search", "tine")
     expect(cards(page)).to_have_count(1)
-    expect(cards(page).first).to_contain_text("Lettmelk")
-    expect(cards(page).first.locator(".brand")).to_contain_text("Q")
+    expect(cards(page).first.locator("h3")).to_have_text("Tine lettmelk")
+    # The product finds every item of it, and the category every product in it
+    page.fill("#search", "lettmelk")
+    expect(cards(page)).to_have_count(2)
+    page.fill("#search", "meieri")
+    expect(cards(page)).to_have_count(2)
     page.fill("#search", "KJØTT")
     expect(cards(page)).to_have_count(1)
     page.fill("#search", "finnes ikke")
@@ -247,14 +250,14 @@ def test_category_filter(page):
     page.goto("/")
     open_categories(page)
     page.get_by_role("button", name="Meieri", exact=True).click()
-    expect(cards(page)).to_have_count(1)
+    expect(cards(page)).to_have_count(2)
     # Picking one folds the list away and the toggle says which
     expect(page.locator("#categories")).to_be_hidden()
     expect(page.locator("#category-toggle")).to_have_text(re.compile(r"Kategori:\s+Meieri"))
     open_categories(page)
     expect(page.get_by_role("button", name="Meieri", exact=True)).to_have_attribute("aria-pressed", "true")
     page.get_by_role("button", name="Alle", exact=True).click()
-    expect(cards(page)).to_have_count(5)
+    expect(cards(page)).to_have_count(6)
 
 
 def test_product_names_are_not_rendered_as_html(page):
@@ -382,12 +385,11 @@ def test_cards_show_chain_logos_or_colours(page):
 
 def test_card_opens_the_product_page(page):
     page.goto("/")
-    milk = cards(page).filter(has_text="Lettmelk")
-    # The other stores with a price are on the product page
-    expect(milk.locator(".more-stores")).to_have_text("+1 butikker til")
+    # A card is one item, and opens that item's page
+    milk = cards(page).filter(has_text="Tine lettmelk")
     milk.click()
-    page.wait_for_url("**/produkt.html?navn=Lettmelk")
-    expect(page.locator("h1")).to_have_text("Lettmelk")
+    page.wait_for_url("**/produkt.html?navn=Lettmelk&merke=Tine")
+    expect(page.locator("h1")).to_contain_text("Tine")
 
 
 def test_product_page_ranks_stores_cheapest_first(page):
@@ -417,7 +419,7 @@ def test_unknown_product_page(page):
     expect(page.locator("#notice")).to_have_text("Ingen kvitteringer har denne varen ennå.")
 
 
-SEEDED = {'<img src=x onerror="window.pwned=1">', "Seigmenn", "Agurk", "Lettmelk", "Kjøttdeig"}
+SEEDED = {'<img src=x onerror="window.pwned=1">', "Laban seigmenn", "Agurk", "Q lettmelk", "Tine lettmelk", "Gilde kjøttdeig"}
 
 
 def sort_by(page, name):
@@ -434,8 +436,9 @@ def test_sorting_by_price_and_newest(page):
     page.goto("/")
     expect(cards(page).first).to_be_visible()
     sort_by(page, "Lavest pris")
-    # One item each: <img…> 10,00 · Seigmenn 38,70/3 = 12,90 · Agurk 30/2 = 15,00 · Lettmelk 22,90 · Kjøttdeig 89,00
-    assert card_names(page) == ['<img src=x onerror="window.pwned=1">', "Seigmenn", "Agurk", "Lettmelk", "Kjøttdeig"]
+    # One item each: <img…> 10,00 · Seigmenn 38,70/3 = 12,90 · Agurk 30/2 = 15,00 · Q 22,90 · Tine 24,90 · Kjøttdeig 89,00
+    assert card_names(page) == ['<img src=x onerror="window.pwned=1">', "Laban seigmenn", "Agurk", "Q lettmelk",
+                                "Tine lettmelk", "Gilde kjøttdeig"]
     expect(page.locator("#sort-current")).to_have_text("lavest pris")
     sort_by(page, "Nyest")
     assert card_names(page)[-1] == "Agurk"  # 40 days old
@@ -518,7 +521,7 @@ def list_names(page):
 
 def test_plus_on_a_card_puts_the_product_on_the_list(page):
     page.goto("/")
-    toggle = cards(page).filter(has_text="Lettmelk").get_by_role("button", name="Legg Lettmelk på handlelisten")
+    toggle = cards(page).filter(has_text="Q lettmelk").get_by_role("button", name="Legg Q lettmelk på handlelisten")
     expect(toggle).to_have_attribute("aria-pressed", "false")
     toggle.click()
     expect(toggle).to_have_attribute("aria-pressed", "true")
@@ -527,9 +530,9 @@ def test_plus_on_a_card_puts_the_product_on_the_list(page):
     assert page.url.endswith("/")
 
     page.goto("/handleliste.html")
-    assert list_names(page) == ["Lettmelk"]
+    assert list_names(page) == ["Q lettmelk"]
     page.goto("/")
-    toggle = cards(page).filter(has_text="Lettmelk").locator(".list-toggle")
+    toggle = cards(page).filter(has_text="Q lettmelk").locator(".list-toggle")
     expect(toggle).to_have_attribute("aria-pressed", "true")
     toggle.click()
     expect(page.locator(".top [data-list-count]")).to_be_hidden()
@@ -1327,11 +1330,25 @@ def test_a_page_seen_before_folds_its_introduction(page):
     expect(page.locator(".intro .lede")).to_be_hidden()
 
 
+def test_sorted_by_newest_a_card_shows_its_newest_price(page):
+    def older_cheapest(route):
+        first = next(i for i in route.fetch().json() if i["brand"] == "Q")
+        route.fulfill(json=[{**first, "purchase_date": "2026-02-17", "store_chain": "Meny",
+                             "latest": {**first, "total_price": 26.9, "store_chain": "Kiwi", "purchase_date": str(date.today())}}])
+    page.route("**/items", older_cheapest)
+    page.goto("/")
+    expect(cards(page).locator(".price")).to_have_text("22,90 kr")
+    sort_by(page, "Nyest")
+    expect(cards(page).locator(".price")).to_have_text("26,90 kr")
+    expect(cards(page).locator(".where")).to_contain_text("i dag")
+    expect(cards(page).locator(".where .chain img")).to_have_attribute("alt", "Kiwi")
+
+
 def test_explore_shows_products_a_page_at_a_time(page):
     def many(route):
         first = route.fetch().json()[0]
         route.fulfill(json=[{**first, "canonical_name": f"Vare {n:03d}"} for n in range(130)])
-    page.route("**/products", many)
+    page.route("**/items", many)
     page.goto("/")
     expect(cards(page)).to_have_count(48)
     expect(page.locator("#count")).to_have_text("130 produkter")

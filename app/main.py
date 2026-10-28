@@ -274,20 +274,72 @@ def get_products(db: Session = Depends(get_db)):
             "brands": sorted(brands.get(name, ())),
             "variant": item.variant,
             "category": item.category,
-            "unit": item.unit,
-            "quantity": item.quantity,
-            "pack_size": item.pack_size,
-            "total_price": item.total_price,
-            "price_per_unit": item.price_per_unit,
-            "by_weight": worker.sold_by_weight(item.raw_name, item.unit),
-            "store_chain": receipt.store_chain,
-            "purchase_date": str(receipt.purchase_date),
+            **line_price(item, receipt),
             # When it was last bought anywhere, for sorting by newest
             "latest_date": str(newest[name]) if name in newest else None,
             "store_count": max(len(chains.get(name, ())), 1),
         })
 
     return products
+
+
+def line_price(item, receipt) -> dict:
+    """What one receipt line says it cost, where and when."""
+    return {
+        "unit": item.unit,
+        "quantity": item.quantity,
+        "pack_size": item.pack_size,
+        "total_price": item.total_price,
+        "price_per_unit": item.price_per_unit,
+        "by_weight": worker.sold_by_weight(item.raw_name, item.unit),
+        "store_chain": receipt.store_chain,
+        "purchase_date": str(receipt.purchase_date) if receipt.purchase_date else None,
+    }
+
+
+@app.get("/items")
+def get_items(db: Session = Depends(get_db)):
+    """One card per item: Ahlgrens Biler Original and Coca-Cola Zero, not
+    "Godteri" and "Brus". Lines without a brand are one item, the product
+    itself. A card shows the item's cheapest price now, as /products does
+    for a product, and `latest` is its newest line, for sorting by newest."""
+    rows = (
+        db.query(models.ReceiptItem, models.Receipt)
+        .join(models.Receipt, models.ReceiptItem.receipt_id == models.Receipt.id)
+        .filter(models.ReceiptItem.canonical_name.isnot(None))
+        .all()
+    )
+    groups: dict[tuple[str, str], list] = {}
+    spellings: dict[tuple[str, str], Counter] = {}
+    for item, receipt in rows:
+        key = (item.canonical_name, basket.ident(item.brand, item.variant) if item.brand else "")
+        groups.setdefault(key, []).append((item, receipt))
+        if item.brand:
+            spellings.setdefault(key, Counter())[(item.brand, item.variant)] += 1
+
+    cards = []
+    for key, lines in groups.items():
+        name = key[0]
+        newest = max(lines, key=lambda line: (line[1].purchase_date or date.min, line[0].id))
+        shown = newest
+        price_of, _, chosen = basket.choices({c: o for (_, c), o in basket.latest_offers(lines).items()})
+        if chosen:
+            best = min(chosen.values(), key=price_of)
+            shown = (best.line, best.source)
+        # As the item is most often spelled
+        brand, variant = spellings[key].most_common(1)[0][0] if key in spellings else (None, None)
+        cards.append({
+            "canonical_name": name,
+            "brand": brand,
+            "variant": variant if brand else shown[0].variant,
+            "key": basket.Item(name, brand, variant).key if brand else name,
+            "category": shown[0].category,
+            **line_price(*shown),
+            "latest": line_price(*newest),
+            "latest_date": str(newest[1].purchase_date) if newest[1].purchase_date else None,
+            "store_count": max(len({r.store_chain for _, r in lines if r.store_chain}), 1),
+        })
+    return cards
 
 
 def item_summary(item: basket.Item, offers) -> dict | None:
