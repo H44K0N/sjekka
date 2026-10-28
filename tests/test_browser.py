@@ -1344,6 +1344,21 @@ def test_sorted_by_newest_a_card_shows_its_newest_price(page):
     expect(cards(page).locator(".where .chain img")).to_have_attribute("alt", "Kiwi")
 
 
+def test_a_card_with_no_brand_or_variant_says_what_the_receipt_said(page):
+    def bare(route):
+        first = next(i for i in route.fetch().json() if i["canonical_name"] == "Agurk")
+        route.fulfill(json=[{**first, "canonical_name": "Godteri", "raw_name": "PULVERPADDER 120G"},
+                            {**first, "canonical_name": "Kyllingfilet", "variant": "Biter", "raw_name": "KYLLINGFILET BITER"},
+                            {**first, "canonical_name": "Mandelpotet", "quantity": 1500, "unit": "g", "raw_name": "POTET MANDEL 1,5KG"}])
+    page.route("**/items", bare)
+    page.goto("/")
+    expect(cards(page).filter(has_text="Godteri").locator(".brand")).to_have_text("«PULVERPADDER 120G»")
+    # A variant says enough
+    expect(cards(page).filter(has_text="Kyllingfilet").locator(".brand")).to_have_text("Biter")
+    # Receipt words that only repeat the name don't
+    expect(cards(page).filter(has_text="Mandelpotet").locator(".brand")).to_have_text("1,5 kg")
+
+
 def test_explore_shows_products_a_page_at_a_time(page):
     def many(route):
         first = route.fetch().json()[0]

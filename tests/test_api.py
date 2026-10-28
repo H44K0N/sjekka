@@ -62,8 +62,9 @@ def test_items_are_one_card_each_named_as_most_often_spelled(client, db):
     assert set(items) == {("Ahlgrens", "Biler Original"), ("Laban", "Seigmenn"), (None, None)}
     biler = items[("Ahlgrens", "Biler Original")]
     assert (biler["canonical_name"], biler["key"], biler["category"]) == ("Godteri", "Godteri|Ahlgrens|Biler Original", "Meieri")
-    # Lines without a brand are the product itself
+    # Lines without a brand are the product itself, with what the receipt said
     assert items[(None, None)]["key"] == "Godteri"
+    assert "raw_name" in items[(None, None)]
 
 
 def test_an_item_card_has_its_cheapest_price_now_and_its_newest(client, db):

@@ -113,6 +113,11 @@
         // Original", "Coca-Cola Zero", or the product when it has no brand
         const entryOf = p => p.brand ? { name: p.canonical_name, brand: p.brand, variant: p.variant } : p.canonical_name;
         const titleOf = p => ShoppingList.label(entryOf(p));
+        // Whether a receipt line has a word the name hasn't: "PULVERPADDER 120G"
+        // says more than "Godteri", "TOMATER KG" nothing more than "Tomater"
+        const PACKING = new Set(["stk", "kg", "pk", "pr", "brett", "beger", "pose", "boks", "strømpe", "bukett", "norsk", "snacks", "i", "av"]);
+        const saysMore = (raw, name) => (raw || "").toLowerCase().split(/[^a-zæøå]+/)
+            .some(w => w.length > 1 && !PACKING.has(w) && !plain(name).includes(w));
         const plain = text => (text || "").toLowerCase().replace(/[^0-9a-zæøå%]/g, "");
         const SORTS = {
             navn: (a, b) => titleOf(a).localeCompare(titleOf(b), "nb"),
@@ -210,8 +215,10 @@
                 const title = el("h3");
                 title.append(link);
                 body.append(title);
-                // What it is and its size: "Godteri · 160 g"
-                const about = describe({ ...p, brand: null, variant: p.brand ? p.canonical_name : p.variant });
+                // What it is and its size: "Godteri · 160 g". With no brand or
+                // variant, "Godteri" says too little: the receipt's own words do
+                const about = !p.brand && !p.variant && saysMore(p.raw_name, p.canonical_name) ? `«${p.raw_name}»`
+                    : describe({ ...p, brand: null, variant: p.brand ? p.canonical_name : p.variant });
                 if (about) body.append(el("p", "brand", about));
                 body.append(el("p", "price", each));
                 if (unit) body.append(el("p", "unit", unit));
