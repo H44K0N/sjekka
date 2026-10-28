@@ -52,6 +52,37 @@ def test_a_card_is_not_led_by_a_family_pack(client, db):
         ("Bunnpris", 41.3): 41.3, ("Kiwi", 59.9): 59.9, ("Meny", 169.0): 96.33, ("Meny", 62.9): None}
 
 
+def test_items_are_one_card_each_named_as_most_often_spelled(client, db):
+    add_item(db, "Godteri", 28.9, date(2026, 4, 18), brand="Ahlgrens", variant="Biler Original")
+    add_item(db, "Godteri", 29.9, date(2026, 5, 1), brand="AHLGRENS", variant="Biler Original")
+    add_item(db, "Godteri", 30.9, date(2026, 6, 1), brand="Ahlgrens", variant="Biler Original")
+    add_item(db, "Godteri", 19.9, date(2026, 10, 1), brand="Laban", variant="Seigmenn")
+    add_item(db, "Godteri", 37.5, date(2026, 10, 27), store="Extra")
+    items = {(i["brand"], i["variant"]): i for i in client.get("/items").json()}
+    assert set(items) == {("Ahlgrens", "Biler Original"), ("Laban", "Seigmenn"), (None, None)}
+    biler = items[("Ahlgrens", "Biler Original")]
+    assert (biler["canonical_name"], biler["key"], biler["category"]) == ("Godteri", "Godteri|Ahlgrens|Biler Original", "Meieri")
+    # Lines without a brand are the product itself
+    assert items[(None, None)]["key"] == "Godteri"
+
+
+def test_an_item_card_has_its_cheapest_price_now_and_its_newest(client, db):
+    # Cheapest now at Rema; the newest line is from Kiwi
+    add_item(db, "Kyllingfilet", 184.0, date(2026, 2, 17), store="Rema 1000", brand="Kyllinggården")
+    add_item(db, "Kyllingfilet", 199.0, date(2026, 10, 28), store="Kiwi", brand="Kyllinggården")
+    item, = client.get("/items").json()
+    assert (item["total_price"], item["store_chain"], item["purchase_date"]) == (184.0, "Rema 1000", "2026-02-17")
+    assert (item["latest"]["total_price"], item["latest"]["store_chain"], item["latest"]["purchase_date"]) == \
+        (199.0, "Kiwi", "2026-10-28")
+    assert (item["latest_date"], item["store_count"]) == ("2026-10-28", 2)
+
+
+def test_an_item_bought_only_outside_grocery_chains_shows_its_latest(client, db):
+    add_item(db, "Blomster", 99.0, date(2026, 10, 1), store="Mester Grønn", brand="Mester Grønn")
+    item, = client.get("/items").json()
+    assert (item["total_price"], item["latest"]["total_price"]) == (99.0, 99.0)
+
+
 def test_products_say_what_is_sold_by_weight(client, db):
     add_item(db, "Appelsiner", 70.49, date(2026, 10, 23), store="Meny")
     add_item(db, "Lettmelk", 24.9, date(2026, 10, 23))

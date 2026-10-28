@@ -92,11 +92,11 @@
 
         // An offer is only worth flagging on the card when it beats the price
         // shown there, per 100 g/ml where both have one, else per item
+        // A pack counted in pieces (12 eggs) compares per piece, if both say how many
+        const sized = (o, p) => (p.unit === "g" || p.unit === "ml" || (p.unit === "stk" && p.quantity > 1 && o.quantity > 1)) &&
+            o.unit === p.unit && o.per_unit != null && p.price_per_unit != null;
         function beats(o, p) {
-            // A pack counted in pieces (12 eggs) compares per piece, if both say how many
-            const sized = (p.unit === "g" || p.unit === "ml" || (p.unit === "stk" && p.quantity > 1 && o.quantity > 1)) &&
-                o.unit === p.unit && o.per_unit != null && p.price_per_unit != null;
-            if (sized) return o.per_unit < p.price_per_unit - 0.005;
+            if (sized(o, p)) return o.per_unit < p.price_per_unit - 0.005;
             const each = p.pack_size > 1 ? p.total_price / p.pack_size : p.total_price;
             return each != null && o.each < each - 0.005;
         }
@@ -109,12 +109,19 @@
         let showing = PAGE;
         document.getElementById("search").value = params.get("q") || "";
 
+        // A card is one item, called what a person calls it: "Ahlgrens Biler
+        // Original", "Coca-Cola Zero", or the product when it has no brand
+        const entryOf = p => p.brand ? { name: p.canonical_name, brand: p.brand, variant: p.variant } : p.canonical_name;
+        const titleOf = p => ShoppingList.label(entryOf(p));
+        const plain = text => (text || "").toLowerCase().replace(/[^0-9a-zæøå%]/g, "");
         const SORTS = {
-            navn: (a, b) => a.canonical_name.localeCompare(b.canonical_name, "nb"),
+            navn: (a, b) => titleOf(a).localeCompare(titleOf(b), "nb"),
             // The price of one item: per-unit prices can't be compared across g, ml and stk
             pris: (a, b) => (unitPrice(a) ?? Infinity) - (unitPrice(b) ?? Infinity),
             nyest: (a, b) => (b.latest_date || "").localeCompare(a.latest_date || ""),
         };
+        // Sorted by newest, a card shows its newest price, so its date is the one sorted by
+        const shownLine = p => sortBy === "nyest" && p.latest ? { ...p, ...p.latest } : p;
         function unitPrice(p) {
             if (p.by_weight && p.price_per_unit) return p.price_per_unit * 10;  // the kilo price shown on the card
             return p.total_price == null ? null : p.pack_size > 1 ? p.total_price / p.pack_size : p.total_price;
@@ -161,9 +168,10 @@
 
         function renderGrid() {
             const query = document.getElementById("search").value.toLowerCase().trim();
+            // "godteri" finds every sweet, "biler" the one
             const filtered = allProducts.filter(p =>
                 (activeCategory === null || p.category === activeCategory) &&
-                (!query || p.canonical_name.toLowerCase().includes(query) || (p.brands || []).some(b => b.toLowerCase().includes(query)))
+                (!query || [titleOf(p), p.canonical_name, p.category, p.variant].some(t => (t || "").toLowerCase().includes(query)))
             ).sort((a, b) => SORTS[sortBy](a, b) || SORTS.navn(a, b));
             for (const item of document.querySelectorAll("[data-sort]")) {
                 item.setAttribute("aria-checked", String(item.dataset.sort === sortBy));
@@ -191,22 +199,27 @@
             document.getElementById("more").hidden = filtered.length <= showing;
             document.getElementById("more-button").textContent = `Vis flere (${filtered.length - shown.length} til)`;
 
-            document.getElementById("grid").replaceChildren(...shown.map(p => {
+            document.getElementById("grid").replaceChildren(...shown.map(item => {
+                const p = shownLine(item);
                 const { each, unit } = prices(p);
                 const body = el("div", "body");
                 // The name is the link, stretched over the whole card, so the
                 // list button can sit inside the card without nesting in a link
-                const link = el("a", "", p.canonical_name);
-                link.href = `/produkt.html?navn=${encodeURIComponent(p.canonical_name)}`;
+                const link = el("a", "", titleOf(p));
+                link.href = productLink(entryOf(p));
                 const title = el("h3");
                 title.append(link);
                 body.append(title);
-                const about = describe(p);
+                // What it is and its size: "Godteri · 160 g"
+                const about = describe({ ...p, brand: null, variant: p.brand ? p.canonical_name : p.variant });
                 if (about) body.append(el("p", "brand", about));
                 body.append(el("p", "price", each));
                 if (unit) body.append(el("p", "unit", unit));
+                // The product's best offer, on its brand's card; on a card without
+                // a brand only when it's cheaper per 100 g, since it's another make
                 const deal = offerFor.get(p.canonical_name);
-                if (deal && beats(deal, p)) body.append(el("p", "deal-tag", `Tilbud ${offerPrice(deal)} hos ${deal.chain}${deal.pack_size > 1 ? `, må kjøpe ${deal.pack_size}` : ""}`));
+                const fits = deal && (p.brand ? plain(deal.brand) === plain(p.brand) : sized(deal, p));
+                if (fits && beats(deal, p)) body.append(el("p", "deal-tag", `Tilbud ${offerPrice(deal)} hos ${deal.chain}${deal.pack_size > 1 ? `, må kjøpe ${deal.pack_size}` : ""}`));
                 const where = el("p", "where");
                 const shop = el("span", "shop");
                 shop.append(chainBadge(p.store_chain));
@@ -219,7 +232,7 @@
                 }
                 where.append(shop, el("span", "", daysAgo(p.purchase_date)));
                 const card = el("article", "card");
-                card.append(body, where, ShoppingList.toggle(p.canonical_name));
+                card.append(body, where, ShoppingList.toggle(entryOf(p)));
                 return card;
             }));
         }
@@ -227,7 +240,7 @@
 
         async function load() {
             try {
-                const [productsRes, statsRes] = await Promise.all([fetch("/products"), fetch("/stats")]);
+                const [productsRes, statsRes] = await Promise.all([fetch("/items"), fetch("/stats")]);
                 if (!productsRes.ok || !statsRes.ok) throw new Error();
                 allProducts = await productsRes.json();
                 // A category from an old link may no longer exist
