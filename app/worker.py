@@ -167,6 +167,46 @@ def repair_multipacks(db: Session) -> int:
     return fixed
 
 
+# Better naming rules should make better cards of what's already saved, not
+# only of new receipts: lines named by older rules are named again from
+# what the receipt said, a text call per batch while the worker is idle.
+# Only the names change (product, brand, variant, category), never a price
+# or a size. Gemini's free tier allows a few calls a minute.
+RENAME_EVERY = timedelta(minutes=1)
+RENAME_BACKOFF = timedelta(minutes=30)
+
+
+def rename_lines(db: Session, namer=None) -> int:
+    """Names one batch of lines named by older rules again, and returns how
+    many lines it went through (0 when none are left). Each distinct text is
+    named once, for every line that says it."""
+    stale = (db.query(models.ReceiptItem)
+             .filter(models.ReceiptItem.raw_name.isnot(None),
+                     or_(models.ReceiptItem.named_by.is_(None), models.ReceiptItem.named_by != trumf.NAMING_RULES)))
+    texts = [t for (t,) in stale.with_entities(models.ReceiptItem.raw_name).distinct().limit(trumf.NAMES_PER_CALL)]
+    if not texts:
+        return 0
+    known = known_product_names(db)
+    found, _ = (namer or trumf.gemini_names)(texts, known)
+    in_use = names.Names(db)
+    done = 0
+    for i, text in enumerate(texts):
+        name = found.get(i)
+        for row in stale.filter(models.ReceiptItem.raw_name == text):
+            done += 1
+            row.named_by = trumf.NAMING_RULES
+            # Not a product (a deposit, a fee), or no answer: the old name stays
+            if name is None or not name.product:
+                continue
+            new = (*in_use.tidy(name.canonical_name, name.brand, name.variant), name.category)
+            old = (row.canonical_name, row.brand, row.variant, row.category)
+            if new != old:
+                logger.info(f"Renamed {text!r}: {' | '.join(map(str, old))} -> {' | '.join(map(str, new))}")
+                row.canonical_name, row.brand, row.variant, row.category = new
+    db.commit()
+    return done
+
+
 # Enough to cover what's bought often, short enough to keep each call cheap
 KNOWN_NAMES = 1500
 
@@ -381,6 +421,7 @@ def save_receipt(db: Session, job: models.Job, data: ExtractedReceipt) -> models
             is_member_price=int(item.is_member_price),
             deal=item.deal,
             confidence=item.confidence,
+            named_by=trumf.NAMING_RULES,
         ))
     return receipt
 
@@ -521,6 +562,7 @@ async def run_worker():
     db.close()
 
     last_cleanup = None
+    next_rename = models.utcnow()
     while True:
         db = SessionLocal()
         try:
@@ -531,6 +573,15 @@ async def run_worker():
             job = next_job(db)
             if job:
                 await process_job(job, db)
+            elif models.utcnow() >= next_rename:
+                next_rename = models.utcnow() + RENAME_EVERY
+                try:
+                    if not await asyncio.to_thread(rename_lines, db):
+                        await asyncio.sleep(POLL_INTERVAL)
+                except Exception as e:
+                    db.rollback()
+                    next_rename = models.utcnow() + RENAME_BACKOFF
+                    logger.warning(f"Naming lines again failed, trying again in {RENAME_BACKOFF}: {e}")
             else:
                 await asyncio.sleep(POLL_INTERVAL)
         except Exception as e:

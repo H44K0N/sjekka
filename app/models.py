@@ -59,6 +59,9 @@ class ReceiptItem(Base):
     brand = Column(String, nullable=True)
     variant = Column(String, nullable=True)
     confidence = Column(String, default="high")
+    # The naming rules (worker.NAMING_RULES) this line was named by: when
+    # they change, the worker names it again from raw_name
+    named_by = Column(String, nullable=True)
 
 class Job(Base):
     __tablename__ = "jobs"
