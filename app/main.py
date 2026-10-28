@@ -332,6 +332,8 @@ def get_items(db: Session = Depends(get_db)):
             "canonical_name": name,
             "brand": brand,
             "variant": variant if brand else shown[0].variant,
+            # What the receipt said, for a card with no brand or variant to name it by
+            "raw_name": shown[0].raw_name,
             "key": basket.Item(name, brand, variant).key if brand else name,
             "category": shown[0].category,
             **line_price(*shown),

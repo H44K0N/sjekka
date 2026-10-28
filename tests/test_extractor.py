@@ -94,3 +94,9 @@ def test_variants_keep_every_word_of_the_line_and_add_none():
     # "COCA-COLA ORIGINAL CREA" (Creamy Vanilla, cut short by the till) was read as plain Original
     assert '"COCA-COLA ORIGINAL CREA" → variant "Original Crea"' in extractor.DEFINITIONS
     assert "Never add a word that isn't on the line" in extractor.DEFINITIONS
+
+
+def test_the_lines_own_word_and_brand_are_kept_and_none_are_borrowed():
+    # "PULVERPADDER 120G" became a bare "Godteri", and "S.M.NAAN" took the brand of "SMAK 7-KORNBRØD" above it
+    assert '"PULVERPADDER 120G" → "Godteri" (variant "Pulverpadder")' in extractor.DEFINITIONS
+    assert "Never take one from another line" in extractor.DEFINITIONS

@@ -122,7 +122,7 @@ Add a line here for each AI-assisted change.
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
 | 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
-| 24–26 Oct 2026 | #55–#90: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
+| 24–26 Oct 2026 | #55–#91: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -210,3 +210,4 @@ Add a line here for each AI-assisted change.
 | #87 | The films' player captions start off, since the words are already in the picture, and the sound starts at half | Haakon: "since the videos are already captioned in the actual video, can we make video player captions off by default? also maybe default volume at 50%?" |
 | #89 | The front page has a card per item ("Ahlgrens Biler Original", product "Godteri" under it), searchable by product and category; sorted by newest, a card shows its newest price, so the dates are in order; an offer on a card without a brand only when it's cheaper per kilo or litre | Haakon, on a card titled "Godteri": "this product should be more sensibly named Ahlgrens Biler Original" and "Every product should get its own card, sortable by category … Searchable" |
 | #90 | Prices per amount are shown per kilo and per litre (kept per 100 g/ml) | Haakon: "per unit should be shown as x kr / l for liquids and x kr / kg for solids. This is what norwegians are more accustomed to" |
+| #91 | The reader keeps the line's own word when the name is more general ("PULVERPADDER 120G" → Godteri, variant Pulverpadder) and only takes a brand written on that line; a card with no brand or variant shows the receipt's words when they say more than its name | Haakon, on cards "Godteri" and "Smak Br.Garlic": "Smak? And what is this godteri? Far too little explanation?" |

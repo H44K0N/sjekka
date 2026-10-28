@@ -22,6 +22,8 @@ DEFINITIONS = """## DEFINITIONS
   - "GRANDIOSA ORIGINAL" → "Pizza" (brand "Grandiosa", variant "Original")
   - "COCA-COLA 1,5L" → "Brus" (brand "Coca-Cola")
   - "PRIOR FROKOSTEGG 12STK" → "Egg" (brand "Prior", variant "Frokostegg")
+  - "PULVERPADDER 120G" → "Godteri" (variant "Pulverpadder"): when the name
+    is more general than the line, the line's own word goes in variant
   - Always Title Case. Always generic. Never include brand or size, and never
     use the brand as the name, even for a product known by it. Singular or
     plural as the product is usually called ("Bananer", "Agurk"). Norwegian
@@ -32,6 +34,9 @@ DEFINITIONS = """## DEFINITIONS
   - "TINE LETTMELK" → "Tine"
   - "XTRA KJØTTDEIG" → "Xtra"
   - "KJØTTDEIG" (no brand visible) → null
+  - Only a brand written out on this line. Never take one from another line
+    of the receipt, and never expand an abbreviation into a brand you guess:
+    "S.M.NAAN BR.GARLIC" → brand null, not a brand from the line above.
 
 **variant**: Every word of the name that isn't the brand, the product or the
 size, as written, or null when there are none.
