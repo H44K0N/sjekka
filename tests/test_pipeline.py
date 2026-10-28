@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from app import models, worker
+from app import models, trumf, worker
 from app.config import UPLOAD_DIR
 from app.schema import ExtractedItem, ExtractedReceipt, ExtractedReceipts
 from tests import helpers
@@ -165,3 +165,39 @@ def test_a_receipt_uploaded_as_csv_goes_all_the_way_through(client, db, monkeypa
     assert client.get(f"/jobs/{filename}").json()["status"] == "done"
     assert {p["canonical_name"] for p in client.get("/products").json()} == {"Lettmelk", "Kjøttdeig"}
     assert not (UPLOAD_DIR / filename).exists()  # deleted once read, like a photo
+
+
+def stale(db, raw="PULVERPADDER 120G"):
+    receipt = models.Receipt(image_filename="old.jpg", store_chain="Extra", purchase_date=date(2026, 10, 27))
+    db.add(receipt)
+    db.flush()
+    db.add(models.ReceiptItem(receipt_id=receipt.id, raw_name=raw, canonical_name="Godteri", category="Godteri",
+                              quantity=120, unit="g", pack_size=1, total_price=37.5, price_per_unit=31.25))
+    db.commit()
+
+
+def test_the_idle_worker_names_lines_again_when_the_rules_change(client, db, monkeypatch):
+    monkeypatch.setattr(worker, "POLL_INTERVAL", 0.01)
+    monkeypatch.setattr(trumf, "gemini_names", lambda texts, known=(): (
+        {i: trumf.LineName(index=i, canonical_name="Godteri", variant="Pulverpadder", category="Godteri")
+         for i in range(len(texts))}, "{}"))
+    stale(db)
+    run_worker_until(lambda: db.query(models.ReceiptItem).one().variant == "Pulverpadder", db)
+
+
+def test_the_worker_backs_off_when_naming_again_fails(client, db, monkeypatch, caplog):
+    monkeypatch.setattr(worker, "POLL_INTERVAL", 0.01)
+    calls = []
+
+    def quota(texts, known=()):
+        calls.append(texts)
+        raise RuntimeError("429 quota")
+    monkeypatch.setattr(trumf, "gemini_names", quota)
+    stale(db)
+    # The upload after it is still read: a failed naming holds nothing up
+    monkeypatch.setattr(worker, "extract_receipt", lambda path, known=(): kiwi_receipt(path).model_dump_json())
+    run_worker_until(lambda: bool(calls), db)
+    upload(client)
+    run_worker_until(lambda: db.query(models.Job).one().status == "done", db)
+    assert "Naming lines again failed" in caplog.text
+    assert db.query(models.ReceiptItem).filter_by(raw_name="PULVERPADDER 120G").one().named_by is None

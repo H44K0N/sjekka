@@ -3,7 +3,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from app import models, worker
+from app import models, trumf, worker
 from app.schema import ExtractedItem, ExtractedReceipt
 from tests.helpers import api_error
 
@@ -341,3 +341,75 @@ def test_the_same_total_and_a_price_in_common_is_the_same_purchase(client, db):
     assert found(113.8, 12.0) is None                  # the same total by chance, nothing alike
     assert found(99.0, 32.9, 29.9) is not None         # another total, but the very same lines
     assert found(None, 32.9, 29.9, 49.0) is None       # no total: a short receipt must match exactly
+
+
+def stale_line(db, raw, name, brand=None, variant=None, price=37.5, quantity=120.0, named_by=None):
+    receipt = models.Receipt(image_filename="old.jpg", store_chain="Extra", purchase_date=date(2026, 10, 27))
+    db.add(receipt)
+    db.flush()
+    db.add(models.ReceiptItem(receipt_id=receipt.id, raw_name=raw, canonical_name=name, brand=brand, variant=variant,
+                              category="Godteri", quantity=quantity, unit="g", pack_size=1, total_price=price,
+                              price_per_unit=round(price / quantity * 100, 2) if quantity else None, named_by=named_by))
+    db.commit()
+
+
+def namer_of(answers, calls=None):
+    def name(texts, known=()):
+        if calls is not None:
+            calls.append((list(texts), list(known)))
+        return {i: trumf.LineName(index=i, **answers[t]) for i, t in enumerate(texts) if t in answers}, "{}"
+    return name
+
+
+def test_new_lines_are_stamped_with_the_rules_that_named_them(client, db):
+    run(db, lambda path, known=(): receipt().model_dump_json())
+    assert {i.named_by for i in db.query(models.ReceiptItem)} == {trumf.NAMING_RULES}
+
+
+def test_lines_named_by_older_rules_are_named_again_from_the_receipt_text(client, db, caplog):
+    caplog.set_level("INFO", logger="sjekka.worker")
+    # Named before "PULVERPADDER" was kept, and "S.M." given a borrowed brand; the second twice
+    stale_line(db, "PULVERPADDER 120G", "Godteri")
+    stale_line(db, "S.M.NAAN BR.GARLIC", "Naan", brand="Smak", variant="Br.Garlic", price=35.9, quantity=None)
+    stale_line(db, "S.M.NAAN BR.GARLIC", "Naan", brand="Smak", variant="Br.Garlic", price=34.9, quantity=None,
+               named_by="older")
+    stale_line(db, "LABAN SEIGMENN 260G", "Seigmenn", brand="Laban", named_by=trumf.NAMING_RULES)
+    calls = []
+    namer = namer_of({
+        "PULVERPADDER 120G": dict(canonical_name="Godteri", variant="Pulverpadder", category="Godteri"),
+        "S.M.NAAN BR.GARLIC": dict(canonical_name="Naan", variant="Butter Garlic", category="Bakeri"),
+    }, calls)
+    assert worker.rename_lines(db, namer) == 3
+    # Each text once, and only the stale ones, with the names in use
+    texts, known = calls[0]
+    assert sorted(texts) == ["PULVERPADDER 120G", "S.M.NAAN BR.GARLIC"]
+    assert "Seigmenn" in known
+    rows = {(i.raw_name, i.total_price): i for i in db.query(models.ReceiptItem)}
+    candy = rows[("PULVERPADDER 120G", 37.5)]
+    assert (candy.canonical_name, candy.brand, candy.variant) == ("Godteri", None, "Pulverpadder")
+    # Prices and sizes are left as they were
+    assert (candy.quantity, candy.price_per_unit) == (120.0, 31.25)
+    for price in (35.9, 34.9):
+        naan = rows[("S.M.NAAN BR.GARLIC", price)]
+        assert (naan.brand, naan.variant, naan.category) == (None, "Butter Garlic", "Bakeri")
+    assert {i.named_by for i in db.query(models.ReceiptItem)} == {trumf.NAMING_RULES}
+    assert "Renamed 'S.M.NAAN BR.GARLIC': Naan | Smak | Br.Garlic | Godteri -> Naan | None | Butter Garlic | Bakeri" in caplog.text
+    # Nothing left: no call
+    assert worker.rename_lines(db, lambda *a: pytest.fail("nothing to name")) == 0
+
+
+def test_a_line_not_named_or_not_a_product_keeps_its_name(client, db):
+    stale_line(db, "PANT 3KR", "Pant")
+    stale_line(db, "UTYDELIG", "Godteri")
+    namer = namer_of({"PANT 3KR": dict(canonical_name="Pant", category="Annet", product=False)})
+    assert worker.rename_lines(db, namer) == 2
+    assert {(i.canonical_name, i.category, i.named_by) for i in db.query(models.ReceiptItem)} == {
+        ("Pant", "Godteri", trumf.NAMING_RULES), ("Godteri", "Godteri", trumf.NAMING_RULES)}
+
+
+def test_naming_again_goes_a_batch_at_a_time(client, db, monkeypatch):
+    monkeypatch.setattr(trumf, "NAMES_PER_CALL", 2)
+    for n in range(5):
+        stale_line(db, f"VARE {n}", "Godteri")
+    namer = namer_of({f"VARE {n}": dict(canonical_name="Godteri", variant=f"Vare {n}", category="Godteri") for n in range(5)})
+    assert [worker.rename_lines(db, namer) for _ in range(4)] == [2, 2, 1, 0]

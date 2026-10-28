@@ -12,6 +12,7 @@ receipts, misses no lines, and never misreads a price.
       "totaltBelop": "518.89", "varelinjer": [
         {"varenavn": "DUSJSÅPE FIKEN&SITRUS 275ML VI", "vareAntallVekt": "1.000", "vareBelop": "29.90"}, ...]}, ...]
 """
+import hashlib
 import json
 import logging
 import re
@@ -82,6 +83,10 @@ Return one entry per index, in order; skip nothing.
 {lines}
 """
 
+
+# Which naming rules a line was named by: the definitions and this prompt.
+# Changing either names every saved line again (see worker.rename_lines)
+NAMING_RULES = hashlib.sha256((DEFINITIONS + NAMES_PROMPT).encode()).hexdigest()[:12]
 
 # Lines named per Gemini call: a short answer is never cut off
 NAMES_PER_CALL = 60

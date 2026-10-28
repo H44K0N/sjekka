@@ -12,6 +12,7 @@ COLUMNS = [
     ("jobs", "model", "VARCHAR"),
     ("jobs", "batch", "VARCHAR"),
     ("receipts", "total", "FLOAT"),
+    ("receipt_items", "named_by", "VARCHAR"),
 ]
 
 
