@@ -212,3 +212,19 @@ def test_receipts_saved_before_get_their_total_from_the_kept_file(client, db):
     assert sorted((r.purchase_date.isoformat(), r.total) for r in db.query(models.Receipt)) == [
         ("2025-09-02", 34.9), ("2025-09-03", None), ("2026-10-23", 156.38)]
     (ORIGINALS_DIR / "hist.json").unlink()
+
+
+def test_a_review_shows_gemini_each_text_with_how_it_was_saved(monkeypatch):
+    sent = []
+
+    class Models:
+        def generate_content(self, model, contents, config):
+            sent.append(contents[0])
+            return type("Answer", (), {"text": json.dumps({"lines": [
+                {"index": 0, "canonical_name": "Naan", "brand": None, "variant": "Br.Garlic"}]})})()
+    monkeypatch.setattr(trumf, "client", type("Client", (), {"models": Models()})())
+    found, raw = trumf.gemini_review([("S.M.NAAN BR.GARLIC", "Naan", "Smak", "Br.Garlic"), ("AGURK", "Agurk", None, None)],
+                                     ["Naan"])
+    assert "0 | S.M.NAAN BR.GARLIC | Naan | Smak | Br.Garlic\n1 | AGURK | Agurk | - | -" in sent[0]
+    assert "Never swap a name for another that would also do" in sent[0] and "Naan" in sent[0].split("KNOWN")[-1]
+    assert (found[0].brand, json.loads(raw)["lines"][0]["variant"]) == (None, "Br.Garlic")

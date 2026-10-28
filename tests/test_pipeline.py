@@ -176,11 +176,10 @@ def stale(db, raw="PULVERPADDER 120G"):
     db.commit()
 
 
-def test_the_idle_worker_names_lines_again_when_the_rules_change(client, db, monkeypatch):
+def test_the_idle_worker_reviews_lines_when_the_rules_change(client, db, monkeypatch):
     monkeypatch.setattr(worker, "POLL_INTERVAL", 0.01)
-    monkeypatch.setattr(trumf, "gemini_names", lambda texts, known=(): (
-        {i: trumf.LineName(index=i, canonical_name="Godteri", variant="Pulverpadder", category="Godteri")
-         for i in range(len(texts))}, "{}"))
+    monkeypatch.setattr(trumf, "gemini_review", lambda saved, known=(): (
+        {i: trumf.LineReview(index=i, canonical_name="Godteri", variant="Pulverpadder") for i in range(len(saved))}, "{}"))
     stale(db)
     run_worker_until(lambda: db.query(models.ReceiptItem).one().variant == "Pulverpadder", db)
 
@@ -189,10 +188,10 @@ def test_the_worker_backs_off_when_naming_again_fails(client, db, monkeypatch, c
     monkeypatch.setattr(worker, "POLL_INTERVAL", 0.01)
     calls = []
 
-    def quota(texts, known=()):
-        calls.append(texts)
+    def quota(saved, known=()):
+        calls.append(saved)
         raise RuntimeError("429 quota")
-    monkeypatch.setattr(trumf, "gemini_names", quota)
+    monkeypatch.setattr(trumf, "gemini_review", quota)
     stale(db)
     # The upload after it is still read: a failed naming holds nothing up
     monkeypatch.setattr(worker, "extract_receipt", lambda path, known=(): kiwi_receipt(path).model_dump_json())
