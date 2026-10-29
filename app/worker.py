@@ -168,43 +168,62 @@ def repair_multipacks(db: Session) -> int:
 
 
 # Better naming rules should make better cards of what's already saved, not
-# only of new receipts: lines named by older rules are named again from
-# what the receipt said, a text call per batch while the worker is idle.
-# Only the names change (product, brand, variant, category), never a price
-# or a size. Gemini's free tier allows a few calls a minute.
+# only of new receipts: lines named by older rules are reviewed against the
+# rules from what the receipt said, a text call per batch while the worker
+# is idle. Only product, brand and variant can change, never a price or a
+# size. Gemini's free tier allows a few calls a minute.
 RENAME_EVERY = timedelta(minutes=1)
 RENAME_BACKOFF = timedelta(minutes=30)
+# A review fixes the odd mistake. One that would change more than this share
+# of a batch is wrong itself: nothing is saved, and reviewing stops until the
+# app restarts (a restart tries the same batch once more)
+MOST_CHANGED = 0.1
+FEWEST_ALLOWED = 3
+reviews_stopped = False
 
 
-def rename_lines(db: Session, namer=None) -> int:
-    """Names one batch of lines named by older rules again, and returns how
-    many lines it went through (0 when none are left). Each distinct text is
-    named once, for every line that says it."""
+def rename_lines(db: Session, reviewer=None) -> int:
+    """Reviews one batch of lines named by older rules, and returns how many
+    lines it went through (0 when none are left, or reviewing has stopped).
+    Each distinct text is reviewed once, for every line that says it."""
+    global reviews_stopped
+    if reviews_stopped:
+        return 0
     stale = (db.query(models.ReceiptItem)
              .filter(models.ReceiptItem.raw_name.isnot(None),
                      or_(models.ReceiptItem.named_by.is_(None), models.ReceiptItem.named_by != trumf.NAMING_RULES)))
     texts = [t for (t,) in stale.with_entities(models.ReceiptItem.raw_name).distinct().limit(trumf.NAMES_PER_CALL)]
     if not texts:
         return 0
-    known = known_product_names(db)
-    found, _ = (namer or trumf.gemini_names)(texts, known)
+    rows = {text: stale.filter(models.ReceiptItem.raw_name == text).all() for text in texts}
+    # Each text as it's most often saved
+    saved = [(text, *Counter((r.canonical_name, r.brand, r.variant) for r in rows[text]).most_common(1)[0][0])
+             for text in texts]
+    found, _ = (reviewer or trumf.gemini_review)(saved, known_product_names(db))
     in_use = names.Names(db)
-    done = 0
+    changes = []
     for i, text in enumerate(texts):
-        name = found.get(i)
-        for row in stale.filter(models.ReceiptItem.raw_name == text):
-            done += 1
+        review = found.get(i)
+        new = in_use.tidy(review.canonical_name, review.brand, review.variant) if review else None
+        for row in rows[text]:
             row.named_by = trumf.NAMING_RULES
-            # Not a product (a deposit, a fee), or no answer: the old name stays
-            if name is None or not name.product:
-                continue
-            new = (*in_use.tidy(name.canonical_name, name.brand, name.variant), name.category)
-            old = (row.canonical_name, row.brand, row.variant, row.category)
-            if new != old:
-                logger.info(f"Renamed {text!r}: {' | '.join(map(str, old))} -> {' | '.join(map(str, new))}")
-                row.canonical_name, row.brand, row.variant, row.category = new
+            # No answer: the saved name stays
+            if new and new != (row.canonical_name, row.brand, row.variant):
+                changes.append((text, row, new))
+    changed = len({text for text, _, _ in changes})
+    if changed > max(FEWEST_ALLOWED, MOST_CHANGED * len(texts)):
+        db.rollback()
+        reviews_stopped = True
+        logger.warning(f"Review would change {changed} of {len(texts)} texts, more than a review should: "
+                       f"nothing saved, reviewing stopped. First: " +
+                       "; ".join(f"{t!r} -> {' | '.join(map(str, n))}" for t, _, n in changes[:5]))
+        return 0
+    for text, row, new in changes:
+        logger.info(f"Renamed {text!r}: {' | '.join(map(str, (row.canonical_name, row.brand, row.variant)))} "
+                    f"-> {' | '.join(map(str, new))}")
+        row.canonical_name, row.brand, row.variant = new
     db.commit()
-    return done
+    return sum(len(r) for r in rows.values())
 
 
 # Enough to cover what's bought often, short enough to keep each call cheap

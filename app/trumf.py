@@ -84,9 +84,49 @@ Return one entry per index, in order; skip nothing.
 """
 
 
-# Which naming rules a line was named by: the definitions and this prompt.
-# Changing either names every saved line again (see worker.rename_lines)
-NAMING_RULES = hashlib.sha256((DEFINITIONS + NAMES_PROMPT).encode()).hexdigest()[:12]
+class LineReview(BaseModel):
+    index: int
+    canonical_name: str
+    brand: str | None = None
+    variant: str | None = None
+
+
+class LineReviews(BaseModel):
+    lines: list[LineReview]
+
+
+# Naming a saved line again from scratch gives a slightly different answer
+# each time: Chips for Potetgull, Brus for Kullsyredrikk, a new "Brus
+# multipack". So a line is reviewed, not named again: its saved name stays
+# unless it breaks a definition.
+REVIEW_PROMPT = """
+Lines from Norwegian grocery receipts follow, one per line as
+"index | receipt text | name | brand | variant". The text is exactly as the till
+printed it (upper case, cut short); the rest is how the line was named before,
+with "-" for none.
+
+Check each saved naming against the definitions below. Keep it, field for
+field, unless it breaks one; most are fine and stay exactly as they are.
+Change a field only to fix a clear mistake, such as:
+  - a word of the text that says what the product is, dropped: "PULVERPADDER
+    120G" saved as Godteri with no variant gets variant "Pulverpadder"
+  - a brand that isn't written in the text, taken from another line or guessed
+    from an abbreviation: "S.M.NAAN BR.GARLIC" saved with brand "Smak" gets none
+  - a word in the variant that isn't in the text
+Never swap a name for another that would also do (Chips and Potetgull, Brus
+and Kullsyredrikk), never make a new name for a pack or size ("Brus
+multipack"), and never correct spelling the text shares.
+
+{definitions}
+Return one entry per index, in order, with name, brand and variant: unchanged
+or fixed.
+
+{lines}
+"""
+
+# Which naming rules a line was named by: the definitions and these prompts.
+# Changing any reviews every saved line again (see worker.rename_lines)
+NAMING_RULES = hashlib.sha256((DEFINITIONS + NAMES_PROMPT + REVIEW_PROMPT).encode()).hexdigest()[:12]
 
 # Lines named per Gemini call: a short answer is never cut off
 NAMES_PER_CALL = 60
@@ -103,6 +143,20 @@ def gemini_names(texts: list[str], known=()) -> tuple[dict[int, LineName], str]:
     )
     raw = response.text
     return {n.index: n for n in LineNames.model_validate_json(raw).lines}, raw
+
+
+def gemini_review(saved: list[tuple[str, str, str | None, str | None]], known=()) -> tuple[dict[int, LineReview], str]:
+    """One text-only Gemini call reviewing saved lines: (text, name, brand,
+    variant) each. Returns the reviewed names by index and the raw answer."""
+    lines = "\n".join(f"{i} | {text} | {name} | {brand or '-'} | {variant or '-'}"
+                      for i, (text, name, brand, variant) in enumerate(saved))
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=[REVIEW_PROMPT.format(definitions=DEFINITIONS, lines=lines) + known_names(known)],
+        config=json_answer(LineReviews),
+    )
+    raw = response.text
+    return {n.index: n for n in LineReviews.model_validate_json(raw).lines}, raw
 
 
 def number(text) -> float:
