@@ -201,16 +201,20 @@ def rename_lines(db: Session, reviewer=None) -> int:
              for text in texts]
     found, _ = (reviewer or trumf.gemini_review)(saved, known_product_names(db))
     in_use = names.Names(db)
-    changes = []
-    for i, text in enumerate(texts):
+    changes, changed = [], 0
+    for i, (text, *usual) in enumerate(saved):
         review = found.get(i)
         new = in_use.tidy(review.canonical_name, review.brand, review.variant) if review else None
+        # No answer, or only other capitals: the text keeps its usual name
+        if new is None or folded(new) == folded(usual):
+            new = tuple(usual)
+        else:
+            changed += 1
         for row in rows[text]:
             row.named_by = trumf.NAMING_RULES
-            # No answer: the saved name stays
-            if new and new != (row.canonical_name, row.brand, row.variant):
+            # Lines of a text named some other way join it, which is no change to brake for
+            if new != (row.canonical_name, row.brand, row.variant):
                 changes.append((text, row, new))
-    changed = len({text for text, _, _ in changes})
     if changed > max(FEWEST_ALLOWED, MOST_CHANGED * len(texts)):
         db.rollback()
         reviews_stopped = True
@@ -224,6 +228,10 @@ def rename_lines(db: Session, reviewer=None) -> int:
         row.canonical_name, row.brand, row.variant = new
     db.commit()
     return sum(len(r) for r in rows.values())
+
+
+def folded(name) -> tuple:
+    return tuple((part or "").casefold() for part in name)
 
 
 # Enough to cover what's bought often, short enough to keep each call cheap

@@ -122,7 +122,7 @@ Add a line here for each AI-assisted change.
 | 18 Oct 2026 | CI/CD pipeline, Docker image, VPS deployment (#1) | Claude Code (Claude Opus 5.5) |
 | 23 Oct 2026 | #2–#21 | Claude Code (Claude Opus 5.5) |
 | 24 Oct 2026 | #22–#54: shopping list, flyer offers, UI rework, two customer walkthroughs, promo films | Claude Code (Claude Opus 5.5), directed by Haakon in short prompts |
-| 24–26 Oct 2026 | #55–#93: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
+| 24–26 Oct 2026 | #55–#95: receipt files and Trumf histories, a five-persona walkthrough on production data | Claude Code (Claude Opus 5.5); #60–#68 done overnight, unattended, with permission to merge |
 
 | PR | Change | Notes |
 |---|---|---|
@@ -213,3 +213,4 @@ Add a line here for each AI-assisted change.
 | #91 | The reader keeps the line's own word when the name is more general ("PULVERPADDER 120G" → Godteri, variant Pulverpadder) and only takes a brand written on that line; a card with no brand or variant shows the receipt's words when they say more than its name | Haakon, on cards "Godteri" and "Smak Br.Garlic": "Smak? And what is this godteri? Far too little explanation?" |
 | #92 | Each saved line records the naming rules that named it; when the rules change, the idle worker names it again from the receipt text, so better rules mend existing cards (names only, never prices or sizes; every change logged) | Haakon: "Doing manual edits on existing cards should never be a priority in this project. We should rather focus on the system that creates these cards to keep producing high quality cards" |
 | #93 | Saved lines are reviewed, not named again: Gemini sees how each was named and keeps it unless it breaks a rule; a review changing over 10 % of a batch saves nothing and stops. The first pass of #92 changed 467 of 1,379 lines, mostly swaps between names that would both do, and was undone from a copy taken just before | Haakon: "do all three" (undo the pass, review mode, a brake) |
+| #95 | Gemini answers at temperature 0, so a text is named the same way every time; a review counts only real renames against its brake (not other capitals, nor stray lines joining their text's usual name) | After #93's first batch hit the brake at 47 of 60: two dry runs on production showed the review itself wanted 2 changes, the rest was run-to-run wording |

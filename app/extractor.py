@@ -161,10 +161,13 @@ def json_answer(schema) -> types.GenerateContentConfig:
     """Every call answers in JSON by a schema. Thinking is off: reading and
     naming need none, and on gemini-2.5-flash it uses the same budget as the
     answer, so a long list got cut off mid-way (a Trumf part did). The limit
-    is the model's largest."""
+    is the model's largest. Temperature 0, so the same text is named the
+    same way each time: at the default, one review worded a third of its
+    names differently from the run before, with nothing new to go on."""
     return types.GenerateContentConfig(
         response_mime_type="application/json",
         response_schema=schema,
+        temperature=0,
         thinking_config=types.ThinkingConfig(thinking_budget=0),
         max_output_tokens=65536,
     )

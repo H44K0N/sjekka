@@ -429,6 +429,20 @@ def test_a_review_that_would_change_too_much_saves_nothing_and_stops(client, db,
     assert worker.rename_lines(db, reviewer_of({f"CHIPS {n}": dict(canonical_name="Chips") for n in range(3)})) == 30
 
 
+def test_capitals_and_stray_lines_are_not_changes_to_brake_for(client, db, caplog):
+    caplog.set_level("INFO", logger="sjekka.worker")
+    # A review that writes "Stor Potte" for "Stor potte" changes nothing, and
+    # lines of a text that were named apart join its usual name: neither counts
+    for n in range(10):
+        stale_line(db, f"URT {n}", "Timian", variant="Stor potte")
+        stale_line(db, f"URT {n}", "Timian", variant="Stor potte", price=30.0)
+        stale_line(db, f"URT {n}", "Timian", variant="stor Potte 12cm", price=31.0)
+    reviewer = reviewer_of({f"URT {n}": dict(canonical_name="Timian", variant="Stor Potte") for n in range(10)})
+    assert worker.rename_lines(db, reviewer) == 30
+    assert {i.variant for i in db.query(models.ReceiptItem)} == {"Stor potte"}
+    assert "Review would change" not in caplog.text
+
+
 def test_reviewing_goes_a_batch_at_a_time(client, db, monkeypatch):
     monkeypatch.setattr(trumf, "NAMES_PER_CALL", 2)
     for n in range(5):
