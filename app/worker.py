@@ -429,10 +429,17 @@ def save_receipt(db: Session, job: models.Job, data: ExtractedReceipt) -> models
     db.flush()
 
     in_use = names.Names(db)
+    saved = names.SavedLines(db)
     for item in data.items:
         item.quantity = multipack_quantity(item.raw_name, item.quantity, item.unit, item.pack_size)
         item.quantity, item.unit = piece_count(item.raw_name, item.quantity, item.unit, item.pack_size)
-        name, brand, variant = in_use.tidy(item.canonical_name, item.brand, item.variant)
+        named_by = trumf.NAMING_RULES
+        if before := saved.get(item.raw_name):
+            # A text named before keeps that naming (and its rules' stamp, so a
+            # review still reaches it); sizes and prices are this line's own
+            name, brand, variant, item.category, _, _, named_by = before
+        else:
+            name, brand, variant = in_use.tidy(item.canonical_name, item.brand, item.variant)
         db.add(models.ReceiptItem(
             receipt_id=receipt.id,
             raw_name=item.raw_name,
@@ -448,7 +455,7 @@ def save_receipt(db: Session, job: models.Job, data: ExtractedReceipt) -> models
             is_member_price=int(item.is_member_price),
             deal=item.deal,
             confidence=item.confidence,
-            named_by=trumf.NAMING_RULES,
+            named_by=named_by,
         ))
     return receipt
 
@@ -469,7 +476,8 @@ async def process_job(job: models.Job, db: Session):
         history = trumf.receipts_in(json.loads(filepath.read_text(encoding="utf-8"))) if filepath.suffix == ".json" else None
         if history:
             # A Trumf history: prices from the file, only the names from Gemini
-            found, raw = await asyncio.to_thread(trumf.read, history, lambda texts: trumf.gemini_names(texts, known))
+            found, raw = await asyncio.to_thread(trumf.read, history, lambda texts: trumf.gemini_names(texts, known),
+                                                 names.SavedLines(db))
             job.raw_response, job.model = raw, trumf.MODEL_PREFIX + GEMINI_MODEL
         else:
             raw = await asyncio.to_thread(extract_receipts if is_file else extract_receipt, filepath, known)

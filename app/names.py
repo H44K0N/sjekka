@@ -226,6 +226,34 @@ class Names:
         return self.tidy(name)[0]
 
 
+def text_key(text: str | None) -> str:
+    """A receipt line's text as a lookup key: "Banane  kg" and "BANANE KG" are one."""
+    return " ".join((text or "").split()).casefold()
+
+
+class SavedLines:
+    """How each receipt text has been named before, to name it the same way
+    again: the same line on next week's receipt gets the same card, without
+    asking Gemini, whose wording varies from call to call. Made once per
+    receipt or history."""
+
+    def __init__(self, db: Session):
+        seen: dict[str, Counter] = {}
+        rows = (db.query(models.ReceiptItem.raw_name, models.ReceiptItem.canonical_name, models.ReceiptItem.brand,
+                         models.ReceiptItem.variant, models.ReceiptItem.category, models.ReceiptItem.quantity,
+                         models.ReceiptItem.unit, models.ReceiptItem.named_by)
+                .filter(models.ReceiptItem.raw_name.isnot(None), models.ReceiptItem.canonical_name.isnot(None))
+                .order_by(models.ReceiptItem.id))
+        for text, *naming in rows:
+            seen.setdefault(text_key(text), Counter())[tuple(naming)] += 1
+        # The naming most lines of a text have; on a tie, the first saved
+        self.lines = {k: c.most_common(1)[0][0] for k, c in seen.items()}
+
+    def get(self, text: str | None) -> tuple | None:
+        """(name, brand, variant, category, quantity, unit, named_by), or None for a new text."""
+        return self.lines.get(text_key(text))
+
+
 def repair_product_names(db: Session) -> int:
     """Gives lines and offers saved before tidying their product's name and
     brand. Safe to run again."""

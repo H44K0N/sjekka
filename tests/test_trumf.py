@@ -5,7 +5,7 @@ import logging
 
 import pytest
 
-from app import models, trumf, worker
+from app import models, names, trumf, worker
 from tests import helpers
 
 # Trumf's format, with made-up contents
@@ -228,3 +228,18 @@ def test_a_review_shows_gemini_each_text_with_how_it_was_saved(monkeypatch):
     assert "0 | S.M.NAAN BR.GARLIC | Naan | Smak | Br.Garlic\n1 | AGURK | Agurk | - | -" in sent[0]
     assert "Never swap a name for another that would also do" in sent[0] and "Naan" in sent[0].split("KNOWN")[-1]
     assert (found[0].brand, json.loads(raw)["lines"][0]["variant"]) == (None, "Br.Garlic")
+
+
+def test_texts_named_before_are_not_asked_again(client, db):
+    receipt = models.Receipt(image_filename="old.jpg", store_chain="Kiwi")
+    db.add(receipt)
+    db.flush()
+    db.add(models.ReceiptItem(receipt_id=receipt.id, raw_name="tine lettmelk 1l", canonical_name="Lettmelk", brand="Tine",
+                              variant="1,0%", category="Meieri", quantity=1000, unit="ml", total_price=24.9))
+    db.commit()
+    calls = []
+    receipts, _ = trumf.read(HISTORY, namer(calls), names.SavedLines(db))
+    assert "TINE LETTMELK 1L" not in calls[0] and "APPELSINER KG" in calls[0]
+    milk = [i for r in receipts for i in r.items if i.raw_name == "TINE LETTMELK 1L"]
+    assert {(i.canonical_name, i.brand, i.variant, i.quantity, i.pack_size) for i in milk} == {
+        ("Lettmelk", "Tine", "1,0%", 1000, 2), ("Lettmelk", "Tine", "1,0%", 1000, 1)}
