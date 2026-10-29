@@ -29,6 +29,8 @@ SCALE = 3 if PHONE else 2
 RECEIPT = Path(__file__).parent / "receipt.jpg"
 # What goes on the list, in order, from the explore page's cards
 SHOPPING = ["Kjøttdeig", "Lettmelk", "Laksefilet", "Grovbrød", "Bananer", "Gulost"]
+# Each card is one item, so a product with two brands has two: the one to use
+BRANDS = {"Kjøttdeig": "Gilde", "Lettmelk": "Tine", "Laksefilet": "Lerøy", "Grovbrød": "Bakers", "Gulost": "Tine"}
 
 BOXES = """(named) => {
   const box = el => { const r = el.getBoundingClientRect();
@@ -59,6 +61,8 @@ def snap(page, state, named):
 
 
 def card(name):
+    if name in BRANDS:
+        return f'article.card:has(h3 a[href*="navn={quote(name)}&merke={quote(BRANDS[name])}"])'
     return f'article.card:has(h3 a[href$="navn={quote(name)}"])'
 
 
