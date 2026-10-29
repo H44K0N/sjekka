@@ -74,6 +74,7 @@ def test_answers_have_room_and_skip_thinking(monkeypatch, tmp_path):
     extractor.extract_receipt(image)
     config = calls[0]["config"]
     assert config.thinking_config.thinking_budget == 0 and config.max_output_tokens == 65536
+    assert config.temperature == 0  # the same text named the same way each time
 
 
 def test_known_names_are_offered_for_reuse(monkeypatch, tmp_path):
