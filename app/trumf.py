@@ -163,14 +163,21 @@ def number(text) -> float:
     return float(str(text).replace(",", ".").replace(" ", ""))
 
 
-def read(doc, namer=None) -> tuple[list[ExtractedReceipt], str]:
+def read(doc, namer=None, saved=None) -> tuple[list[ExtractedReceipt], str]:
     """The receipts in a Trumf history, priced from the file and named by
-    `namer`; and the namer's raw answer, to keep on the job."""
+    `namer`; and the namer's raw answer, to keep on the job. Texts in
+    `saved` (names.SavedLines) were named before and aren't asked again."""
     receipts = receipts_in(doc)
     texts = sorted({line["varenavn"].strip() for r in receipts for line in r["varelinjer"]
                     if not NOT_A_PRODUCT.search(line["varenavn"])})
     namer = namer or gemini_names
     by_text, answers = {}, []
+    for text in texts:
+        if saved and (before := saved.get(text)):
+            name, brand, variant, category, quantity, unit, _ = before
+            by_text[text] = LineName(index=-1, canonical_name=name, brand=brand, variant=variant, category=category,
+                                     quantity=quantity, unit=unit)
+    texts = [t for t in texts if t not in by_text]
     for start in range(0, len(texts), NAMES_PER_CALL):
         chunk = texts[start:start + NAMES_PER_CALL]
         names, answer = namer(chunk)

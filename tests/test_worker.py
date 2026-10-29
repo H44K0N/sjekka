@@ -448,3 +448,20 @@ def test_reviewing_goes_a_batch_at_a_time(client, db, monkeypatch):
     for n in range(5):
         stale_line(db, f"VARE {n}", "Godteri")
     assert [worker.rename_lines(db, reviewer_of({})) for _ in range(4)] == [2, 2, 1, 0]
+
+
+def test_a_text_named_before_is_named_the_same_way_again(client, db):
+    # Last week's line as it was saved, under rules since changed
+    stale_line(db, "GILDE KJØTTDEIG 400G", "Kjøttdeig", brand="Gilde", variant="Storfe", named_by="older")
+    # This week Gemini words it differently; the text, in other capitals, is the same
+    worded = receipt().model_copy(update={"items": [
+        ExtractedItem(raw_name="Gilde  kjøttdeig 400g", canonical_name="Karbonadedeig", brand="Gilde", category="Frys",
+                      quantity=400, unit="g", total_price=79.0),
+        *receipt().items[1:]]})
+    run(db, lambda path, known=(): worded.model_dump_json())
+    new = db.query(models.ReceiptItem).filter(models.ReceiptItem.total_price == 79.0).one()
+    assert (new.canonical_name, new.brand, new.variant, new.category) == ("Kjøttdeig", "Gilde", "Storfe", "Godteri")
+    # Its own size and price; the old rules' stamp, so a review still reaches it
+    assert (new.quantity, new.price_per_unit, new.named_by) == (400, 19.75, "older")
+    # A text never seen is named as read
+    assert db.query(models.ReceiptItem).filter_by(raw_name="AGURK").one().named_by == trumf.NAMING_RULES
