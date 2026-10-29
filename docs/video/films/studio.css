@@ -101,3 +101,15 @@ svg.wires path.lit { stroke: var(--accent); stroke-width: 2.5; }
 .wordmark { font-weight: 700; letter-spacing: -0.035em; line-height: 0.9; }
 .stat { font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .grain { position: absolute; inset: -50%; z-index: 90; pointer-events: none; opacity: 0.045; mix-blend-mode: screen; }
+
+/* The lens (promo): the rig, a vignette, a flare. The flare and vignette
+   are light, not decoration, so they're the one place with gradients. */
+.rig { will-change: transform; }
+.vignette { position: absolute; inset: 0; z-index: 88; pointer-events: none;
+  background: radial-gradient(ellipse 75% 70% at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.55) 100%); }
+.flare { position: absolute; z-index: 89; visibility: hidden; pointer-events: none; mix-blend-mode: screen; }
+.flare .streak { position: absolute; left: -1400px; top: -3px; width: 2800px; height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(201, 180, 143, 0), rgba(236, 222, 196, 0.9) 50%, rgba(201, 180, 143, 0));
+  box-shadow: 0 0 24px 6px rgba(201, 180, 143, 0.35); }
+.flare .bloom { position: absolute; left: -260px; top: -260px; width: 520px; height: 520px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 244, 222, 0.55) 0%, rgba(201, 180, 143, 0.18) 35%, rgba(201, 180, 143, 0) 70%); }

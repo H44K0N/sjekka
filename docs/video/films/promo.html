@@ -22,15 +22,19 @@
 <body>
 <div id="stage"></div>
 <script type="module">
-import { W, H, PHONE, stage, load, h, layer, place, words, Film, Device, Camera, rise, onVoice, sink, count, ready, addGrain, middle } from "./studio.js";
+import { W, H, PHONE, stage, load, h, layer, place, words, Film, Device, Camera, rise, onVoice, sink, count, ready, addGrain, middle, lens, whip, crash, flare } from "./studio.js";
 
 await load("promo");
 const film = new Film("promo");
 const tl = film.tl;
 const fs = (d, m) => PHONE ? m : d;  // a size for desktop or phone
 
+// Shot like a camera-move ad: everything is filmed through the lens rig
+// (handheld drift, whip pans, crash zooms), with grain over it
+const rig = lens();
+addGrain();
 // A small shake of the whole picture, for impacts
-const shaker = h("div", "abs", stage);
+const shaker = h("div", "abs", rig.move);
 place(shaker, 0, 0, W, H);
 function shake(at, power = 14) {
   const steps = 7;
@@ -56,9 +60,10 @@ const sGoal = film.say("goal", t);
 onVoice(film, goalText, sGoal);
 film.fx("drone", 0, 0.9);
 film.fx("hit", sGoal.at("one"), 0.6);
-t = sGoal.end + 0.35;
-sink(film, goalText, t - 0.1);
-film.span(goal, 0, t + 0.6);
+tl.fromTo(goal, { scale: 1 }, { scale: 1.06, duration: sGoal.end + 0.4, ease: "none", transformOrigin: "50% 50%" }, 0);
+crash(film, rig, sGoal.at("one") - 0.02, { z: 1.16, x: fs(500, 400), y: H / 2 + fs(70, 120), hold: sGoal.end - sGoal.at("one") });
+t = whip(film, rig, sGoal.end + 0.75);
+film.span(goal, 0, t);
 
 // "Getting you to spend more than you planned." The receipt keeps growing
 const spend = L("spend");
@@ -85,7 +90,9 @@ for (const [name, price] of ITEMS) {
 const total = h("div", "total", receipt);
 h("span", "", total, "TOTALT");
 const totalNum = h("span", "", total, "0,00");
-tl.fromTo(receipt, { y: H, rotation: fs(4, 3) }, { y: 0, rotation: fs(2, 1.5), duration: 0.9, ease: "power3.out" }, t);
+tl.fromTo(receipt, { y: H, rotation: fs(4, 3), rotationX: 52, transformPerspective: 1500, transformOrigin: "50% 100%" },
+  { y: 0, rotation: fs(2, 1.5), rotationX: 26, duration: 0.9, ease: "power3.out" }, t);
+tl.to(receipt, { rotationX: 4, duration: 4.2, ease: "sine.inOut" }, t + 0.9);
 const sSpend = film.say("spend", t + 0.25);
 onVoice(film, spendText, sSpend);
 const stripEnd = t + 4.6;
@@ -129,6 +136,8 @@ hero.style.textAlign = "center";
 gsap.set(hero, { scale: 0, autoAlpha: 0 });
 signEls.push(hero);
 const sSigns = film.say("signs", t + 0.2);
+tl.fromTo(signs, { rotationY: -9, rotationX: 4, scale: 1.08, transformPerspective: 2400 },
+  { rotationY: 5, rotationX: 0, scale: 1, duration: sSigns.end - t + 0.5, ease: "sine.inOut" }, t);
 // One sign on each word, and the rest in between, faster and faster
 const slamAt = [sSigns.at("red"), sSigns.at("signs"), sSigns.at("two"), sSigns.at("one"), sSigns.at("deals")];
 const extra = [];
@@ -148,6 +157,9 @@ tl.to(signEls.slice(0, -1), { autoAlpha: 0.18, filter: "blur(6px)", duration: 0.
 tl.fromTo(hero, { scale: 2.6, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.25, ease: "back.out(2)" }, heroAt);
 film.fx("slam", heroAt, 0.6);
 shake(heroAt + 0.05, 18);
+// Vertigo: the wall falls away behind the sign while the sign holds its size
+tl.to(signEls.slice(0, -1), { scale: 0.8, duration: sSigns.end - heroAt + 0.4, ease: "power1.inOut" }, heroAt + 0.25);
+tl.to(hero, { scale: 1.1, duration: sSigns.end - heroAt + 0.4, ease: "power1.inOut" }, heroAt + 0.25);
 const same = h("div", "same abs", signs, "Price last week: 49,90");
 place(same, W / 2 - fs(250, 250), H / 2 + fs(150, 140));
 tl.fromTo(same, { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, sSigns.at("really"));
@@ -157,10 +169,9 @@ t = sSigns.end + 0.45;
 
 // "So we're declaring war on the big chains."
 const war = L("war");
-tl.to([...signEls, same], { y: `+=${H}`, rotation: "+=25", autoAlpha: 0, duration: 0.6, ease: "power2.in", stagger: 0.015 }, t);
-film.fx("whoosh", t, 0.6);
-film.span(signs, null, t + 0.9);
-film.span(war, t + 0.45, null);
+const warCut = whip(film, rig, t, { dir: -1 });
+film.span(signs, null, warCut);
+film.span(war, warCut, null);
 const warText = words(war, "So we're declaring <br>*war* on the <br>big chains.", "big abs");
 place(warText, fs(150, 90), 0, fs(1600, 900));
 warText.style.fontSize = fs("150px", "128px");
@@ -169,6 +180,7 @@ const sWar = film.say("war", t + 0.5);
 onVoice(film, warText, sWar, { dur: 0.45 });
 film.fx("boom", sWar.at("war"), 1);
 shake(sWar.at("war") + 0.02, 22);
+crash(film, rig, sWar.at("war") - 0.02, { z: 1.14, x: fs(560, 420), y: H / 2, hold: sWar.end + 1.0 - sWar.at("war") });
 tl.fromTo(warText, { scale: 1 }, { scale: 1.06, duration: sWar.end - sWar.start + 1.2, ease: "none", transformOrigin: "0% 50%" }, sWar.start);
 film.fx("riser", sWar.end - 0.2, 0.8);
 
@@ -191,6 +203,9 @@ mark.style.textAlign = "center";
 markBlock.innerHTML = "";
 const letters = [..."sjekka"].map(c => { const o = h("span", "word", markBlock); return h("span", "", o, c); });
 tl.fromTo(letters, { yPercent: 120 }, { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.045 }, R);
+tl.fromTo(markBlock, { rotationY: -48, rotationX: 10, z: -300, transformPerspective: 1800, transformOrigin: "50% 50%" },
+  { rotationY: 0, rotationX: 0, z: 0, duration: 1.8, ease: "expo.out" }, R);
+flare(film, meet, R + 0.15, { y: H / 2 - markSize * 0.12, dur: 1.6 });
 const rule = h("div", "abs", meet);
 place(rule, W / 2 - fs(330, 250), H / 2 + markSize * 0.42, fs(660, 500), 3);
 rule.style.background = "var(--accent)";
@@ -262,12 +277,13 @@ function caption(line, text, at) {
 // The device rises in, tilted, and settles
 dev.show("home-0", t2, 0);
 dev.scroll(PHONE ? "card-Grovbrød" : "card-Bananer", t2, 0, { offset: PHONE ? 30 : 16 });
-tl.fromTo(dev.el, { y: dev.y + 500, rotationX: 32, autoAlpha: 0 }, { y: dev.y, rotationX: 0, autoAlpha: 1, duration: 1.2, ease: "expo.out" }, t2);
+tl.fromTo(dev.el, { y: dev.y + 500, z: -500, rotationX: 32, rotationY: fs(-34, -24), autoAlpha: 0 },
+  { y: dev.y, z: 0, rotationX: 0, rotationY: fs(-7, -5), autoAlpha: 1, duration: 1.4, ease: "expo.out" }, t2);
 film.fx("whoosh", t2, 0.7);
 
 // 01: Add what you need, a tap on each beat
 let t3 = t2 + 0.9;
-drift(t2, t2 + 30);
+drift(t2 + 1.4, t2 + 30);
 const sAdd = film.say("add", t3);
 const cAdd = caption(sAdd, "Add what you <br>*need.*", sAdd.start);
 const taps = PHONE ? ["Grovbrød", "Kjøttdeig", "Laksefilet", "Lettmelk"] : ["Kjøttdeig", "Lettmelk", "Laksefilet", "Grovbrød", "Bananer", "Gulost"];
@@ -296,8 +312,8 @@ cAdd.out(t4 + 0.1);
 
 // 02: the whole list, in every store
 t4 = film.beat(t4 + 0.3, "down");
+whip(film, rig, t4 - 0.21, { dist: W * 0.3, spread: 50 });
 dev.navigate("list", t4, { path: "/handleliste.html" });
-film.fx("swoosh", t4, 0.6);
 const sList = film.say("list", t4 + 0.3);
 const cList = caption(sList, "Your whole list, <br>priced in <br>*every store.*", sList.start);
 dev.scroll("verdict", t4 + 0.6, 1.1, { offset: fs(230, 20) });
@@ -329,8 +345,8 @@ cList.out(t6 - 0.3);
 
 // 03: real receipts
 t6 = film.beat(t6, "down");
+whip(film, rig, t6 - 0.21, { dist: W * 0.3, spread: 50 });
 dev.navigate("product", t6, { path: "/produkt.html?navn=Kjøttdeig" });
-film.fx("swoosh", t6, 0.6);
 const sRec = film.say("receipts", t6 + 0.25);
 const cRec = caption(sRec, "Real prices, <br>from *real <br>receipts.*", sRec.start);
 dev.scroll("section", t6 + 0.4, 1.4, { offset: PHONE ? 10 : 20 });
@@ -347,8 +363,8 @@ cRec.out(t7 - 0.3);
 
 // 04: offers, checked
 t7 = film.beat(t7 + 0.3, "down");
+whip(film, rig, t7 - 0.21, { dist: W * 0.3, spread: 50 });
 dev.navigate("offers", t7, { path: "/tilbud.html" });
-film.fx("swoosh", t7, 0.6);
 const sOff = film.say("offers", t7 + 0.25);
 const cOff = caption(sOff, "Offers, <br>*checked.*", sOff.start);
 dev.scroll("real.0", t7 + 0.4, 1.1, { offset: PHONE ? 60 : 40 });
@@ -366,8 +382,8 @@ cOff.out(t8 - 0.3);
 
 // 05: share a receipt
 t8 = film.beat(t8, "down");
+whip(film, rig, t8 - 0.21, { dist: W * 0.3, spread: 50 });
 dev.navigate("upload", t8, { path: "/upload.html" });
-film.fx("swoosh", t8, 0.6);
 const sShare = film.say("share", t8 + 0.25);
 const cShare = caption(sShare, "Snap a receipt. <br>*Help everyone.*", sShare.start);
 dev.scroll("drop", t8 + 0.3, 0.8, { offset: PHONE ? 80 : 120 });
@@ -411,6 +427,10 @@ endMark.style.textAlign = "center";
 place(endMark, 0, H / 2 - markSize * 0.85);
 const endLetters = [..."sjekka"].map(c => { const o = h("span", "word", endMark); return h("span", "", o, c); });
 tl.fromTo(endLetters, { yPercent: 120 }, { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.045 }, tEnd + 0.3);
+tl.fromTo(end, { y: -160, rotationX: -22, transformPerspective: 1800, transformOrigin: "50% 40%" },
+  { y: 0, rotationX: 0, duration: 1.8, ease: "expo.out" }, tEnd + 0.3);
+tl.fromTo(end, { scale: 1 }, { scale: 1.05, duration: 6, ease: "none" }, tEnd + 2.1);
+flare(film, end, tEnd + 0.6, { y: H / 2 - markSize * 0.45, dur: 1.8, power: 0.85 });
 const stop = words(end, "Stop *overpaying.*", "say abs");
 stop.style.fontSize = fs("84px", "80px");
 stop.style.width = `${W}px`;

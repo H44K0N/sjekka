@@ -124,9 +124,10 @@ export class Film {
     return next ?? t;
   }
 
-  // Shows a layer from `from` to `to` (hidden either side)
+  // Shows a layer from `from` to `to` (hidden either side); a null `from`
+  // only hides it (a null position would mean the timeline's current end)
   span(el, from, to) {
-    this.tl.set(el, { visibility: "visible" }, from);
+    if (from != null) this.tl.set(el, { visibility: "visible" }, from);
     if (to != null) this.tl.set(el, { visibility: "hidden" }, to);
   }
 
@@ -135,7 +136,7 @@ export class Film {
     this.tl.set({}, {}, duration);
     window.__film = { name: this.name, format: FORMAT, width: W, height: H, duration: this.duration,
       cues: this.cues, sfx: this.sfx.sort((a, b) => a.at - b.at), music: this.music };
-    window.__seek = t => { this.tl.seek(t, false); grainAt(t); };
+    window.__seek = t => { this.tl.seek(t, false); grainAt(t); handAt(t); };
     window.__seek(0);
   }
 }
@@ -164,6 +165,83 @@ function grainAt(t) {
   if (!grain) return;
   const f = Math.floor(t * 24);  // grain at film rate, 24 a second
   grain.style.transform = `translate(${(f * 73) % 256 - 128}px, ${(f * 151) % 256 - 128}px)`;
+}
+
+// ---- the lens: a camera operator's moves, done to the whole picture ----
+//
+// The promo is cut like a camera-move ad: handheld drift, whip pans with
+// motion blur, crash zooms, a flare over the reveal. `lens()` wraps the
+// stage's content in a rig (outermost: the hand, decided by the time like
+// the grain; inside it: the move, which the timeline tweens) and returns
+// the element to build the film in.
+
+let hand, handAmp = () => 0;
+export function lens({ amp = () => 1 } = {}) {
+  hand = h("div", "abs rig", stage);
+  place(hand, 0, 0, W, H);
+  const move = h("div", "abs rig", hand);
+  place(move, 0, 0, W, H);
+  move.style.transformOrigin = `${W / 2}px ${H / 2}px`;
+  handAmp = amp;
+  // Directional blur for whip pans: x and y spread, tweened as an attribute
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "0");
+  svg.setAttribute("height", "0");
+  svg.style.position = "absolute";
+  svg.innerHTML = `<filter id="whip" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="0 0"/></filter>`;
+  stage.append(svg);
+  h("div", "vignette", stage);
+  return { hand, move, blur: svg.querySelector("feGaussianBlur") };
+}
+// Slow, uneven drift, as if the camera were held: sums of slow sines
+function handAt(t) {
+  if (!hand) return;
+  const a = handAmp(t);
+  const x = a * (5 * Math.sin(t * 0.9) + 2.4 * Math.sin(t * 2.3 + 1.7) + 0.8 * Math.sin(t * 5.1 + 0.4));
+  const y = a * (4 * Math.sin(t * 0.7 + 2.1) + 2.0 * Math.sin(t * 1.9 + 0.3) + 0.7 * Math.sin(t * 4.7 + 2.9));
+  const r = a * 0.12 * Math.sin(t * 0.55 + 0.8);
+  hand.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) rotate(${r.toFixed(3)}deg)`;
+}
+
+// A whip pan: the picture tears sideways, blurred along the move, and the
+// next shot lands from the other side. `swap` is when the cut happens
+// (call the layers' spans for it); returns that time.
+export function whip(film, rig, at, { dir = 1, dur = 0.42, dist = W * 0.45, spread = 70 } = {}) {
+  const tl = film.tl, half = dur / 2, mid = at + half;
+  tl.set(rig.move, { filter: "url(#whip)" }, at);
+  tl.fromTo(rig.blur, { attr: { stdDeviation: "0 0" } }, { attr: { stdDeviation: `${spread} 0` }, duration: half, ease: "power2.in" }, at);
+  tl.to(rig.blur, { attr: { stdDeviation: "0 0" }, duration: half, ease: "power2.out" }, mid);
+  tl.fromTo(rig.move, { x: 0 }, { x: -dir * dist, duration: half, ease: "power3.in" }, at);
+  tl.fromTo(rig.move, { x: dir * dist }, { x: 0, duration: half, ease: "power3.out", immediateRender: false }, mid);
+  tl.set(rig.move, { filter: "none" }, at + dur);
+  film.fx("whoosh", at, 0.7);
+  return mid;
+}
+
+// A crash zoom: a hard punch in on a point, blurred while it moves, held,
+// then eased back (or kept, with `back: false`)
+export function crash(film, rig, at, { z = 1.18, x = W / 2, y = H / 2, hold = 0.5, back = true, blur = 5 } = {}) {
+  const tl = film.tl;
+  tl.set(rig.move, { transformOrigin: `${x}px ${y}px` }, at);
+  tl.to(rig.move, { scale: z, duration: 0.14, ease: "power4.out" }, at);
+  tl.fromTo(rig.move, { filter: `blur(${blur}px)` }, { filter: "blur(0px)", duration: 0.2, ease: "power2.out", immediateRender: false }, at);
+  if (back) tl.to(rig.move, { scale: 1, duration: 0.7, ease: "power3.inOut" }, at + 0.14 + hold);
+  return at + 0.14;
+}
+
+// An anamorphic flare: a thin streak of light and a soft bloom, sweeping
+// across y from one side to the other
+export function flare(film, parent, at, { y = H / 2, dur = 1.4, from = -0.2, to = 1.2, power = 1 } = {}) {
+  const box = h("div", "flare", parent);
+  const streak = h("div", "streak", box), bloom = h("div", "bloom", box);
+  place(box, 0, y, W, 0);
+  const tl = film.tl;
+  tl.set(box, { visibility: "visible" }, at);
+  tl.fromTo([streak, bloom], { x: W * from }, { x: W * to, duration: dur, ease: "sine.inOut" }, at);
+  tl.fromTo(box, { opacity: 0 }, { opacity: power, duration: dur * 0.3, ease: "power1.out" }, at);
+  tl.to(box, { opacity: 0, duration: dur * 0.4, ease: "power1.in" }, at + dur * 0.6);
+  tl.set(box, { visibility: "hidden" }, at + dur);
+  return box;
 }
 
 // ---- a device showing the app ----
